@@ -1,0 +1,411 @@
+<!DOCTYPE html>
+<html lang="en-us">
+
+<head>
+  <title>Drugs and Memories - The impact of Interaction in Regressions | codex</title>
+
+  <meta charset="UTF-8">
+  <meta name="language" content="en">
+  <meta name="description" content="">
+  <meta name="keywords" content="">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta http-equiv="content-type" content="text/html; charset=utf-8">
+  <meta http-equiv="X-UA-Compatible" content="IE=edge">
+
+  
+  
+
+  <link rel="shortcut icon" type="image/png" href="/favicon.ico" />
+
+  
+  
+    
+ 
+  
+  
+  
+  
+  
+  
+    
+    <link rel="stylesheet" href="/css/post.min.3b28d14676e4769849164baf362f2b0aa069ab25702fef98f0c4227cb68d74cd.css" integrity="sha256-OyjRRnbkdphJFkuvNi8rCqBpqyVwL&#43;&#43;Y8MQifLaNdM0="/>
+  
+    
+    <link rel="stylesheet" href="/css/custom.min.e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855.css" integrity="sha256-47DEQpj8HBSa&#43;/TImW&#43;5JCeuQeRkm5NMpJWZG3hSuFU="/>
+  
+  
+   
+   
+    
+
+<script type="application/ld+json">
+  
+    {
+      "@context" : "http://schema.org",
+      "@type" : "BlogPosting",
+      "mainEntityOfPage": {
+            "@type": "WebPage",
+            "@id": "\/"
+      },
+      "articleSection" : "blog",
+      "name" : "Drugs and Memories - The impact of Interaction in Regressions",
+      "headline" : "Drugs and Memories - The impact of Interaction in Regressions",
+      "description" : "",
+      "inLanguage" : "en-US",
+      "author" : "",
+      "creator" : "",
+      "publisher": "",
+      "accountablePerson" : "",
+      "copyrightHolder" : "",
+      "copyrightYear" : "0001",
+      "datePublished": "0001-01-01 00:00:00 \u002b0000 UTC",
+      "dateModified" : "0001-01-01 00:00:00 \u002b0000 UTC",
+      "url" : "\/blog\/drugs-and-memories\/",
+      "wordCount" : "1918",
+      "keywords" : ["Blog"]
+    }
+  
+  </script>
+</head>
+
+<body>
+  <div class="burger__container">
+  <div class="burger" aria-controls="navigation" aria-label="Menu">
+    <div class="burger__meat burger__meat--1"></div>
+    <div class="burger__meat burger__meat--2"></div>
+    <div class="burger__meat burger__meat--3"></div>
+  </div>
+</div>
+ 
+
+  <nav class="nav" role="navigation">
+  <ul class="nav__list">
+    
+    
+      <li>
+        <a  href="/">about</a>
+      </li>
+    
+      <li>
+        <a  class="active"
+         href="/blog">projects</a>
+      </li>
+    
+  </ul>
+</nav>
+
+
+  <main>
+    
+    
+
+    <div class="flex-wrapper">
+      <div class="post__container">
+        <div class="post">
+          <header class="post__header">
+            <h1 id="post__title">Drugs and Memories - The impact of Interaction in Regressions</h1>
+            <time datetime="0001-01-01 00:00:00 &#43;0000 UTC" class="post__date"
+            > </time>
+          </header>
+          <article class="post__content">
+              
+
+<script src="/rmarkdown-libs/htmlwidgets/htmlwidgets.js"></script>
+<script src="/rmarkdown-libs/plotly-binding/plotly.js"></script>
+<script src="/rmarkdown-libs/typedarray/typedarray.min.js"></script>
+<script src="/rmarkdown-libs/jquery/jquery.min.js"></script>
+<link href="/rmarkdown-libs/crosstalk/css/crosstalk.css" rel="stylesheet" />
+<script src="/rmarkdown-libs/crosstalk/js/crosstalk.min.js"></script>
+<link href="/rmarkdown-libs/plotly-htmlwidgets-css/plotly-htmlwidgets.css" rel="stylesheet" />
+<script src="/rmarkdown-libs/plotly-main/plotly-latest.min.js"></script>
+
+
+<div id="introduction" class="section level3">
+<h3>Introduction</h3>
+<p>This is a simple analysis examining how variables interacting with each other can impact regression performance. The data set has only nine features, out of which there will be further feature selection, thereby making it easy to understand the effects. The data was freely obtained from <a href="https://www.kaggle.com/steveahn/memory-test-on-drugged-islanders-data" class="uri">https://www.kaggle.com/steveahn/memory-test-on-drugged-islanders-data</a>. It describes the results of an experiment which observes the effects of anti-anxiety medicine on memory recall, while simultaneously including the effect of happy and sad memories. Three different drugs were used, along with three different levels of dosage. The results (in seconds) of how long it took to finish a memory test before drug exposure and after being exposed are noted in two separate columns, with the difference between these two noted separately. The difference is the target variable in this case. The age of the participants are also considered. The analysis is focused on being as simple as possible, as the primary goal is examining how results change when the interaction between variables is taken into account. More information regarding the data can be found in the provided link.</p>
+<p>Loading the data and required libraries:</p>
+<pre class="r"><code>#Libraries...
+library(tidyverse)
+library(reshape)
+library(GGally)
+library(rsample)
+library(caret)
+library(plotly)
+
+#Data...
+memory &lt;- read.csv(&quot;Islander-data.csv&quot;)
+
+#A glimpse...
+head(memory)</code></pre>
+<pre><code>##   first_name last_name age Happy_Sad_group Dosage Drug Mem_Score_Before
+## 1    Bastian  Carrasco  25               H      1    A             63.5
+## 2       Evan  Carrasco  52               S      1    A             41.6
+## 3  Florencia  Carrasco  29               H      1    A             59.7
+## 4      Holly  Carrasco  50               S      1    A             51.7
+## 5     Justin  Carrasco  52               H      1    A             47.0
+## 6       Liam  Carrasco  37               S      1    A             66.4
+##   Mem_Score_After Diff
+## 1            61.2 -2.3
+## 2            40.7 -0.9
+## 3            55.1 -4.6
+## 4            51.2 -0.5
+## 5            47.1  0.1
+## 6            58.1 -8.3</code></pre>
+</div>
+<div id="processing-and-exploring" class="section level3">
+<h3>Processing and Exploring</h3>
+<p>Before moving forward, the data needs to be processed slightly to simplify a few things. The columns containing first and last names are removed, as they are not necessarily required for this analysis. Also, Dosage needs to be converted to type factor as this is actually a categorical variable.</p>
+<pre class="r"><code>memory &lt;- memory[, -1:-2] #removing columns with names
+memory[, 3] &lt;- as.factor(memory[, 3]) #converting Dosage to factor</code></pre>
+<p>Firstly, the distributions of the age variable can be visualised to see how spread out the different ages of the participants are. The age distribution is right skewed, with majority of the participants falling between the ages 25 and 40. It is noteworthy that there is only one person who is 24 years old.</p>
+<pre class="r"><code>seqage &lt;- as.vector(memory[, 1]) #create temporary vector for the visual
+
+#age distribution
+ggplotly(ggplot(memory, aes(age)) +
+  geom_histogram(bins = 60, fill = &quot;lightblue&quot;, color = &quot;black&quot;) +
+  scale_x_continuous(breaks = seqage) +
+  scale_y_continuous(breaks = seq(0,20, by = 1)) +
+  theme_classic() +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1))) #Interactive</code></pre>
+<div id="htmlwidget-1" style="width:864px;height:576px;" class="plotly html-widget"></div>
+<script type="application/json" data-for="htmlwidget-1">{"x":{"data":[{"orientation":"v","width":[1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1],"base":[0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],"x":[24,25,26,27,28,29,30,31,32,33,34,35,36,37,38,39,40,41,42,43,44,45,46,47,48,49,50,51,52,53,54,55,56,57,58,59,60,61,62,63,64,65,66,67,68,69,70,71,72,73,74,75,76,77,78,79,80,81,82,83],"y":[1,10,7,9,10,12,5,3,7,7,11,11,4,13,7,4,7,2,4,2,2,3,3,2,4,5,5,6,6,3,4,1,2,0,0,1,1,0,2,2,0,2,1,0,2,1,0,0,1,1,0,0,0,0,0,0,1,0,0,1],"text":["count:  1<br />age: 24","count: 10<br />age: 25","count:  7<br />age: 26","count:  9<br />age: 27","count: 10<br />age: 28","count: 12<br />age: 29","count:  5<br />age: 30","count:  3<br />age: 31","count:  7<br />age: 32","count:  7<br />age: 33","count: 11<br />age: 34","count: 11<br />age: 35","count:  4<br />age: 36","count: 13<br />age: 37","count:  7<br />age: 38","count:  4<br />age: 39","count:  7<br />age: 40","count:  2<br />age: 41","count:  4<br />age: 42","count:  2<br />age: 43","count:  2<br />age: 44","count:  3<br />age: 45","count:  3<br />age: 46","count:  2<br />age: 47","count:  4<br />age: 48","count:  5<br />age: 49","count:  5<br />age: 50","count:  6<br />age: 51","count:  6<br />age: 52","count:  3<br />age: 53","count:  4<br />age: 54","count:  1<br />age: 55","count:  2<br />age: 56","count:  0<br />age: 57","count:  0<br />age: 58","count:  1<br />age: 59","count:  1<br />age: 60","count:  0<br />age: 61","count:  2<br />age: 62","count:  2<br />age: 63","count:  0<br />age: 64","count:  2<br />age: 65","count:  1<br />age: 66","count:  0<br />age: 67","count:  2<br />age: 68","count:  1<br />age: 69","count:  0<br />age: 70","count:  0<br />age: 71","count:  1<br />age: 72","count:  1<br />age: 73","count:  0<br />age: 74","count:  0<br />age: 75","count:  0<br />age: 76","count:  0<br />age: 77","count:  0<br />age: 78","count:  0<br />age: 79","count:  1<br />age: 80","count:  0<br />age: 81","count:  0<br />age: 82","count:  1<br />age: 83"],"type":"bar","marker":{"autocolorscale":false,"color":"rgba(173,216,230,1)","line":{"width":1.88976377952756,"color":"rgba(0,0,0,1)"}},"showlegend":false,"xaxis":"x","yaxis":"y","hoverinfo":"text","frame":null}],"layout":{"margin":{"t":26.958904109589,"r":7.30593607305936,"b":40.9132420091324,"l":37.2602739726027},"plot_bgcolor":"rgba(255,255,255,1)","paper_bgcolor":"rgba(255,255,255,1)","font":{"color":"rgba(0,0,0,1)","family":"","size":14.6118721461187},"xaxis":{"domain":[0,1],"automargin":true,"type":"linear","autorange":false,"range":[20.5,86.5],"tickmode":"array","ticktext":["25","52","29","50","52","37","35","38","29","36","63","27","39","26","26","48","51","26","44","53","55","31","50","62","25","40","35","38","28","36","53","29","39","35","68","38","50","25","29","35","26","51","56","35","28","54","51","36","35","52","47","43","30","32","53","68","27","49","35","47","34","34","27","39","40","34","37","26","29","56","28","51","52","41","37","45","42","52","72","29","26","33","40","28","40","33","27","30","33","28","46","37","27","35","27","33","30","50","40","48","34","32","42","37","29","28","59","51","37","31","38","35","37","34","34","49","35","25","29","29","27","44","25","66","36","33","37","45","28","38","43","45","27","37","27","28","30","62","54","29","34","26","65","37","48","32","29","25","37","29","37","31","40","46","46","60","49","83","49","25","24","54","25","42","42","25","65","48","35","69","38","37","32","49","30","25","50","38","33","28","32","80","63","34","51","34","28","32","73","34","34","33","39","52","41","54","40","32"],"tickvals":[25,52,29,50,52,37,35,38,29,36,63,27,39,26,26,48,51,26,44,53,55,31,50,62,25,40,35,38,28,36,53,29,39,35,68,38,50,25,29,35,26,51,56,35,28,54,51,36,35,52,47,43,30,32,53,68,27,49,35,47,34,34,27,39,40,34,37,26,29,56,28,51,52,41,37,45,42,52,72,29,26,33,40,28,40,33,27,30,33,28,46,37,27,35,27,33,30,50,40,48,34,32,42,37,29,28,59,51,37,31,38,35,37,34,34,49,35,25,29,29,27,44,25,66,36,33,37,45,28,38,43,45,27,37,27,28,30,62,54,29,34,26,65,37,48,32,29,25,37,29,37,31,40,46,46,60,49,83,49,25,24,54,25,42,42,25,65,48,35,69,38,37,32,49,30,25,50,38,33,28,32,80,63,34,51,34,28,32,73,34,34,33,39,52,41,54,40,32],"categoryorder":"array","categoryarray":["25","52","29","50","52","37","35","38","29","36","63","27","39","26","26","48","51","26","44","53","55","31","50","62","25","40","35","38","28","36","53","29","39","35","68","38","50","25","29","35","26","51","56","35","28","54","51","36","35","52","47","43","30","32","53","68","27","49","35","47","34","34","27","39","40","34","37","26","29","56","28","51","52","41","37","45","42","52","72","29","26","33","40","28","40","33","27","30","33","28","46","37","27","35","27","33","30","50","40","48","34","32","42","37","29","28","59","51","37","31","38","35","37","34","34","49","35","25","29","29","27","44","25","66","36","33","37","45","28","38","43","45","27","37","27","28","30","62","54","29","34","26","65","37","48","32","29","25","37","29","37","31","40","46","46","60","49","83","49","25","24","54","25","42","42","25","65","48","35","69","38","37","32","49","30","25","50","38","33","28","32","80","63","34","51","34","28","32","73","34","34","33","39","52","41","54","40","32"],"nticks":null,"ticks":"outside","tickcolor":"rgba(51,51,51,1)","ticklen":3.65296803652968,"tickwidth":0.66417600664176,"showticklabels":true,"tickfont":{"color":"rgba(77,77,77,1)","family":"","size":11.689497716895},"tickangle":-45,"showline":true,"linecolor":"rgba(0,0,0,1)","linewidth":0.66417600664176,"showgrid":false,"gridcolor":null,"gridwidth":0,"zeroline":false,"anchor":"y","title":{"text":"age","font":{"color":"rgba(0,0,0,1)","family":"","size":14.6118721461187}},"hoverformat":".2f"},"yaxis":{"domain":[0,1],"automargin":true,"type":"linear","autorange":false,"range":[-0.65,13.65],"tickmode":"array","ticktext":["0","1","2","3","4","5","6","7","8","9","10","11","12","13"],"tickvals":[0,1,2,3,4,5,6,7,8,9,10,11,12,13],"categoryorder":"array","categoryarray":["0","1","2","3","4","5","6","7","8","9","10","11","12","13"],"nticks":null,"ticks":"outside","tickcolor":"rgba(51,51,51,1)","ticklen":3.65296803652968,"tickwidth":0.66417600664176,"showticklabels":true,"tickfont":{"color":"rgba(77,77,77,1)","family":"","size":11.689497716895},"tickangle":-0,"showline":true,"linecolor":"rgba(0,0,0,1)","linewidth":0.66417600664176,"showgrid":false,"gridcolor":null,"gridwidth":0,"zeroline":false,"anchor":"x","title":{"text":"count","font":{"color":"rgba(0,0,0,1)","family":"","size":14.6118721461187}},"hoverformat":".2f"},"shapes":[{"type":"rect","fillcolor":null,"line":{"color":null,"width":0,"linetype":[]},"yref":"paper","xref":"paper","x0":0,"x1":1,"y0":0,"y1":1}],"showlegend":false,"legend":{"bgcolor":"rgba(255,255,255,1)","bordercolor":"transparent","borderwidth":1.88976377952756,"font":{"color":"rgba(0,0,0,1)","family":"","size":11.689497716895}},"hovermode":"closest","barmode":"relative"},"config":{"doubleClick":"reset","showSendToCloud":false},"source":"A","attrs":{"dc441014ad6":{"x":{},"type":"bar"}},"cur_data":"dc441014ad6","visdat":{"dc441014ad6":["function (y) ","x"]},"highlight":{"on":"plotly_click","persistent":false,"dynamic":false,"selectize":false,"opacityDim":0.2,"selected":{"opacity":1},"debounce":0},"shinyEvents":["plotly_hover","plotly_click","plotly_selected","plotly_relayout","plotly_brushed","plotly_brushing","plotly_clickannotation","plotly_doubleclick","plotly_deselect","plotly_afterplot","plotly_sunburstclick"],"base_url":"https://plot.ly"},"evals":[],"jsHooks":[]}</script>
+<pre class="r"><code>rm(seqage) #removing the temporary vector</code></pre>
+<p>The distributions of the memory score variables can also be examined. It is interesting to see that the boxplots for the before and after memory scores are almost exactly the same. This indicates that the differences are only in the margin of a few seconds, which can be visualised by the distribution of the Diff variable.</p>
+<pre class="r"><code>mem_melt &lt;- melt(memory[, 5:7]) #temporary dataframe for the visual
+
+#memory scores distributions
+ggplotly(ggplot(mem_melt, aes(variable, value, fill = variable)) +
+  geom_boxplot() +
+  theme_minimal())</code></pre>
+<div id="htmlwidget-2" style="width:864px;height:576px;" class="plotly html-widget"></div>
+<script type="application/json" data-for="htmlwidget-2">{"x":{"data":[{"x":[1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1],"y":[63.5,41.6,59.7,51.7,47,66.4,44.1,76.3,56.2,54.8,90,52.3,35.5,85.6,42.3,53.5,48.3,64,74.3,45,52.1,79.9,55.7,46.5,48.5,47,75,90,43.9,74.9,74.5,58.9,36.4,58.8,59.9,40.2,74.2,50,84.4,40.8,87,46.5,64.4,90,60.9,46.4,55.2,61.8,65,28.3,41.9,49.4,43.6,71.7,54.8,41.9,81,46.7,31.7,65.6,57.3,72.6,54,61.6,59.8,64.1,53.3,75,90,49.2,54.5,49.3,66.2,56.2,46.9,45.8,41,65.1,76.2,39.6,48.3,42.5,56.9,74,63.3,53,44.1,59.6,46.7,36,54.8,63.5,54.1,46,67,86.3,48.7,76.8,30.7,48.3,61.4,51.5,46.2,41,38.5,79.7,56.3,85.5,76.3,84.5,69.2,56.6,44,45,83.4,62.8,42.3,44.1,40.5,55.9,89.6,53.6,74.5,90,61.4,36.3,47.8,56.9,69.7,88.7,49.3,81.9,40,46.9,51.4,50.5,50,96,62.3,48.6,49,48.3,50.9,47.7,45.3,72.9,40.7,59.5,70.5,27.2,64.2,58.6,56.3,47.2,82.4,76.1,53.9,44.2,100,78.8,57.1,55.2,54.6,52.7,48.2,41.5,70.9,30.1,33.4,46.6,43.4,44.5,77.8,42.7,53.8,57.6,44,44.9,52.5,49.7,59.6,58.4,67.2,54.6,72.1,59.6,60.2,74.4,110,90,68.8,39.8,50.8,71.3,72.5,30.8,53.6,43.1],"hoverinfo":"y","type":"box","fillcolor":"rgba(248,118,109,1)","marker":{"opacity":null,"outliercolor":"rgba(0,0,0,1)","line":{"width":1.88976377952756,"color":"rgba(0,0,0,1)"},"size":5.66929133858268},"line":{"color":"rgba(51,51,51,1)","width":1.88976377952756},"name":"Mem_Score_Before","legendgroup":"Mem_Score_Before","showlegend":true,"xaxis":"x","yaxis":"y","frame":null},{"x":[2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2],"y":[61.2,40.7,55.1,51.2,47.1,58.1,56,74.8,45,75.9,102,63.7,40.7,84.3,32.8,56.3,44.6,72.5,65.4,49.2,44.2,73.3,52.7,46.1,54,55.5,82.9,108,46.8,70.8,79.6,56.3,50.9,50.8,65.6,44.5,88.1,49.4,96,63,102,50.8,48.1,108,64.9,66.6,74.3,87.4,114,44,55.6,69.2,63,90,88.2,67.4,120,59.7,53.4,86.4,96,77.2,60,88.5,79.7,90,75.2,73.3,90,64.2,53.6,56.7,61.4,59,48.5,50.9,44.1,61.5,81.4,41.7,47.6,45.6,59.2,90,62.9,52.1,49.4,56.8,46,35.8,65.4,65.2,59.5,43.2,70.9,79.6,52.9,78.5,27.1,47,66.4,50.2,41.3,47,41.9,88.9,56.6,83.6,74.8,44.1,65.8,53.4,38.2,46.2,67.4,54.1,28.9,41.5,33.4,60.8,89.9,48.3,75.2,80.4,57.5,40.3,49.3,58.9,71.9,96,52.7,80.6,42.2,46.9,51.4,56.8,42.2,102,66.8,50.4,40.5,44.1,41.8,37.9,41.1,74,39,61.5,65.8,37.8,57.3,52.7,56.8,49.2,83.1,73.1,49,44.5,96,84.5,53.7,51.7,54.6,53.3,55.1,46.8,67.8,30.5,57.5,52.1,47.4,47.7,72.2,48.1,45.6,60.6,40.6,48.3,60.3,41.3,56.1,63.6,64.9,59.2,74.3,44.9,55.7,82.9,87.8,82.6,77.4,44.3,30.4,74.3,70.4,33.1,53.8,42.1],"hoverinfo":"y","type":"box","fillcolor":"rgba(0,186,56,1)","marker":{"opacity":null,"outliercolor":"rgba(0,0,0,1)","line":{"width":1.88976377952756,"color":"rgba(0,0,0,1)"},"size":5.66929133858268},"line":{"color":"rgba(51,51,51,1)","width":1.88976377952756},"name":"Mem_Score_After","legendgroup":"Mem_Score_After","showlegend":true,"xaxis":"x","yaxis":"y","frame":null},{"x":[3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3],"y":[-2.3,-0.9,-4.6,-0.5,0.1,-8.3,11.9,-1.5,-11.2,21.1,12,11.4,5.2,-1.3,-9.5,2.8,-3.7,8.5,-8.9,4.2,-7.9,-6.6,-3,-0.4,5.5,8.5,7.9,18,2.9,-4.1,5.1,-2.6,14.5,-8,5.7,4.3,13.9,-0.6,11.6,22.2,15,4.3,-16.3,18,4,20.2,19.1,25.6,49,15.7,13.7,19.8,19.4,18.3,33.4,25.5,39,13,21.7,20.8,38.7,4.6,6,26.9,19.9,25.9,21.9,-1.7,0,15,-0.9,7.4,-4.8,2.8,1.6,5.1,3.1,-3.6,5.2,2.1,-0.7,3.1,2.3,16,-0.4,-0.9,5.3,-2.8,-0.7,-0.2,10.6,1.7,5.4,-2.8,3.9,-6.7,4.2,1.7,-3.6,-1.3,5,-1.3,-4.9,6,3.4,9.2,0.3,-1.9,-1.5,-40.4,-3.4,-3.2,-5.8,1.2,-16,-8.7,-13.4,-2.6,-7.1,4.9,0.3,-5.3,0.7,-9.6,-3.9,4,1.5,2,2.2,7.3,3.4,-1.3,2.2,0,0,6.3,-7.8,6,4.5,1.8,-8.5,-4.2,-9.1,-9.8,-4.2,1.1,-1.7,2,-4.7,10.6,-6.9,-5.9,0.5,2,0.7,-3,-4.9,0.3,-4,5.7,-3.4,-3.5,0,0.6,6.9,5.3,-3.1,0.4,24.1,5.5,4,3.2,-5.6,5.4,-8.2,3,-3.4,3.4,7.8,-8.4,-3.5,5.2,-2.3,4.6,2.2,-14.7,-4.5,8.5,-22.2,-7.4,8.6,4.5,-20.4,3,-2.1,2.3,0.2,-1],"hoverinfo":"y","type":"box","fillcolor":"rgba(97,156,255,1)","marker":{"opacity":null,"outliercolor":"rgba(0,0,0,1)","line":{"width":1.88976377952756,"color":"rgba(0,0,0,1)"},"size":5.66929133858268},"line":{"color":"rgba(51,51,51,1)","width":1.88976377952756},"name":"Diff","legendgroup":"Diff","showlegend":true,"xaxis":"x","yaxis":"y","frame":null}],"layout":{"margin":{"t":26.958904109589,"r":7.30593607305936,"b":40.9132420091324,"l":43.1050228310502},"font":{"color":"rgba(0,0,0,1)","family":"","size":14.6118721461187},"xaxis":{"domain":[0,1],"automargin":true,"type":"linear","autorange":false,"range":[0.4,3.6],"tickmode":"array","ticktext":["Mem_Score_Before","Mem_Score_After","Diff"],"tickvals":[1,2,3],"categoryorder":"array","categoryarray":["Mem_Score_Before","Mem_Score_After","Diff"],"nticks":null,"ticks":"","tickcolor":null,"ticklen":3.65296803652968,"tickwidth":0,"showticklabels":true,"tickfont":{"color":"rgba(77,77,77,1)","family":"","size":11.689497716895},"tickangle":-0,"showline":false,"linecolor":null,"linewidth":0,"showgrid":true,"gridcolor":"rgba(235,235,235,1)","gridwidth":0.66417600664176,"zeroline":false,"anchor":"y","title":{"text":"variable","font":{"color":"rgba(0,0,0,1)","family":"","size":14.6118721461187}},"hoverformat":".2f"},"yaxis":{"domain":[0,1],"automargin":true,"type":"linear","autorange":false,"range":[-48.42,128.02],"tickmode":"array","ticktext":["0","50","100"],"tickvals":[0,50,100],"categoryorder":"array","categoryarray":["0","50","100"],"nticks":null,"ticks":"","tickcolor":null,"ticklen":3.65296803652968,"tickwidth":0,"showticklabels":true,"tickfont":{"color":"rgba(77,77,77,1)","family":"","size":11.689497716895},"tickangle":-0,"showline":false,"linecolor":null,"linewidth":0,"showgrid":true,"gridcolor":"rgba(235,235,235,1)","gridwidth":0.66417600664176,"zeroline":false,"anchor":"x","title":{"text":"value","font":{"color":"rgba(0,0,0,1)","family":"","size":14.6118721461187}},"hoverformat":".2f"},"shapes":[{"type":"rect","fillcolor":null,"line":{"color":null,"width":0,"linetype":[]},"yref":"paper","xref":"paper","x0":0,"x1":1,"y0":0,"y1":1}],"showlegend":true,"legend":{"bgcolor":null,"bordercolor":null,"borderwidth":0,"font":{"color":"rgba(0,0,0,1)","family":"","size":11.689497716895},"y":0.972933070866142},"annotations":[{"text":"variable","x":1.02,"y":1,"showarrow":false,"ax":0,"ay":0,"font":{"color":"rgba(0,0,0,1)","family":"","size":14.6118721461187},"xref":"paper","yref":"paper","textangle":-0,"xanchor":"left","yanchor":"bottom","legendTitle":true}],"hovermode":"closest","barmode":"relative"},"config":{"doubleClick":"reset","showSendToCloud":false},"source":"A","attrs":{"dc47d104fca":{"x":{},"y":{},"fill":{},"type":"box"}},"cur_data":"dc47d104fca","visdat":{"dc47d104fca":["function (y) ","x"]},"highlight":{"on":"plotly_click","persistent":false,"dynamic":false,"selectize":false,"opacityDim":0.2,"selected":{"opacity":1},"debounce":0},"shinyEvents":["plotly_hover","plotly_click","plotly_selected","plotly_relayout","plotly_brushed","plotly_brushing","plotly_clickannotation","plotly_doubleclick","plotly_deselect","plotly_afterplot","plotly_sunburstclick"],"base_url":"https://plot.ly"},"evals":[],"jsHooks":[]}</script>
+<pre class="r"><code>rm(mem_melt) #removing temporary data frame</code></pre>
+<p>To further examine the variables, the relationship between the age variables and the memory scores are plotted below. Firstly, the skewness in the score variables is fairly negligible. There is also a high correlation between the before and after scores, but perhaps that is because the difference between them is only marginal. These variables will not be used in the modelling process anyway. Apart from that, there is very little correlation seen between age and the scores, implying that perhaps age does not have much of an impact on memory recall in this specific experiment.</p>
+<pre class="r"><code>mem_num &lt;- memory[, c(1, 5:7)] #temporary data frame of age and scores
+
+ggpairs(mem_num) + theme_minimal()</code></pre>
+<p><img src="/blog/Drugs-and-Memories_files/figure-html/unnamed-chunk-5-1.png" width="864" /></p>
+<pre class="r"><code>rm(mem_num) #remove temporary dataframe</code></pre>
+<p>A quick glimpse at the proportions of the categorical variables (Drugs, Dosage, Happy_Sad_group) can provide insights into how balanced the data is.</p>
+<pre class="r"><code>prop.table(table(memory[,2])) * 100 #happy / sad memory primer</code></pre>
+<pre><code>## 
+##  H  S 
+## 50 50</code></pre>
+<pre class="r"><code>prop.table(table(memory[,3])) * 100 #dosage levels</code></pre>
+<pre><code>## 
+##        1        2        3 
+## 33.83838 33.33333 32.82828</code></pre>
+<pre class="r"><code>prop.table(table(memory[,4])) * 100 #drugs</code></pre>
+<pre><code>## 
+##        A        S        T 
+## 33.83838 33.33333 32.82828</code></pre>
+<p>It can be seen that the categorical variables are all almost equally proportional, indicating that the data in this regard is very well balanced. Moving on to the main aspect of this analysis, the interactions between the aforementioned variables needs to be observed. Acknowledging the presence of interactions amongst variables is important in statistical analysis as when they are not accounted for, the modelling results will be inaccurate since the model is unable to capture the specific relationship between the variables. To check for interactions, interaction plots are developed to identify any relationships between the three categorical variables.</p>
+<pre class="r"><code>interaction.plot(memory$Drug, memory$Dosage, memory$Diff, 
+                 xlab = &quot;Drug&quot;, ylab = &quot;Mean of Diff&quot;,trace.label = &quot;Dosage&quot;) #Drug-Dosage</code></pre>
+<p><img src="/blog/Drugs-and-Memories_files/figure-html/unnamed-chunk-7-1.png" width="864" /></p>
+<pre class="r"><code>interaction.plot(memory$Dosage, memory$Happy_Sad_group, memory$Diff,
+                 xlab = &quot;Dosage&quot;, ylab = &quot;Mean of Diff&quot;,trace.label = &quot;Happy_Sad&quot;) #Dosage - Happy_Sad</code></pre>
+<p><img src="/blog/Drugs-and-Memories_files/figure-html/unnamed-chunk-7-2.png" width="864" /></p>
+<pre class="r"><code>interaction.plot(memory$Drug, memory$Happy_Sad_group, memory$Diff, 
+                 xlab = &quot;Drug&quot;, ylab = &quot;Mean of Diff&quot;,trace.label = &quot;Happy_Sad&quot;) #Drug - Happy_Sad</code></pre>
+<p><img src="/blog/Drugs-and-Memories_files/figure-html/unnamed-chunk-7-3.png" width="864" /></p>
+<p>From the plots above, interaction is observed between the Drug and Dosage variables. This needs to be accounted for in the modelling process to provide accurate results. Before moving to the modelling stage, the before and after scores are removed as these are not necessary for the analysis and are already accounted for in the Diff variable.</p>
+<pre class="r"><code>memory &lt;- memory[,-5:-6] #remove before and after scores as accounted for in diff</code></pre>
+</div>
+<div id="modelling" class="section level3">
+<h3>Modelling</h3>
+<p>The modelling phase begins with partitioning the data into a 70/30 train-test split. The resampling method is also defined as 10-fold repeated cross validation.</p>
+<pre class="r"><code>set.seed(1234)
+split &lt;- initial_split(memory, prop = 0.7)
+train &lt;- training(split)
+test &lt;- testing(split)
+
+cv &lt;- trainControl(method = &quot;repeatedcv&quot;, number = 10, repeats = 5) #10-fold repeated cross validation</code></pre>
+<p>To provide a benchmark, a simple Linear Model is used, without accounting for the interaction effects, to see how the model initially performs.</p>
+<pre class="r"><code>set.seed(1234)
+memory_LM &lt;- train(Diff ~ .,
+                   data = train,
+                   method = &quot;lm&quot;,
+                   trControl = cv)
+
+memory_LM</code></pre>
+<pre><code>## Linear Regression 
+## 
+## 139 samples
+##   4 predictor
+## 
+## No pre-processing
+## Resampling: Cross-Validated (10 fold, repeated 5 times) 
+## Summary of sample sizes: 124, 126, 125, 125, 126, 125, ... 
+## Resampling results:
+## 
+##   RMSE     Rsquared   MAE     
+##   8.86716  0.2618596  6.757937
+## 
+## Tuning parameter &#39;intercept&#39; was held constant at a value of TRUE</code></pre>
+<p>The simple linear model produces an R-squared which is not particularly impressive. To test if a more advanced model is able to do better, the Bagging method is used, implementing several decision trees and aggregating their results. It basically implements an ensemble approach. It may seem overkill for the purpose of this analysis, but this is only to compare how much a highly advanced model can improve performance.</p>
+<pre class="r"><code>set.seed(1234)
+memory_bagg &lt;- train(
+  Diff ~ .,
+  data = train,
+  method = &quot;treebag&quot;,
+  trControl = cv,
+  nbagg = 100
+)
+
+memory_bagg</code></pre>
+<pre><code>## Bagged CART 
+## 
+## 139 samples
+##   4 predictor
+## 
+## No pre-processing
+## Resampling: Cross-Validated (10 fold, repeated 5 times) 
+## Summary of sample sizes: 124, 126, 125, 125, 126, 125, ... 
+## Resampling results:
+## 
+##   RMSE      Rsquared   MAE     
+##   7.972879  0.3763765  5.800715</code></pre>
+<p>The R-squared for the Bagged model is much better, but it is still a bit unimpressive. In the next iteration, the interaction effect will be accounted for by adding "Drug*Dosage" to the list of independent variables. This is demonstrated below by the simple LM model.</p>
+<pre class="r"><code>set.seed(1234)
+memory_LM_inter &lt;- train(Diff ~ Drug+Dosage+Happy_Sad_group+Drug*Dosage,
+                   data = train,
+                   method = &quot;lm&quot;,
+                   trControl = cv)
+
+memory_LM_inter</code></pre>
+<pre><code>## Linear Regression 
+## 
+## 139 samples
+##   3 predictor
+## 
+## No pre-processing
+## Resampling: Cross-Validated (10 fold, repeated 5 times) 
+## Summary of sample sizes: 124, 126, 125, 125, 126, 125, ... 
+## Resampling results:
+## 
+##   RMSE      Rsquared  MAE     
+##   7.745279  0.402875  5.682905
+## 
+## Tuning parameter &#39;intercept&#39; was held constant at a value of TRUE</code></pre>
+<p>An improvement in the R-squared value as compared to the previous LM implementation is observed. The RMSE has also slightly lowered. These metrics indicate that the model is now performing much better compared to its original iteration, when accounting for interaction. The same is done for the bagged model.</p>
+<pre class="r"><code>set.seed(1234)
+memory_bagg_inter &lt;- train(
+  Diff ~ Drug+Dosage+Happy_Sad_group+Drug*Dosage,
+  data = train,
+  method = &quot;treebag&quot;,
+  trControl = cv,
+  nbagg = 100
+)
+
+memory_bagg_inter</code></pre>
+<pre><code>## Bagged CART 
+## 
+## 139 samples
+##   3 predictor
+## 
+## No pre-processing
+## Resampling: Cross-Validated (10 fold, repeated 5 times) 
+## Summary of sample sizes: 124, 126, 125, 125, 126, 125, ... 
+## Resampling results:
+## 
+##   RMSE      Rsquared   MAE     
+##   7.643842  0.4152214  5.564111</code></pre>
+<p>An improvement from the previous Bagged iteration is seen here as well. These results clearly indicate that incorporating the interaction effect improves the explaining power of the model significantly, thereby increasing the validity of the modelling results. As an additional check, the predictive power on the test set can be checked for these models to identify any bias and variance issues.</p>
+<pre class="r"><code>LM_predict_inter &lt;- predict(memory_LM_inter, test)
+Bagg_predict_inter &lt;- predict(memory_bagg_inter, test)
+
+postResample(LM_predict_inter, test$Diff)</code></pre>
+<pre><code>##      RMSE  Rsquared       MAE 
+## 8.7386036 0.4959643 6.4912207</code></pre>
+<pre class="r"><code>postResample(Bagg_predict_inter, test$Diff)</code></pre>
+<pre><code>##     RMSE Rsquared      MAE 
+## 8.980167 0.462956 6.761733</code></pre>
+<p>While the R-squares have improved even further, the RMSE values have marginally increased, indicating some issues with variance for the models. However, the overall objective of this analysis has been completed, which was highlighting the magnitude of the impact interaction effects have upon model performance.</p>
+</div>
+<div id="conclusion" class="section level3">
+<h3>Conclusion</h3>
+<p>The above results have clearly indicated that accounting for interaction is essential in the regression process, as their influence can significantly impact how the model performs. While it may have been slightly intuitive that the drugs and their dosage are related with each other, it is still worthwhile to check for interactions if the model is performing unexpectedly poorly, or there is a suspicion about interactions based on an understanding of the data. The above results can then be further improved with more thorough modelling techniques. An example can be assessing the importance of the features. The feature importance plot according to the first LM model is shown below as an example.</p>
+<pre class="r"><code>library(vip)
+vip(memory_LM)</code></pre>
+<p><img src="/blog/Drugs-and-Memories_files/figure-html/unnamed-chunk-15-1.png" width="864" /></p>
+<p>Applying dummy encodings to the categorical variables and then selecting only the most important features can help further improve the overall model performance.</p>
+</div>
+
+
+              
+          </article>
+          
+
+ <div class="pagination">
+  
+    <a class="pagination__item" href="/blog/whr-2019/">
+        <span class="pagination__label">Previous Post</span>
+        <span class="pagination__title">Visualizing Happiness - World Happiness Report 2019</span>
+    </a>
+  
+
+  
+</div>
+
+          
+          <footer class="post__footer">
+            
+
+
+<div class="social-icons">
+  
+     
+    
+  
+     
+    
+  
+     
+    
+  
+     
+    
+  
+     
+    
+  
+     
+    
+  
+     
+    
+  
+     
+    
+     
+</div>
+
+            <p>© 2020 fazi_rda</p>
+          </footer>
+          </div>
+      </div>
+      
+    </div>
+    
+
+  </main>
+
+   
+
+  
+  <script src="/js/index.min.49e4d8a384357d9b445b87371863419937ede9fa77737522ffb633073aebfa44.js" integrity="sha256-SeTYo4Q1fZtEW4c3GGNBmTft6fp3c3Ui/7YzBzrr&#43;kQ=" crossorigin="anonymous"></script>
+  
+  
+  <script src="https://unpkg.com/prismjs@1.20.0/components/prism-core.min.js"></script>
+
+  
+  <script src="https://unpkg.com/prismjs@1.20.0/plugins/autoloader/prism-autoloader.min.js"
+    data-autoloader-path="https://unpkg.com/prismjs@1.20.0/components/"></script>
+
+  
+
+
+</body>
+
+</html>

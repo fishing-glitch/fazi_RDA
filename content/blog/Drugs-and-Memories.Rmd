@@ -1,0 +1,192 @@
+---
+title: "Drugs and Memories - The impact of Interaction in Regressions"
+output: html_notebook
+---
+
+### Introduction
+
+This is a simple analysis examining how variables interacting with each other can impact regression performance. The data set has only nine features, out of which there will be further feature selection, thereby making it easy to understand the effects. The data was freely obtained from https://www.kaggle.com/steveahn/memory-test-on-drugged-islanders-data. It describes the results of an experiment which observes the effects of anti-anxiety medicine on memory recall, while simultaneously including the effect of happy and sad memories. Three different drugs were used, along with three different levels of dosage. The results (in seconds) of how long it took to finish a memory test before drug exposure and after being exposed are noted in two separate columns, with the difference between these two noted separately. The difference is the target variable in this case. The age of the participants are also considered. The analysis is focused on being as simple as possible, as the primary goal is examining how results change when the interaction between variables is taken into account. More information regarding the data can be found in the provided link. 
+
+Loading the data and required libraries:
+
+```{r message=FALSE, warning=FALSE}
+#Libraries...
+library(tidyverse)
+library(reshape)
+library(GGally)
+library(rsample)
+library(caret)
+library(plotly)
+
+#Data...
+memory <- read.csv("Islander-data.csv")
+
+#A glimpse...
+head(memory)
+```
+
+
+### Processing and Exploring
+
+Before moving forward, the data needs to be processed slightly to simplify a few things. The columns containing first and last names are removed, as they are not necessarily required for this analysis. Also, Dosage needs to be converted to type factor as this is actually a categorical variable. 
+
+```{r message=FALSE, warning=FALSE}
+memory <- memory[, -1:-2] #removing columns with names
+memory[, 3] <- as.factor(memory[, 3]) #converting Dosage to factor
+```
+
+Firstly, the distributions of the age variable can be visualised to see how spread out the different ages of the participants are. The age distribution is right skewed, with majority of the participants falling between the ages 25 and 40. It is noteworthy that there is only one person who is 24 years old. 
+
+```{r message=FALSE, warning=FALSE, fig.width=9, fig.height=6}
+seqage <- as.vector(memory[, 1]) #create temporary vector for the visual
+
+#age distribution
+ggplotly(ggplot(memory, aes(age)) +
+  geom_histogram(bins = 60, fill = "lightblue", color = "black") +
+  scale_x_continuous(breaks = seqage) +
+  scale_y_continuous(breaks = seq(0,20, by = 1)) +
+  theme_classic() +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1))) #Interactive
+
+rm(seqage) #removing the temporary vector
+```
+
+The distributions of the memory score variables can also be examined. It is interesting to see that the boxplots for the before and after memory scores are almost exactly the same. This indicates that the differences are only in the margin of a few seconds, which can be visualised by the distribution of the Diff variable. 
+
+```{r message=FALSE, warning=FALSE, fig.width=9, fig.height=6}
+mem_melt <- melt(memory[, 5:7]) #temporary dataframe for the visual
+
+#memory scores distributions
+ggplotly(ggplot(mem_melt, aes(variable, value, fill = variable)) +
+  geom_boxplot() +
+  theme_minimal())
+
+rm(mem_melt) #removing temporary data frame
+```
+
+To further examine the variables, the relationship between the age variables and the memory scores are plotted below. Firstly, the skewness in the score variables is fairly negligible. There is also a high correlation between the before and after scores, but perhaps that is because the difference between them is only marginal. These variables will not be used in the modelling process anyway. Apart from that, there is very little correlation seen between age and the scores, implying that perhaps age does not have much of an impact on memory recall in this specific experiment. 
+
+```{r message=FALSE, warning=FALSE, fig.width=9, fig.height=6}
+mem_num <- memory[, c(1, 5:7)] #temporary data frame of age and scores
+
+ggpairs(mem_num) + theme_minimal()
+
+rm(mem_num) #remove temporary dataframe
+```
+
+A quick glimpse at the proportions of the categorical variables (Drugs, Dosage, Happy_Sad_group) can provide insights into how balanced the data is.
+
+```{r message=FALSE, warning=FALSE, fig.width=9, fig.height=6}
+prop.table(table(memory[,2])) * 100 #happy / sad memory primer
+prop.table(table(memory[,3])) * 100 #dosage levels
+prop.table(table(memory[,4])) * 100 #drugs
+```
+
+It can be seen that the categorical variables are all almost equally proportional, indicating that the data in this regard is very well balanced. Moving on to the main aspect of this analysis, the interactions between the aforementioned variables needs to be observed. Acknowledging the presence of interactions amongst variables is important in statistical analysis as when they are not accounted for, the modelling results will be inaccurate since the model is unable to capture the specific relationship between the variables. To check for interactions, interaction plots are developed to identify any relationships between the three categorical variables. 
+
+```{r message=FALSE, warning=FALSE, fig.width=9, fig.height=6}
+interaction.plot(memory$Drug, memory$Dosage, memory$Diff, 
+                 xlab = "Drug", ylab = "Mean of Diff",trace.label = "Dosage") #Drug-Dosage
+interaction.plot(memory$Dosage, memory$Happy_Sad_group, memory$Diff,
+                 xlab = "Dosage", ylab = "Mean of Diff",trace.label = "Happy_Sad") #Dosage - Happy_Sad
+interaction.plot(memory$Drug, memory$Happy_Sad_group, memory$Diff, 
+                 xlab = "Drug", ylab = "Mean of Diff",trace.label = "Happy_Sad") #Drug - Happy_Sad
+```
+
+From the plots above, interaction is observed between the Drug and Dosage variables. This needs to be accounted for in the modelling process to provide accurate results. Before moving to the modelling stage, the before and after scores are removed as these are not necessary for the analysis and are already accounted for in the Diff variable. 
+```{r, message=FALSE, warning=FALSE}
+memory <- memory[,-5:-6] #remove before and after scores as accounted for in diff
+```
+
+### Modelling
+
+The modelling phase begins with partitioning the data into a 70/30 train-test split. The resampling method is also defined as 10-fold repeated cross validation. 
+
+```{r message=FALSE, warning=FALSE, fig.width=9, fig.height=6}
+set.seed(1234)
+split <- initial_split(memory, prop = 0.7)
+train <- training(split)
+test <- testing(split)
+
+cv <- trainControl(method = "repeatedcv", number = 10, repeats = 5) #10-fold repeated cross validation
+```
+
+To provide a benchmark, a simple Linear Model is used, without accounting for the interaction effects, to see how the model initially performs. 
+
+```{r message=FALSE, warning=FALSE, fig.width=9, fig.height=6}
+set.seed(1234)
+memory_LM <- train(Diff ~ .,
+                   data = train,
+                   method = "lm",
+                   trControl = cv)
+
+memory_LM
+```
+
+The simple linear model produces an R-squared which is not particularly impressive. To test if a more advanced model is able to do better, the Bagging method is used, implementing several decision trees and aggregating their results. It basically implements an ensemble approach. It may seem overkill for the purpose of this analysis, but this is only to compare how much a highly advanced model can improve performance.
+
+```{r message=FALSE, warning=FALSE, fig.width=9, fig.height=6}
+set.seed(1234)
+memory_bagg <- train(
+  Diff ~ .,
+  data = train,
+  method = "treebag",
+  trControl = cv,
+  nbagg = 100
+)
+
+memory_bagg
+```
+
+
+The R-squared for the Bagged model is much better, but it is still a bit unimpressive. In the next iteration, the interaction effect will be accounted for by adding "Drug*Dosage" to the list of independent variables. This is demonstrated below by the simple LM model. 
+
+```{r message=FALSE, warning=FALSE, fig.width=9, fig.height=6}
+set.seed(1234)
+memory_LM_inter <- train(Diff ~ Drug+Dosage+Happy_Sad_group+Drug*Dosage,
+                   data = train,
+                   method = "lm",
+                   trControl = cv)
+
+memory_LM_inter
+```
+
+An improvement in the R-squared value as compared to the previous LM implementation is observed. The RMSE has also slightly lowered. These metrics indicate that the model is now performing much better compared to its original iteration, when accounting for interaction. The same is done for the bagged model. 
+
+```{r message=FALSE, warning=FALSE, fig.width=9, fig.height=6}
+set.seed(1234)
+memory_bagg_inter <- train(
+  Diff ~ Drug+Dosage+Happy_Sad_group+Drug*Dosage,
+  data = train,
+  method = "treebag",
+  trControl = cv,
+  nbagg = 100
+)
+
+memory_bagg_inter
+```
+
+An improvement from the previous Bagged iteration is seen here as well. These results clearly indicate that incorporating the interaction effect improves the explaining power of the model significantly, thereby increasing the validity of the modelling results. As an additional check, the predictive power on the test set can be checked for these models to identify any bias and variance issues. 
+
+```{r message=FALSE, warning=FALSE, fig.width=9, fig.height=6}
+LM_predict_inter <- predict(memory_LM_inter, test)
+Bagg_predict_inter <- predict(memory_bagg_inter, test)
+
+postResample(LM_predict_inter, test$Diff)
+postResample(Bagg_predict_inter, test$Diff)
+```
+
+While the R-squares have improved even further, the RMSE values have marginally increased, indicating some issues with variance for the models. However, the overall objective of this analysis has been completed, which was highlighting the magnitude of the impact interaction effects have upon model performance. 
+
+
+### Conclusion
+
+The above results have clearly indicated that accounting for interaction is essential in the regression process, as their influence can significantly impact how the model performs. While it may have been slightly intuitive that the drugs and their dosage are related with each other, it is still worthwhile to check for interactions if the model is performing unexpectedly poorly, or there is a suspicion about interactions based on an understanding of the data. The above results can then be further improved with more thorough modelling techniques. An example can be assessing the importance of the features. The feature importance plot according to the first LM model is shown below as an example. 
+
+```{r message=FALSE, warning=FALSE, fig.width=9, fig.height=6}
+library(vip)
+vip(memory_LM)
+```
+
+Applying dummy encodings to the categorical variables and then selecting only the most important features can help further improve the overall model performance.  
+
