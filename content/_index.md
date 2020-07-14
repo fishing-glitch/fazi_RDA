@@ -1,5 +1,5 @@
 ---
-handle: hugo-theme-codex
-heading: Hi, I'm Codex
-subheading: A minimal blog theme for hugo.
+handle: faizaan.shahid@gmail.com
+heading: Fazi_RDA
+subheading: Data Analysis Projects with R.
 ---

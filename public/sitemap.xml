@@ -7,11 +7,19 @@
   </url>
   
   <url>
+    <loc>/blog/</loc>
+  </url>
+  
+  <url>
     <loc>/categories/</loc>
   </url>
   
   <url>
     <loc>/tags/</loc>
+  </url>
+  
+  <url>
+    <loc>/blog/whr-2019/</loc>
   </url>
   
 </urlset>

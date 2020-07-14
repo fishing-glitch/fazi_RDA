@@ -1,0 +1,164 @@
+---
+title: "Visualizing Happiness - World Happiness Report 2019"
+output:
+  html_document:
+    df_print: paged
+---
+
+### Introduction
+
+The following is a simple exercise in visualizing data. The data used is from the World Happiness Report for the year 2019, and was obtained freely from: https://www.kaggle.com/unsdsn/world-happiness?select=2019.csv. The aim is to generate some simple insights about the data using only visualizations. 
+
+Loading the data and required libraries:
+
+```{r message=FALSE, warning=FALSE}
+#Load Libraries
+
+library(tidyverse)
+library(reshape2)
+library(corrplot)
+
+#Read Data..
+whr19 <- read.csv("whr-2019.csv")
+```
+
+
+### Data processing
+
+Before moving forward with the visuals, the data needs to be processed a little bit. The column names are slightly changed to look a bit more neat for the visuals, and a new feature called Region is added to group all the countries according to their respective regions. The regions are Asia, Europe, Middle East, North America, South America, Central America, The Caribbean, Oceania (Australia and New Zealand) and Africa. This is all carried out in the code chunk below. 
+
+```{r message=FALSE, warning=FALSE}
+#change column names
+colnames(whr19) <- c("Rank", "Country", "Score",
+                     "GDP_per_Cap", "Social_Supp", "Life_Exp",
+                     "Freedom", "Generosity", "Corruption")
+
+whr19$Country <- as.character(whr19$Country)
+
+#add new Region variable
+whr19$Region <- NA
+
+whr19$Region[which(whr19$Country %in% c("Afganistan", "Armenia", "Azerbaijan","Bangladesh", "Bhutan", "Brunei Darussalam", "Cambodia", "China","Georgia", "Hong Kong",
+                                           "India","Indonesia","Japan","Kazakhstan", "North Korea", "South Korea","Kyrgyzstan","Laos","Macao","Malaysia","Maldives","Mongolia",
+                                           "Myanmar","Nepal","Pakistan","Philippines","Singapore","Sri Lanka","Taiwan","Tajikistan","Thailand","Timor Leste","Turkmenistan",
+                                           "Uzbekistan","Vietnam"))] <- "Asia"
+
+whr19$Region[which(whr19$Country %in% c("Norway", "Denmark", "Iceland", "Switzerland", "Finland",
+                                                   "Netherlands", "Sweden", "Austria", "Ireland", "Germany",
+                                                   "Belgium", "Luxembourg", "United Kingdom", "Czech Republic",
+                                                   "Malta", "France", "Spain", "Slovakia", "Poland", "Italy",
+                                                   "Russia", "Lithuania", "Latvia", "Moldova", "Romania",
+                                                   "Slovenia", "Northern Cyprus", "Cyprus", "Estonia", "Belarus",
+                                                   "Serbia", "Hungary", "Croatia", "Kosovo", "Montenegro",
+                                                   "Greece", "Portugal", "Bosnia and Herzegovina", "Macedonia",
+                                                   "Bulgaria", "Albania", "Ukraine", "Turkey", "North Macedonia"))] <- "Europe"
+
+whr19$Region[which(whr19$Country %in% c("Bahrain", "Iraq", "Iran", "Israel","Jordan","Kuwait","Lebanon","Libya","Oman","Palestinian Territories",
+                                           "Qatar","Saudi Arabia","Syria","United Arab Emirates","Yemen"))] <- "Middle East"
+
+whr19$Region[which(whr19$Country %in% c("Bermuda", "Canada", "Greenland", 
+                                           "Saint Pierre and Miquelon", "United States"))] <- "North America"
+
+whr19$Region[which(whr19$Country %in% c("Belize", "Costa Rica", "El Salvador", "Guatemala", 
+                                           "Honduras","Mexico", "Nicaragua", "Panama"))] <- "Central America"
+
+whr19$Region[which(whr19$Country %in% c("Anguilla", "Antigua and Barbuda", "Aruba", "Bahamas", "Barbados", "Bonaire", "Saint Eustatius and Saba", "British Virgin Islands", "Cayman Islands",
+                                           "Cuba", "Curaçao", "Dominica","Dominican Republic", "Grenada", "Guadeloupe", "Haiti", "Jamaica", "Martinique", 
+                                           "Monserrat", "Puerto Rico", "Saint-Barthélemy", "St. Kitts and Nevis", "Saint Lucia", "Saint Martin","Saint Vincent and the Grenadines","Sint Maarten", 
+                                           "Trinidad & Tobago", "Turks and Caicos Islands", "Virgin Islands (US)"))] <- "The Caribbean"
+
+whr19$Region[which(whr19$Country %in% c("Argentina","Bolivia","Brazil","Chile","Colombia","Ecuador","Falkland Islands (Malvinas)",
+                                           "French Guiana","Guyana","Paraguay", "Peru", "Suriname", "Uruguay", "Venezuela"))] <- "South America"
+
+whr19$Region[which(whr19$Country %in% c("New Zealand", "Australia"))] <- "Oceania"
+whr19$Region[which(is.na(whr19$Region))] <- "Africa"
+
+```
+
+
+### Correlation plot for all numeric variables
+
+```{r message=FALSE, warning=FALSE, fig.width=8, fig.height=8}
+correlation <- cor(whr19[,3:9])
+
+corrplot(correlation, method = "square")
+```
+
+As the key variable here is the Score (Which determines the happiness rank), it can be seen that the Score variable shares the highest correlation with GDP per capita, Social Support and Life Expectancy. It is intersting how Generosity and Score have almost no correlation with each other (according to the data). However, in such cases it is important to remember that correlation (or lack thereof) does not imply causation. 
+
+
+### Boxplot to analyse the distribution of different regions
+
+```{r message=FALSE, warning=FALSE, fig.width=9, fig.height=7}
+box <- ggplot(whr19, aes(Region, Score)) +
+  geom_boxplot(aes(fill = Region)) +
+  coord_flip() + 
+  theme_minimal()
+
+box #interactive
+```
+
+The boxplot shows the variation in Score across the different regions. The highest variations are in the Middle East and Europe. A potential reason for this may be due to the large disparity between the very rich and poor countries in both regions. The lowest range of scores are in Africa, and the highest scoring country belongs to the European region. Oceania has the lowest variation as it is only comprised of two countries. 
+
+
+### Bar charts for average regional performance
+
+```{r message=FALSE, warning=FALSE, fig.width=9, fig.height=7}
+whr19_Region <- whr19[,-1:-2] %>%
+  group_by(Region) %>%
+  summarise_all(funs(mean))
+
+region_melt <- melt(whr19_Region)
+
+bar <- ggplot(region_melt, aes(Region, value, fill = Region)) +
+  geom_bar(stat = "identity") +
+  facet_wrap(~variable, scales = "free") +
+  theme_minimal() +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1))
+
+bar
+```
+
+The above grid of bar charts highlights the average value each region obtained across all the features. The Oceania region apparently achieved the highest average scores across all the features, being only surpassed slightly by North America in GDP per capita. However, Oceania only comprises of Australia and New Zealand, thus making it a bit unfair to compare it with other regional averages. Perhaps logically combining Oceania with another region might help paint a better picture of how the scores for each feature are distributed across the regions. 
+
+
+### Circular barplot of all countries happiness score, in order
+
+This is just for the aesthetics. However, there are a couple of issues with this plot. Some of the country labels are a bit distorted on closer inspection. At the time of making this plot, no solution to this text distortion was found. Perhaps it is because plotting a large number of labels artificially in a circle has its difficulties and issues. The other issue is that this same information could have been easily conveyed through a simple ordered bar chart, which would have looked much more neat. Therefore, the important conclusion to draw from here is that just because it looks complex and different doesn't always mean it is the best. On a more positive note, the circle chart does highlight the regions quite colourfully. 
+
+```{r message=FALSE, warning=FALSE, fig.width=9, fig.align='center', fig.height=9}
+circle_whr <- whr19[,c(1:3,10)]
+circle_whr$Score <- circle_whr$Score * 10
+circle_whr$Region <- as.factor(circle_whr$Region)
+
+#Groups...
+circle_whr$id <- seq(1, nrow(circle_whr))
+circle_whr <- circle_whr %>% arrange(Region)
+
+#labels...
+labeled <- circle_whr
+n_bar <- nrow(labeled)
+angle <- 90-360*(labeled$id-0.5)/n_bar
+labeled$hjust <- ifelse(angle < -90, 1, 0)
+labeled$angle <- ifelse(angle < -90, angle+180, angle)
+
+circle <- ggplot(circle_whr, aes(x = as.factor(id), y = Score, fill = Region)) +
+  geom_bar(stat = "identity", alpha = 0.5) +
+  scale_fill_brewer(palette = "Paired") +
+  ylim(-100,100) +
+  theme_minimal() +
+  theme(axis.text = element_blank(),
+        axis.title = element_blank(),
+        panel.grid = element_blank(),
+        plot.margin = unit(rep(-1,4), "cm"),
+        legend.position = c(0.53,0.5)) +
+  coord_polar() +
+  geom_text(data = labeled, aes(x = id, y = Score + 10, label = Country,
+                                   hjust = hjust),
+            color = "black", fontface = "bold", alpha = 1, size = 3,
+            angle = labeled$angle, inherit.aes = FALSE)
+
+circle
+
+```
+
