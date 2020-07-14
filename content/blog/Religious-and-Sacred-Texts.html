@@ -1,0 +1,320 @@
+---
+title: "Mining Religious and Sacred Texts"
+output: html_notebook
+---
+
+<script src="/rmarkdown-libs/htmlwidgets/htmlwidgets.js"></script>
+<script src="/rmarkdown-libs/plotly-binding/plotly.js"></script>
+<script src="/rmarkdown-libs/typedarray/typedarray.min.js"></script>
+<script src="/rmarkdown-libs/jquery/jquery.min.js"></script>
+<link href="/rmarkdown-libs/crosstalk/css/crosstalk.css" rel="stylesheet" />
+<script src="/rmarkdown-libs/crosstalk/js/crosstalk.min.js"></script>
+<link href="/rmarkdown-libs/plotly-htmlwidgets-css/plotly-htmlwidgets.css" rel="stylesheet" />
+<script src="/rmarkdown-libs/plotly-main/plotly-latest.min.js"></script>
+
+
+<div id="introduction" class="section level3">
+<h3>Introduction</h3>
+<p>This is an exercise in simple text mining. Five different religious and sacred texts are analysed, namely the King James Bible, the Koran, the Book of Meditations, the Gospel of Buddha and the Book of Mormon. The analysis is structured in two segments. First, the text data is processed and some visual analysis is performed, simply to gather a better understanding about these texts. The second segment involves applying a simple clustering algorithim to determine if there are any existing clusters (segments) present within the texts. The aim here is not make any religious or sacred commentary, rather only to apply statistical techniques on some texts that belong to a unique subject area. The data was freely obtained from <a href="https://www.kaggle.com/tentotheminus9/religious-and-philosophical-texts?select=pg2800.txt" class="uri">https://www.kaggle.com/tentotheminus9/religious-and-philosophical-texts?select=pg2800.txt</a>, where more details can be found.</p>
+<p>Loading the data and required libraries:</p>
+<pre class="r"><code>#Libraries...
+library(readr)
+library(tm)
+library(tidyverse)
+library(wordcloud)
+library(cluster)
+library(factoextra)
+library(wordspace)
+library(plotly)
+#Data...
+
+Meditations &lt;- read_lines(&quot;Meditations.txt&quot;)
+Koran &lt;- read_lines(&quot;The-Koran.txt&quot;)
+Mormon &lt;- read_lines(&quot;Book-of-Mormon.txt&quot;)
+Buddha &lt;- read_lines(&quot;Gospel-of-Buddha.txt&quot;)
+Bible &lt;- read_lines(&quot;King-James-Bible.txt&quot;)</code></pre>
+</div>
+<div id="filtering-for-visualizations" class="section level3">
+<h3>Filtering (for visualizations)</h3>
+<p>As the loaded data is quite large in size, the data will be filtered to improve computational efficiency as much as possible due to limited computing power. 50% of the data is selected from each text.</p>
+<pre class="r"><code>set.seed(1234)
+
+Bible_filter &lt;- sample(Bible, length(Bible) * 0.5) 
+Buddha_filter &lt;- sample(Buddha, length(Buddha) * 0.5)
+Koran_filter &lt;- sample(Koran, length(Koran) * 0.5) 
+Meditations_filter &lt;- sample(Meditations, length(Meditations) * 0.5) 
+Mormon_filter &lt;- sample(Mormon, length(Mormon) * 0.5) </code></pre>
+</div>
+<div id="corpus-and-dtms" class="section level3">
+<h3>Corpus and DTMs</h3>
+<p>The next step is to transform the loaded text data into document corpuses. A corpus will allow for further edits on the text data, which in this case will be removing numbers, stopwords (for example “at”, “the”, “it” etc), punctuations and white spaces. Also, everything is converted to lower case. After these edits and transformations, each corpus is transformed into a Document Term Matrix (DTM), which creates a large sparse matrix indicating the presence or absence of each word in the texts. This matrix will then further enable any visualisations and analysis. This entire process is carried out in the code chunk below.</p>
+<pre class="r"><code>#Create individual corpus for each book, as doing cluster analysis on each
+
+
+bible_corpus &lt;- Corpus(VectorSource(Bible_filter))
+buddha_corpus &lt;- Corpus(VectorSource(Buddha_filter))
+koran_corpus &lt;- Corpus(VectorSource(Koran_filter))
+meditations_corpus &lt;- Corpus(VectorSource(Meditations_filter))
+mormon_corpus &lt;- Corpus(VectorSource(Mormon_filter))
+
+
+#Cleaning each corpus..
+
+bible_corpus &lt;- tm_map(bible_corpus, content_transformer(tolower))
+bible_corpus &lt;- tm_map(bible_corpus, removeNumbers)
+bible_corpus &lt;- tm_map(bible_corpus, removeWords, stopwords())
+bible_corpus &lt;- tm_map(bible_corpus, removePunctuation)
+bible_corpus &lt;- tm_map(bible_corpus, stripWhitespace)
+
+buddha_corpus &lt;- tm_map(buddha_corpus, content_transformer(tolower))
+buddha_corpus &lt;- tm_map(buddha_corpus, removeNumbers)
+buddha_corpus &lt;- tm_map(buddha_corpus, removeWords, stopwords())
+buddha_corpus &lt;- tm_map(buddha_corpus, removePunctuation)
+buddha_corpus &lt;- tm_map(buddha_corpus, stripWhitespace)
+
+koran_corpus &lt;- tm_map(koran_corpus, content_transformer(tolower))
+koran_corpus &lt;- tm_map(koran_corpus, removeNumbers)
+koran_corpus &lt;- tm_map(koran_corpus, removeWords, stopwords())
+koran_corpus &lt;- tm_map(koran_corpus, removePunctuation)
+koran_corpus &lt;- tm_map(koran_corpus, stripWhitespace)
+
+meditations_corpus &lt;- tm_map(meditations_corpus, content_transformer(tolower))
+meditations_corpus &lt;- tm_map(meditations_corpus, removeNumbers)
+meditations_corpus &lt;- tm_map(meditations_corpus, removeWords, stopwords())
+meditations_corpus &lt;- tm_map(meditations_corpus, removePunctuation)
+meditations_corpus &lt;- tm_map(meditations_corpus, stripWhitespace)
+
+mormon_corpus &lt;- tm_map(mormon_corpus, content_transformer(tolower))
+mormon_corpus &lt;- tm_map(mormon_corpus, removeNumbers)
+mormon_corpus &lt;- tm_map(mormon_corpus, removeWords, stopwords())
+mormon_corpus &lt;- tm_map(mormon_corpus, removePunctuation)
+mormon_corpus &lt;- tm_map(mormon_corpus, stripWhitespace)
+
+
+#creating sparse matrix - tokenization..
+
+bible_dtm &lt;- DocumentTermMatrix(bible_corpus)
+buddha_dtm &lt;- DocumentTermMatrix(buddha_corpus)
+koran_dtm &lt;- DocumentTermMatrix(koran_corpus)
+meditations_dtm &lt;- DocumentTermMatrix(meditations_corpus)
+mormon_dtm &lt;- DocumentTermMatrix(mormon_corpus)
+
+
+#Remove unecessary items
+
+rm(Bible)
+rm(Buddha)
+rm(Koran)
+rm(Meditations)
+rm(Mormon)
+rm(toSpace)
+rm(bible_corpus)
+rm(buddha_corpus)
+rm(koran_corpus)
+rm(meditations_corpus)
+rm(mormon_corpus)
+rm(Bible_filter)
+rm(Buddha_filter)
+rm(Koran_filter)
+rm(Meditations_filter)
+rm(Mormon_filter)
+
+#Clear Junk Memory 
+gc()</code></pre>
+<pre><code>##           used  (Mb) gc trigger  (Mb) max used  (Mb)
+## Ncells 2047533 109.4    4495624 240.1  2915735 155.8
+## Vcells 4363062  33.3   10146329  77.5 10133352  77.4</code></pre>
+</div>
+<div id="visualizing" class="section level3">
+<h3>Visualizing</h3>
+<p>Having converted the data into the required format, visualizing techniques can be applied on it. As this is text data, the most insightful approach would be to visualize the frequency of words occuring in each of the sacred texts. Two different techniques will be used here; a standard bar chart (interactive) and the more specific WordClouds. As these graphics are fairly self-explanatory, no additional commentary is required. The visualizations are as follows:</p>
+<div id="king-james-bible" class="section level4">
+<h4>King James Bible</h4>
+<pre class="r"><code>bible_freq &lt;- sort(colSums(as.matrix(bible_dtm)), decreasing = TRUE) #temporary dataframe
+bible_wf &lt;- data.frame(word = names(bible_freq), freq = bible_freq) #temporary dataframe
+
+x &lt;- subset(bible_wf, bible_freq &gt; 500) %&gt;%
+  ggplot(aes(word, freq)) +
+  geom_bar(stat = &quot;identity&quot;, fill = &quot;lightblue&quot;, color = &quot;black&quot;) +
+  theme_minimal() +
+  theme(axis.text.x=element_text(angle=45, hjust=1))#plotting the words with frequency of above 500
+
+ggplotly(x)</code></pre>
+<div id="htmlwidget-1" style="width:864px;height:576px;" class="plotly html-widget"></div>
+<script type="application/json" data-for="htmlwidget-1">{"x":{"data":[{"orientation":"v","width":[0.900000000000006,0.900000000000006,0.899999999999999,0.900000000000006,0.900000000000006,0.899999999999999,0.899999999999999,0.900000000000006,0.900000000000006,0.900000000000006,0.899999999999999,0.899999999999999,0.900000000000006,0.899999999999999,0.899999999999999,0.9,0.899999999999999,0.9,0.899999999999999,0.899999999999999,0.899999999999999,0.9,0.9,0.9,0.900000000000006,0.899999999999999,0.899999999999999,0.900000000000002,0.899999999999999,0.899999999999999,0.900000000000006,0.899999999999999,0.9,0.899999999999999,0.899999999999999,0.900000000000006,0.900000000000006,0.899999999999999,0.900000000000006,0.899999999999999,0.899999999999999,0.899999999999999,0.9,0.899999999999999,0.899999999999999],"base":[0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],"x":[33,42,20,40,41,10,29,45,37,43,23,15,35,17,13,3,28,5,14,27,18,7,4,1,34,25,19,32,11,26,44,8,2,21,30,38,39,9,36,31,22,24,6,12,16],"y":[4937,4518,3965,2761,2276,2125,2034,1935,1890,1373,1265,1264,1192,1121,1087,1069,1042,1020,1005,993,875,873,856,855,824,818,775,735,733,716,713,687,685,675,650,628,582,577,553,546,529,528,517,514,502],"text":["word: shall<br />freq: 4937","word: unto<br />freq: 4518","word: lord<br />freq: 3965","word: thou<br />freq: 2761","word: thy<br />freq: 2276","word: god<br />freq: 2125","word: said<br />freq: 2034","word: will<br />freq: 1935","word: thee<br />freq: 1890","word: upon<br />freq: 1373","word: man<br />freq: 1265","word: israel<br />freq: 1264","word: son<br />freq: 1192","word: king<br />freq: 1121","word: hath<br />freq: 1087","word: came<br />freq: 1069","word: people<br />freq: 1042","word: come<br />freq: 1020","word: house<br />freq: 1005","word: one<br />freq:  993","word: land<br />freq:  875","word: day<br />freq:  873","word: children<br />freq:  856","word: also<br />freq:  855","word: shalt<br />freq:  824","word: men<br />freq:  818","word: let<br />freq:  775","word: saying<br />freq:  735","word: hand<br />freq:  733","word: now<br />freq:  716","word: went<br />freq:  713","word: even<br />freq:  687","word: behold<br />freq:  685","word: made<br />freq:  675","word: saith<br />freq:  650","word: therefore<br />freq:  628","word: things<br />freq:  582","word: every<br />freq:  577","word: sons<br />freq:  553","word: say<br />freq:  546","word: make<br />freq:  529","word: may<br />freq:  528","word: david<br />freq:  517","word: hast<br />freq:  514","word: jesus<br />freq:  502"],"type":"bar","marker":{"autocolorscale":false,"color":"rgba(173,216,230,1)","line":{"width":1.88976377952756,"color":"rgba(0,0,0,1)"}},"showlegend":false,"xaxis":"x","yaxis":"y","hoverinfo":"text","frame":null}],"layout":{"margin":{"t":26.958904109589,"r":7.30593607305936,"b":57.5312039761743,"l":48.9497716894977},"font":{"color":"rgba(0,0,0,1)","family":"","size":14.6118721461187},"xaxis":{"domain":[0,1],"automargin":true,"type":"linear","autorange":false,"range":[0.4,45.6],"tickmode":"array","ticktext":["also","behold","came","children","come","david","day","even","every","god","hand","hast","hath","house","israel","jesus","king","land","let","lord","made","make","man","may","men","now","one","people","said","saith","say","saying","shall","shalt","son","sons","thee","therefore","things","thou","thy","unto","upon","went","will"],"tickvals":[1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20,21,22,23,24,25,26,27,28,29,30,31,32,33,34,35,36,37,38,39,40,41,42,43,44,45],"categoryorder":"array","categoryarray":["also","behold","came","children","come","david","day","even","every","god","hand","hast","hath","house","israel","jesus","king","land","let","lord","made","make","man","may","men","now","one","people","said","saith","say","saying","shall","shalt","son","sons","thee","therefore","things","thou","thy","unto","upon","went","will"],"nticks":null,"ticks":"","tickcolor":null,"ticklen":3.65296803652968,"tickwidth":0,"showticklabels":true,"tickfont":{"color":"rgba(77,77,77,1)","family":"","size":11.689497716895},"tickangle":-45,"showline":false,"linecolor":null,"linewidth":0,"showgrid":true,"gridcolor":"rgba(235,235,235,1)","gridwidth":0.66417600664176,"zeroline":false,"anchor":"y","title":{"text":"word","font":{"color":"rgba(0,0,0,1)","family":"","size":14.6118721461187}},"hoverformat":".2f"},"yaxis":{"domain":[0,1],"automargin":true,"type":"linear","autorange":false,"range":[-246.85,5183.85],"tickmode":"array","ticktext":["0","1000","2000","3000","4000","5000"],"tickvals":[2.8421709430404e-014,1000,2000,3000,4000,5000],"categoryorder":"array","categoryarray":["0","1000","2000","3000","4000","5000"],"nticks":null,"ticks":"","tickcolor":null,"ticklen":3.65296803652968,"tickwidth":0,"showticklabels":true,"tickfont":{"color":"rgba(77,77,77,1)","family":"","size":11.689497716895},"tickangle":-0,"showline":false,"linecolor":null,"linewidth":0,"showgrid":true,"gridcolor":"rgba(235,235,235,1)","gridwidth":0.66417600664176,"zeroline":false,"anchor":"x","title":{"text":"freq","font":{"color":"rgba(0,0,0,1)","family":"","size":14.6118721461187}},"hoverformat":".2f"},"shapes":[{"type":"rect","fillcolor":null,"line":{"color":null,"width":0,"linetype":[]},"yref":"paper","xref":"paper","x0":0,"x1":1,"y0":0,"y1":1}],"showlegend":false,"legend":{"bgcolor":null,"bordercolor":null,"borderwidth":0,"font":{"color":"rgba(0,0,0,1)","family":"","size":11.689497716895}},"hovermode":"closest","barmode":"relative"},"config":{"doubleClick":"reset","showSendToCloud":false},"source":"A","attrs":{"2e805349211e":{"x":{},"y":{},"type":"bar"}},"cur_data":"2e805349211e","visdat":{"2e805349211e":["function (y) ","x"]},"highlight":{"on":"plotly_click","persistent":false,"dynamic":false,"selectize":false,"opacityDim":0.2,"selected":{"opacity":1},"debounce":0},"shinyEvents":["plotly_hover","plotly_click","plotly_selected","plotly_relayout","plotly_brushed","plotly_brushing","plotly_clickannotation","plotly_doubleclick","plotly_deselect","plotly_afterplot","plotly_sunburstclick"],"base_url":"https://plot.ly"},"evals":[],"jsHooks":[]}</script>
+<pre class="r"><code>set.seed(1234)
+wordcloud(names(bible_freq), bible_freq, 
+          min.freq = 50, colors = brewer.pal(6, &quot;Dark2&quot;),
+          fixed.asp = TRUE, random.order = FALSE) #words with a minimum frequency of at least 50</code></pre>
+<p><img src="/blog/Religious-and-Sacred-Texts_files/figure-html/unnamed-chunk-5-1.png" width="864" /></p>
+<pre class="r"><code>rm(bible_freq) #remove temporary dataframe
+rm(bible_wf) #remove temporary dataframe
+rm(x) #remove temporary dataframe</code></pre>
+</div>
+<div id="gospel-of-buddha" class="section level4">
+<h4>Gospel of Buddha</h4>
+<pre class="r"><code>buddha_freq &lt;- sort(colSums(as.matrix(buddha_dtm)), decreasing = TRUE) #temp df
+buddha_wf &lt;- data.frame(word = names(buddha_freq), freq = buddha_freq) #temp df
+
+x &lt;- subset(buddha_wf, buddha_freq &gt; 50) %&gt;%
+  ggplot(aes(word, freq)) +
+  geom_bar(stat = &quot;identity&quot;, fill = &quot;goldenrod2&quot;, color = &quot;black&quot;) +
+  theme_minimal() +
+  theme(axis.text.x=element_text(angle=45, hjust=1)) #frequency &gt; 50
+
+ggplotly(x)</code></pre>
+<div id="htmlwidget-2" style="width:864px;height:576px;" class="plotly html-widget"></div>
+<script type="application/json" data-for="htmlwidget-2">{"x":{"data":[{"orientation":"v","width":[0.899999999999999,0.9,0.900000000000006,0.900000000000006,0.899999999999999,0.900000000000006,0.9,0.899999999999999,0.899999999999999,0.899999999999999,0.900000000000006,0.900000000000006,0.899999999999999,0.899999999999999,0.899999999999999,0.899999999999999,0.899999999999999,0.899999999999999,0.899999999999999,0.899999999999999,0.899999999999999,0.899999999999999,0.899999999999999,0.899999999999999,0.9,0.899999999999999,0.9,0.899999999999999,0.9,0.899999999999999,0.899999999999999,0.900000000000006,0.9,0.900000000000006,0.900000000000006,0.9,0.900000000000002,0.899999999999999,0.899999999999999,0.899999999999999],"base":[0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],"x":[23,3,37,39,26,33,4,15,28,18,35,40,10,11,24,29,13,31,14,20,22,30,17,9,5,16,1,27,6,8,25,38,7,36,34,2,32,12,19,21],"y":[410,266,233,230,190,164,164,121,116,99,96,93,91,89,89,85,84,84,81,79,79,75,74,72,63,63,62,62,60,59,59,58,57,57,56,55,55,53,53,52],"text":["word: one<br />freq: 410","word: blessed<br />freq: 266","word: truth<br />freq: 233","word: will<br />freq: 230","word: said<br />freq: 190","word: thou<br />freq: 164","word: buddha<br />freq: 164","word: life<br />freq: 121","word: self<br />freq: 116","word: man<br />freq:  99","word: thy<br />freq:  96","word: world<br />freq:  93","word: gospel<br />freq:  91","word: great<br />freq:  89","word: parallelisms<br />freq:  89","word: skt<br />freq:  85","word: king<br />freq:  84","word: tathagata<br />freq:  84","word: let<br />freq:  81","word: mind<br />freq:  79","word: now<br />freq:  79","word: sources<br />freq:  75","word: lord<br />freq:  74","word: good<br />freq:  72","word: can<br />freq:  63","word: like<br />freq:  63","word: ananda<br />freq:  62","word: see<br />freq:  62","word: death<br />freq:  60","word: evil<br />freq:  59","word: path<br />freq:  59","word: upon<br />freq:  58","word: doctrine<br />freq:  57","word: time<br />freq:  57","word: thought<br />freq:  56","word: bhikkhus<br />freq:  55","word: thee<br />freq:  55","word: heart<br />freq:  53","word: may<br />freq:  53","word: name<br />freq:  52"],"type":"bar","marker":{"autocolorscale":false,"color":"rgba(238,180,34,1)","line":{"width":1.88976377952756,"color":"rgba(0,0,0,1)"}},"showlegend":false,"xaxis":"x","yaxis":"y","hoverinfo":"text","frame":null}],"layout":{"margin":{"t":26.958904109589,"r":7.30593607305936,"b":66.5764694493192,"l":43.1050228310502},"font":{"color":"rgba(0,0,0,1)","family":"","size":14.6118721461187},"xaxis":{"domain":[0,1],"automargin":true,"type":"linear","autorange":false,"range":[0.4,40.6],"tickmode":"array","ticktext":["ānanda","bhikkhus","blessed","buddha","can","death","doctrine","evil","good","gospel","great","heart","king","let","life","like","lord","man","may","mind","name","now","one","parallelisms","path","said","see","self","skt","sources","tathāgata","thee","thou","thought","thy","time","truth","upon","will","world"],"tickvals":[1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20,21,22,23,24,25,26,27,28,29,30,31,32,33,34,35,36,37,38,39,40],"categoryorder":"array","categoryarray":["ānanda","bhikkhus","blessed","buddha","can","death","doctrine","evil","good","gospel","great","heart","king","let","life","like","lord","man","may","mind","name","now","one","parallelisms","path","said","see","self","skt","sources","tathāgata","thee","thou","thought","thy","time","truth","upon","will","world"],"nticks":null,"ticks":"","tickcolor":null,"ticklen":3.65296803652968,"tickwidth":0,"showticklabels":true,"tickfont":{"color":"rgba(77,77,77,1)","family":"","size":11.689497716895},"tickangle":-45,"showline":false,"linecolor":null,"linewidth":0,"showgrid":true,"gridcolor":"rgba(235,235,235,1)","gridwidth":0.66417600664176,"zeroline":false,"anchor":"y","title":{"text":"word","font":{"color":"rgba(0,0,0,1)","family":"","size":14.6118721461187}},"hoverformat":".2f"},"yaxis":{"domain":[0,1],"automargin":true,"type":"linear","autorange":false,"range":[-20.5,430.5],"tickmode":"array","ticktext":["0","100","200","300","400"],"tickvals":[0,100,200,300,400],"categoryorder":"array","categoryarray":["0","100","200","300","400"],"nticks":null,"ticks":"","tickcolor":null,"ticklen":3.65296803652968,"tickwidth":0,"showticklabels":true,"tickfont":{"color":"rgba(77,77,77,1)","family":"","size":11.689497716895},"tickangle":-0,"showline":false,"linecolor":null,"linewidth":0,"showgrid":true,"gridcolor":"rgba(235,235,235,1)","gridwidth":0.66417600664176,"zeroline":false,"anchor":"x","title":{"text":"freq","font":{"color":"rgba(0,0,0,1)","family":"","size":14.6118721461187}},"hoverformat":".2f"},"shapes":[{"type":"rect","fillcolor":null,"line":{"color":null,"width":0,"linetype":[]},"yref":"paper","xref":"paper","x0":0,"x1":1,"y0":0,"y1":1}],"showlegend":false,"legend":{"bgcolor":null,"bordercolor":null,"borderwidth":0,"font":{"color":"rgba(0,0,0,1)","family":"","size":11.689497716895}},"hovermode":"closest","barmode":"relative"},"config":{"doubleClick":"reset","showSendToCloud":false},"source":"A","attrs":{"2e8058c8531b":{"x":{},"y":{},"type":"bar"}},"cur_data":"2e8058c8531b","visdat":{"2e8058c8531b":["function (y) ","x"]},"highlight":{"on":"plotly_click","persistent":false,"dynamic":false,"selectize":false,"opacityDim":0.2,"selected":{"opacity":1},"debounce":0},"shinyEvents":["plotly_hover","plotly_click","plotly_selected","plotly_relayout","plotly_brushed","plotly_brushing","plotly_clickannotation","plotly_doubleclick","plotly_deselect","plotly_afterplot","plotly_sunburstclick"],"base_url":"https://plot.ly"},"evals":[],"jsHooks":[]}</script>
+<pre class="r"><code>set.seed(1234)
+wordcloud(names(buddha_freq), buddha_freq, 
+          min.freq = 10, colors = brewer.pal(6, &quot;Dark2&quot;),
+          fixed.asp = TRUE, random.order = FALSE) #frequency at least 10</code></pre>
+<p><img src="/blog/Religious-and-Sacred-Texts_files/figure-html/unnamed-chunk-7-1.png" width="864" /></p>
+<pre class="r"><code>rm(buddha_freq)
+rm(buddha_wf)
+rm(x) #remove temporary dataframe</code></pre>
+</div>
+<div id="the-koran" class="section level4">
+<h4>The Koran</h4>
+<pre class="r"><code>koran_freq &lt;- sort(colSums(as.matrix(koran_dtm)), decreasing = TRUE)
+koran_wf &lt;- data.frame(word = names(koran_freq), freq = koran_freq)
+
+x &lt;- subset(koran_wf, koran_freq &gt; 110) %&gt;%
+  ggplot(aes(word, freq)) +
+  geom_bar(stat = &quot;identity&quot;, fill = &quot;lightgreen&quot;, color = &quot;black&quot;) +
+  theme_minimal() +
+  theme(axis.text.x=element_text(angle=45, hjust=1))
+
+ggplotly(x)</code></pre>
+<div id="htmlwidget-3" style="width:864px;height:576px;" class="plotly html-widget"></div>
+<script type="application/json" data-for="htmlwidget-3">{"x":{"data":[{"orientation":"v","width":[0.899999999999999,0.899999999999999,0.900000000000006,0.899999999999999,0.899999999999999,0.900000000000006,0.899999999999999,0.899999999999999,0.899999999999999,0.9,0.899999999999999,0.900000000000006,0.899999999999999,0.900000000000006,0.9,0.899999999999999,0.9,0.899999999999999,0.9,0.899999999999999,0.899999999999999,0.899999999999999,0.899999999999999,0.900000000000006,0.900000000000006,0.899999999999999,0.9,0.899999999999999,0.900000000000002,0.899999999999999,0.899999999999999,0.9,0.899999999999999,0.899999999999999,0.899999999999999,0.899999999999999,0.9,0.899999999999999],"base":[0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],"x":[10,26,38,15,13,33,22,23,30,6,28,34,20,37,3,24,7,21,5,18,17,25,27,36,35,8,1,16,32,12,11,4,19,31,9,14,2,29],"y":[1657,1168,716,467,458,426,423,374,318,278,246,239,230,223,220,218,211,204,201,195,189,179,165,161,155,143,137,131,128,126,125,123,120,117,114,113,111,111],"text":["word: god<br />freq: 1657","word: shall<br />freq: 1168","word: will<br />freq:  716","word: lord<br />freq:  467","word: hath<br />freq:  458","word: thou<br />freq:  426","word: said<br />freq:  423","word: say<br />freq:  374","word: thee<br />freq:  318","word: day<br />freq:  278","word: sura<br />freq:  246","word: thy<br />freq:  239","word: one<br />freq:  230","word: verily<br />freq:  223","word: believe<br />freq:  220","word: see<br />freq:  218","word: earth<br />freq:  211","word: people<br />freq:  204","word: come<br />freq:  201","word: men<br />freq:  195","word: may<br />freq:  189","word: sent<br />freq:  179","word: signs<br />freq:  165","word: upon<br />freq:  161","word: truth<br />freq:  155","word: fear<br />freq:  143","word: among<br />freq:  137","word: made<br />freq:  131","word: things<br />freq:  128","word: good<br />freq:  126","word: gods<br />freq:  125","word: book<br />freq:  123","word: merciful<br />freq:  120","word: therefore<br />freq:  117","word: forth<br />freq:  114","word: know<br />freq:  113","word: apostle<br />freq:  111","word: surely<br />freq:  111"],"type":"bar","marker":{"autocolorscale":false,"color":"rgba(144,238,144,1)","line":{"width":1.88976377952756,"color":"rgba(0,0,0,1)"}},"showlegend":false,"xaxis":"x","yaxis":"y","hoverinfo":"text","frame":null}],"layout":{"margin":{"t":26.958904109589,"r":7.30593607305936,"b":57.5312039761743,"l":48.9497716894977},"font":{"color":"rgba(0,0,0,1)","family":"","size":14.6118721461187},"xaxis":{"domain":[0,1],"automargin":true,"type":"linear","autorange":false,"range":[0.4,38.6],"tickmode":"array","ticktext":["among","apostle","believe","book","come","day","earth","fear","forth","god","gods","good","hath","know","lord","made","may","men","merciful","one","people","said","say","see","sent","shall","signs","sura","surely","thee","therefore","things","thou","thy","truth","upon","verily","will"],"tickvals":[1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20,21,22,23,24,25,26,27,28,29,30,31,32,33,34,35,36,37,38],"categoryorder":"array","categoryarray":["among","apostle","believe","book","come","day","earth","fear","forth","god","gods","good","hath","know","lord","made","may","men","merciful","one","people","said","say","see","sent","shall","signs","sura","surely","thee","therefore","things","thou","thy","truth","upon","verily","will"],"nticks":null,"ticks":"","tickcolor":null,"ticklen":3.65296803652968,"tickwidth":0,"showticklabels":true,"tickfont":{"color":"rgba(77,77,77,1)","family":"","size":11.689497716895},"tickangle":-45,"showline":false,"linecolor":null,"linewidth":0,"showgrid":true,"gridcolor":"rgba(235,235,235,1)","gridwidth":0.66417600664176,"zeroline":false,"anchor":"y","title":{"text":"word","font":{"color":"rgba(0,0,0,1)","family":"","size":14.6118721461187}},"hoverformat":".2f"},"yaxis":{"domain":[0,1],"automargin":true,"type":"linear","autorange":false,"range":[-82.85,1739.85],"tickmode":"array","ticktext":["0","500","1000","1500"],"tickvals":[0,500,1000,1500],"categoryorder":"array","categoryarray":["0","500","1000","1500"],"nticks":null,"ticks":"","tickcolor":null,"ticklen":3.65296803652968,"tickwidth":0,"showticklabels":true,"tickfont":{"color":"rgba(77,77,77,1)","family":"","size":11.689497716895},"tickangle":-0,"showline":false,"linecolor":null,"linewidth":0,"showgrid":true,"gridcolor":"rgba(235,235,235,1)","gridwidth":0.66417600664176,"zeroline":false,"anchor":"x","title":{"text":"freq","font":{"color":"rgba(0,0,0,1)","family":"","size":14.6118721461187}},"hoverformat":".2f"},"shapes":[{"type":"rect","fillcolor":null,"line":{"color":null,"width":0,"linetype":[]},"yref":"paper","xref":"paper","x0":0,"x1":1,"y0":0,"y1":1}],"showlegend":false,"legend":{"bgcolor":null,"bordercolor":null,"borderwidth":0,"font":{"color":"rgba(0,0,0,1)","family":"","size":11.689497716895}},"hovermode":"closest","barmode":"relative"},"config":{"doubleClick":"reset","showSendToCloud":false},"source":"A","attrs":{"2e8078f5722":{"x":{},"y":{},"type":"bar"}},"cur_data":"2e8078f5722","visdat":{"2e8078f5722":["function (y) ","x"]},"highlight":{"on":"plotly_click","persistent":false,"dynamic":false,"selectize":false,"opacityDim":0.2,"selected":{"opacity":1},"debounce":0},"shinyEvents":["plotly_hover","plotly_click","plotly_selected","plotly_relayout","plotly_brushed","plotly_brushing","plotly_clickannotation","plotly_doubleclick","plotly_deselect","plotly_afterplot","plotly_sunburstclick"],"base_url":"https://plot.ly"},"evals":[],"jsHooks":[]}</script>
+<pre class="r"><code>set.seed(1234)
+wordcloud(names(koran_freq), koran_freq, 
+          min.freq = 15, colors = brewer.pal(6, &quot;Dark2&quot;),
+          fixed.asp = TRUE, random.order = FALSE)</code></pre>
+<p><img src="/blog/Religious-and-Sacred-Texts_files/figure-html/unnamed-chunk-9-1.png" width="864" /></p>
+<pre class="r"><code>rm(koran_freq)
+rm(koran_wf)
+rm(x)</code></pre>
+</div>
+<div id="meditations" class="section level4">
+<h4>Meditations</h4>
+<pre class="r"><code>meditations_freq &lt;- sort(colSums(as.matrix(meditations_dtm)), decreasing = TRUE)
+meditations_wf &lt;- data.frame(word = names(meditations_freq), 
+                             freq = meditations_freq)
+
+x &lt;- subset(meditations_wf, meditations_freq &gt; 60) %&gt;%
+  ggplot(aes(word, freq)) +
+  geom_bar(stat = &quot;identity&quot;, fill = &quot;indianred2&quot;, color = &quot;black&quot;) +
+  theme_minimal() +
+  theme(axis.text.x=element_text(angle=45, hjust=1))
+
+
+ggplotly(x)</code></pre>
+<div id="htmlwidget-4" style="width:864px;height:576px;" class="plotly html-widget"></div>
+<script type="application/json" data-for="htmlwidget-4">{"x":{"data":[{"orientation":"v","width":[0.899999999999999,0.899999999999999,0.899999999999999,0.899999999999999,0.899999999999999,0.899999999999999,0.899999999999999,0.9,0.899999999999999,0.9,0.899999999999999,0.899999999999999,0.9,0.899999999999999,0.899999999999999,0.899999999999999,0.9,0.899999999999999,0.899999999999999,0.899999999999999,0.899999999999999,0.900000000000006,0.900000000000002,0.899999999999999,0.899999999999999,0.9,0.899999999999999,0.9,0.9,0.899999999999999,0.899999999999999,0.899999999999999,0.899999999999999],"base":[0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],"x":[23,22,28,24,9,21,18,4,15,5,25,14,6,31,30,17,1,13,8,20,29,33,32,10,26,2,12,3,7,27,11,19,16],"y":[450,267,232,183,175,155,154,126,125,116,107,103,102,96,91,84,83,83,78,74,74,72,71,70,68,68,66,65,64,63,63,62,62],"text":["word: thou<br />freq: 450","word: things<br />freq: 267","word: unto<br />freq: 232","word: thy<br />freq: 183","word: man<br />freq: 175","word: thee<br />freq: 155","word: one<br />freq: 154","word: doth<br />freq: 126","word: nature<br />freq: 125","word: either<br />freq: 116","word: thyself<br />freq: 107","word: must<br />freq: 103","word: good<br />freq: 102","word: will<br />freq:  96","word: whatsoever<br />freq:  91","word: now<br />freq:  84","word: also<br />freq:  83","word: mind<br />freq:  83","word: life<br />freq:  78","word: shall<br />freq:  74","word: upon<br />freq:  74","word: yet<br />freq:  72","word: world<br />freq:  71","word: many<br />freq:  70","word: time<br />freq:  68","word: art<br />freq:  68","word: men<br />freq:  66","word: can<br />freq:  65","word: hath<br />freq:  64","word: true<br />freq:  63","word: may<br />freq:  63","word: part<br />freq:  62","word: nothing<br />freq:  62"],"type":"bar","marker":{"autocolorscale":false,"color":"rgba(238,99,99,1)","line":{"width":1.88976377952756,"color":"rgba(0,0,0,1)"}},"showlegend":false,"xaxis":"x","yaxis":"y","hoverinfo":"text","frame":null}],"layout":{"margin":{"t":26.958904109589,"r":7.30593607305936,"b":60.535549333637,"l":43.1050228310502},"font":{"color":"rgba(0,0,0,1)","family":"","size":14.6118721461187},"xaxis":{"domain":[0,1],"automargin":true,"type":"linear","autorange":false,"range":[0.4,33.6],"tickmode":"array","ticktext":["also","art","can","doth","either","good","hath","life","man","many","may","men","mind","must","nature","nothing","now","one","part","shall","thee","things","thou","thy","thyself","time","true","unto","upon","whatsoever","will","world","yet"],"tickvals":[1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20,21,22,23,24,25,26,27,28,29,30,31,32,33],"categoryorder":"array","categoryarray":["also","art","can","doth","either","good","hath","life","man","many","may","men","mind","must","nature","nothing","now","one","part","shall","thee","things","thou","thy","thyself","time","true","unto","upon","whatsoever","will","world","yet"],"nticks":null,"ticks":"","tickcolor":null,"ticklen":3.65296803652968,"tickwidth":0,"showticklabels":true,"tickfont":{"color":"rgba(77,77,77,1)","family":"","size":11.689497716895},"tickangle":-45,"showline":false,"linecolor":null,"linewidth":0,"showgrid":true,"gridcolor":"rgba(235,235,235,1)","gridwidth":0.66417600664176,"zeroline":false,"anchor":"y","title":{"text":"word","font":{"color":"rgba(0,0,0,1)","family":"","size":14.6118721461187}},"hoverformat":".2f"},"yaxis":{"domain":[0,1],"automargin":true,"type":"linear","autorange":false,"range":[-22.5,472.5],"tickmode":"array","ticktext":["0","100","200","300","400"],"tickvals":[0,100,200,300,400],"categoryorder":"array","categoryarray":["0","100","200","300","400"],"nticks":null,"ticks":"","tickcolor":null,"ticklen":3.65296803652968,"tickwidth":0,"showticklabels":true,"tickfont":{"color":"rgba(77,77,77,1)","family":"","size":11.689497716895},"tickangle":-0,"showline":false,"linecolor":null,"linewidth":0,"showgrid":true,"gridcolor":"rgba(235,235,235,1)","gridwidth":0.66417600664176,"zeroline":false,"anchor":"x","title":{"text":"freq","font":{"color":"rgba(0,0,0,1)","family":"","size":14.6118721461187}},"hoverformat":".2f"},"shapes":[{"type":"rect","fillcolor":null,"line":{"color":null,"width":0,"linetype":[]},"yref":"paper","xref":"paper","x0":0,"x1":1,"y0":0,"y1":1}],"showlegend":false,"legend":{"bgcolor":null,"bordercolor":null,"borderwidth":0,"font":{"color":"rgba(0,0,0,1)","family":"","size":11.689497716895}},"hovermode":"closest","barmode":"relative"},"config":{"doubleClick":"reset","showSendToCloud":false},"source":"A","attrs":{"2e8020b63b08":{"x":{},"y":{},"type":"bar"}},"cur_data":"2e8020b63b08","visdat":{"2e8020b63b08":["function (y) ","x"]},"highlight":{"on":"plotly_click","persistent":false,"dynamic":false,"selectize":false,"opacityDim":0.2,"selected":{"opacity":1},"debounce":0},"shinyEvents":["plotly_hover","plotly_click","plotly_selected","plotly_relayout","plotly_brushed","plotly_brushing","plotly_clickannotation","plotly_doubleclick","plotly_deselect","plotly_afterplot","plotly_sunburstclick"],"base_url":"https://plot.ly"},"evals":[],"jsHooks":[]}</script>
+<pre class="r"><code>set.seed(1234)
+wordcloud(names(meditations_freq), meditations_freq, 
+          min.freq = 10, colors = brewer.pal(6, &quot;Dark2&quot;),
+          fixed.asp = TRUE, random.order = FALSE)</code></pre>
+<p><img src="/blog/Religious-and-Sacred-Texts_files/figure-html/unnamed-chunk-11-1.png" width="864" /></p>
+<pre class="r"><code>rm(meditations_freq)
+rm(meditations_wf)
+rm(x)</code></pre>
+</div>
+<div id="book-of-mormon" class="section level4">
+<h4>Book of Mormon</h4>
+<pre class="r"><code>mormon_freq &lt;- sort(colSums(as.matrix(mormon_dtm)), decreasing = TRUE)
+mormon_wf &lt;- data.frame(word = names(mormon_freq), freq = mormon_freq)
+
+x &lt;- subset(mormon_wf, mormon_freq &gt; 250) %&gt;%
+  ggplot(aes(word, freq)) +
+  geom_bar(stat = &quot;identity&quot;, fill = &quot;slategray3&quot;, color = &quot;black&quot;) +
+  theme_minimal() +
+  theme(axis.text.x=element_text(angle=45, hjust=1))
+
+
+ggplotly(x)</code></pre>
+<div id="htmlwidget-5" style="width:864px;height:576px;" class="plotly html-widget"></div>
+<script type="application/json" data-for="htmlwidget-5">{"x":{"data":[{"orientation":"v","width":[0.900000000000006,0.899999999999999,0.899999999999999,0.9,0.899999999999999,0.9,0.899999999999999,0.899999999999999,0.9,0.899999999999999,0.900000000000006,0.899999999999999,0.899999999999999,0.900000000000006,0.900000000000006,0.9,0.899999999999999,0.899999999999999,0.899999999999999,0.899999999999999,0.899999999999999,0.899999999999999,0.900000000000006,0.899999999999999,0.899999999999999,0.899999999999999,0.899999999999999,0.900000000000002,0.899999999999999,0.899999999999999,0.9,0.9,0.899999999999999,0.9,0.899999999999999,0.899999999999999,0.899999999999999],"base":[0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],"x":[33,24,29,2,27,7,12,26,5,18,37,25,17,35,34,3,23,31,20,8,16,9,36,30,13,28,11,32,15,10,6,4,22,1,14,19,21],"y":[1759,1377,1235,1145,888,875,827,816,814,785,642,629,621,543,541,535,428,427,407,382,343,339,333,320,314,310,306,300,299,277,273,270,268,259,256,252,251],"text":["word: unto<br />freq: 1759","word: nephi<br />freq: 1377","word: shall<br />freq: 1235","word: alma<br />freq: 1145","word: people<br />freq:  888","word: came<br />freq:  875","word: god<br />freq:  827","word: pass<br />freq:  816","word: behold<br />freq:  814","word: lord<br />freq:  785","word: yea<br />freq:  642","word: now<br />freq:  629","word: land<br />freq:  621","word: will<br />freq:  543","word: upon<br />freq:  541","word: also<br />freq:  535","word: mosiah<br />freq:  428","word: things<br />freq:  427","word: many<br />freq:  407","word: come<br />freq:  382","word: lamanites<br />freq:  343","word: even<br />freq:  339","word: words<br />freq:  333","word: therefore<br />freq:  320","word: great<br />freq:  314","word: said<br />freq:  310","word: forth<br />freq:  306","word: thou<br />freq:  300","word: helaman<br />freq:  299","word: father<br />freq:  277","word: brethren<br />freq:  273","word: among<br />freq:  270","word: men<br />freq:  268","word: according<br />freq:  259","word: hath<br />freq:  256","word: man<br />freq:  252","word: may<br />freq:  251"],"type":"bar","marker":{"autocolorscale":false,"color":"rgba(159,182,205,1)","line":{"width":1.88976377952756,"color":"rgba(0,0,0,1)"}},"showlegend":false,"xaxis":"x","yaxis":"y","hoverinfo":"text","frame":null}],"layout":{"margin":{"t":26.958904109589,"r":7.30593607305936,"b":57.5312039761743,"l":48.9497716894977},"font":{"color":"rgba(0,0,0,1)","family":"","size":14.6118721461187},"xaxis":{"domain":[0,1],"automargin":true,"type":"linear","autorange":false,"range":[0.4,37.6],"tickmode":"array","ticktext":["according","alma","also","among","behold","brethren","came","come","even","father","forth","god","great","hath","helaman","lamanites","land","lord","man","many","may","men","mosiah","nephi","now","pass","people","said","shall","therefore","things","thou","unto","upon","will","words","yea"],"tickvals":[1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20,21,22,23,24,25,26,27,28,29,30,31,32,33,34,35,36,37],"categoryorder":"array","categoryarray":["according","alma","also","among","behold","brethren","came","come","even","father","forth","god","great","hath","helaman","lamanites","land","lord","man","many","may","men","mosiah","nephi","now","pass","people","said","shall","therefore","things","thou","unto","upon","will","words","yea"],"nticks":null,"ticks":"","tickcolor":null,"ticklen":3.65296803652968,"tickwidth":0,"showticklabels":true,"tickfont":{"color":"rgba(77,77,77,1)","family":"","size":11.689497716895},"tickangle":-45,"showline":false,"linecolor":null,"linewidth":0,"showgrid":true,"gridcolor":"rgba(235,235,235,1)","gridwidth":0.66417600664176,"zeroline":false,"anchor":"y","title":{"text":"word","font":{"color":"rgba(0,0,0,1)","family":"","size":14.6118721461187}},"hoverformat":".2f"},"yaxis":{"domain":[0,1],"automargin":true,"type":"linear","autorange":false,"range":[-87.95,1846.95],"tickmode":"array","ticktext":["0","500","1000","1500"],"tickvals":[0,500,1000,1500],"categoryorder":"array","categoryarray":["0","500","1000","1500"],"nticks":null,"ticks":"","tickcolor":null,"ticklen":3.65296803652968,"tickwidth":0,"showticklabels":true,"tickfont":{"color":"rgba(77,77,77,1)","family":"","size":11.689497716895},"tickangle":-0,"showline":false,"linecolor":null,"linewidth":0,"showgrid":true,"gridcolor":"rgba(235,235,235,1)","gridwidth":0.66417600664176,"zeroline":false,"anchor":"x","title":{"text":"freq","font":{"color":"rgba(0,0,0,1)","family":"","size":14.6118721461187}},"hoverformat":".2f"},"shapes":[{"type":"rect","fillcolor":null,"line":{"color":null,"width":0,"linetype":[]},"yref":"paper","xref":"paper","x0":0,"x1":1,"y0":0,"y1":1}],"showlegend":false,"legend":{"bgcolor":null,"bordercolor":null,"borderwidth":0,"font":{"color":"rgba(0,0,0,1)","family":"","size":11.689497716895}},"hovermode":"closest","barmode":"relative"},"config":{"doubleClick":"reset","showSendToCloud":false},"source":"A","attrs":{"2e8054471d5a":{"x":{},"y":{},"type":"bar"}},"cur_data":"2e8054471d5a","visdat":{"2e8054471d5a":["function (y) ","x"]},"highlight":{"on":"plotly_click","persistent":false,"dynamic":false,"selectize":false,"opacityDim":0.2,"selected":{"opacity":1},"debounce":0},"shinyEvents":["plotly_hover","plotly_click","plotly_selected","plotly_relayout","plotly_brushed","plotly_brushing","plotly_clickannotation","plotly_doubleclick","plotly_deselect","plotly_afterplot","plotly_sunburstclick"],"base_url":"https://plot.ly"},"evals":[],"jsHooks":[]}</script>
+<pre class="r"><code>set.seed(1234)
+wordcloud(names(mormon_freq), mormon_freq, 
+          min.freq = 30, colors = brewer.pal(6, &quot;Dark2&quot;),
+          fixed.asp = TRUE, random.order = FALSE)</code></pre>
+<p><img src="/blog/Religious-and-Sacred-Texts_files/figure-html/unnamed-chunk-13-1.png" width="864" /></p>
+<pre class="r"><code>rm(mormon_freq)
+rm(mormon_wf)
+rm(x)</code></pre>
+</div>
+</div>
+<div id="clustering" class="section level3">
+<h3>Clustering</h3>
+<p>The second phase of this text mining analysis to identify whether there are any naturally occurring clusters (groupings) in the data that can be used to classify the texts into further segments, thus providing further insights. A simple K-means clustering algorithim will be applied here, as it is simpler to interpret than other methods. The main objective here is to simply examine an example of applying an unsupervised learning technique, on the basis of which more advanced techniques can be utilised. Before progressing straight to the algorithim, a slight modification needs to be made to the data. The filtering section has to be altered, as when calculating distance measures required for the clustering algorithim, the sparse martrix produced is exceptionally large and thus the distance calculations take a long time to process (due to limited computing power). To improve efficiency, specfic proportions of the data are filtered, based on the origninal text file size to result in smaller sized sparse matrices (Bible = 0.1, Buddha = 0.5, Koran = 0.4, Meditations = 0.5, Mormon = 0.2). This approach does have its downsides, as will be discussed later. The only reason for this is to reduce the load on the CPU (no GPU was available during this process). The code is exactly the same as it was earlier, and will therefore not be shown.</p>
+<p>After collecting the data (again), the next steps towards applying the algorithim were to first remove excessive sparse terms from the DTM. This would further reduce the computing time and power required by the distance function. After this conversion, the DTM is converted to a regular matrix, after which the distance function is applied. Terms with 99.5% sparsity are removed from the set. The code for this is shown below:</p>
+<pre class="r"><code>meditations_rmsp &lt;- removeSparseTerms(meditations_dtm, 0.995)
+bible_rmsp &lt;- removeSparseTerms(bible_dtm, 0.995)
+koran_rmsp &lt;- removeSparseTerms(koran_dtm, 0.995)
+buddha_rmsp &lt;- removeSparseTerms(buddha_dtm, 0.995)
+mormon_rmsp &lt;- removeSparseTerms(mormon_dtm, 0.995)
+
+
+meditations_m &lt;- as.matrix(meditations_rmsp)
+bible_m &lt;- as.matrix(bible_rmsp)
+koran_m &lt;- as.matrix(koran_rmsp)
+buddha_m &lt;- as.matrix(buddha_rmsp)
+mormon_m &lt;- as.matrix(mormon_rmsp)
+
+meditations_dist &lt;- dist(meditations_m)
+bible_dist &lt;- dist(bible_m)
+koran_dist &lt;- dist(koran_m)
+buddha_dist &lt;- dist(buddha_m)
+mormon_dist &lt;- dist(mormon_m)</code></pre>
+<p>The parameter value to determine when applying a k-means clustering is of course the value of k. However, instead of blindly searching for k values, or applying grid searches that can take too much time to compute, there is a method that first determines how many k values can be used. This is called the Elbow method, where the number of potential k values are plotted against the sum of squared distances (calculated earlier). When an “elbow” is seen in the plot, the number of k’s at that elbow point is determined to be the optimal value of k for applying the algorithim. Therefore, before going forward with the actual algorithim itself, the elbow method is first applied, for each text.</p>
+<pre class="r"><code>meditations_nclust &lt;- fviz_nbclust(meditations_m,
+                   kmeans,
+                   k.max = 50,
+                   method = &quot;wss&quot;,
+                   diss = meditations_dist)
+
+
+mormon_nclust &lt;- fviz_nbclust(mormon_m,
+                                   kmeans,
+                                   k.max = 50,
+                                   method = &quot;wss&quot;,
+                                   diss = mormon_dist)
+
+
+bible_nclust &lt;- fviz_nbclust(bible_m,
+                                   kmeans,
+                                   k.max = 50,
+                                   method = &quot;wss&quot;,
+                                   diss = bible_dist)
+
+
+koran_nclust &lt;- fviz_nbclust(koran_m,
+                                   kmeans,
+                                   k.max = 50,
+                                   method = &quot;wss&quot;,
+                                   diss = koran_dist)
+
+buddha_nclust &lt;- fviz_nbclust(buddha_m,
+                                   kmeans,
+                                   k.max = 50,
+                                   method = &quot;wss&quot;,
+                                   diss = buddha_dist)
+
+meditations_nclust</code></pre>
+<p><img src="/blog/Religious-and-Sacred-Texts_files/figure-html/unnamed-chunk-16-1.png" width="864" /></p>
+<pre class="r"><code>mormon_nclust</code></pre>
+<p><img src="/blog/Religious-and-Sacred-Texts_files/figure-html/unnamed-chunk-16-2.png" width="864" /></p>
+<pre class="r"><code>bible_nclust</code></pre>
+<p><img src="/blog/Religious-and-Sacred-Texts_files/figure-html/unnamed-chunk-16-3.png" width="864" /></p>
+<pre class="r"><code>koran_nclust</code></pre>
+<p><img src="/blog/Religious-and-Sacred-Texts_files/figure-html/unnamed-chunk-16-4.png" width="864" /></p>
+<pre class="r"><code>buddha_nclust</code></pre>
+<p><img src="/blog/Religious-and-Sacred-Texts_files/figure-html/unnamed-chunk-16-5.png" width="864" /></p>
+</div>
+<div id="conclusion" class="section level3">
+<h3>Conclusion</h3>
+<p>From the plots shown, there is no distinct elbow seen in either of the texts. This can mean that either there are no clusters present, or that because small proportions of the data have been selected, there is not enough evidence for the method to detect any clusters. This may be plausible as religious and sacred texts do infact cover numerous themes, and since the filtered data is limited, the method was unable to capture any complete picture. It should be noted however that the elbow method is based on visual interpretation, which is not always the most reliable. It is also possible that the range of k’s selected (1:50) is not enough, but this is unlikely. A final possibility is that maybe the k-means algorithim itself isn’t suitable, and perhaps more advanced techniques such as model based clustering or autoencoders can help capture any highly complex clusters and patterns present in the data.</p>
+</div>

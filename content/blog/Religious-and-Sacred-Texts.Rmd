@@ -1,0 +1,431 @@
+---
+title: "Mining Religious and Sacred Texts"
+output: html_notebook
+---
+
+### Introduction
+
+This is an exercise in simple text mining. Five different religious and sacred texts are analysed, namely the King James Bible, the Koran, the Book of Meditations, the Gospel of Buddha and the Book of Mormon. The analysis is structured in two segments. First, the text data is processed and some visual analysis is performed, simply to gather a better understanding about these texts. The second segment involves applying a simple clustering algorithim to determine if there are any existing clusters (segments) present within the texts. The aim here is not make any religious or sacred commentary, rather only to apply statistical techniques on some texts that belong to a unique subject area. The data was freely obtained from https://www.kaggle.com/tentotheminus9/religious-and-philosophical-texts?select=pg2800.txt, where more details can be found.
+
+Loading the data and required libraries:
+
+```{r message=FALSE, warning=FALSE}
+#Libraries...
+library(readr)
+library(tm)
+library(tidyverse)
+library(wordcloud)
+library(cluster)
+library(factoextra)
+library(wordspace)
+library(plotly)
+#Data...
+
+Meditations <- read_lines("Meditations.txt")
+Koran <- read_lines("The-Koran.txt")
+Mormon <- read_lines("Book-of-Mormon.txt")
+Buddha <- read_lines("Gospel-of-Buddha.txt")
+Bible <- read_lines("King-James-Bible.txt")
+```
+
+
+### Filtering (for visualizations)
+
+As the loaded data is quite large in size, the data will be filtered to improve computational efficiency as much as possible due to limited computing power. 50% of the data is selected from each text. 
+
+```{r message=FALSE, warning=FALSE}
+set.seed(1234)
+
+Bible_filter <- sample(Bible, length(Bible) * 0.5) 
+Buddha_filter <- sample(Buddha, length(Buddha) * 0.5)
+Koran_filter <- sample(Koran, length(Koran) * 0.5) 
+Meditations_filter <- sample(Meditations, length(Meditations) * 0.5) 
+Mormon_filter <- sample(Mormon, length(Mormon) * 0.5) 
+
+```
+
+
+### Corpus and DTMs
+
+The next step is to transform the loaded text data into document corpuses. A corpus will allow for further edits on the text data, which in this case will be removing numbers, stopwords (for example "at", "the", "it" etc), punctuations and white spaces. Also, everything is converted to lower case. After these edits and transformations, each corpus is transformed into a Document Term Matrix (DTM), which creates a large sparse matrix indicating the presence or absence of each word in the texts. This matrix will then further enable any visualisations and analysis. This entire process is carried out in the code chunk below.
+
+```{r message=FALSE, warning=FALSE}
+#Create individual corpus for each book, as doing cluster analysis on each
+
+
+bible_corpus <- Corpus(VectorSource(Bible_filter))
+buddha_corpus <- Corpus(VectorSource(Buddha_filter))
+koran_corpus <- Corpus(VectorSource(Koran_filter))
+meditations_corpus <- Corpus(VectorSource(Meditations_filter))
+mormon_corpus <- Corpus(VectorSource(Mormon_filter))
+
+
+#Cleaning each corpus..
+
+bible_corpus <- tm_map(bible_corpus, content_transformer(tolower))
+bible_corpus <- tm_map(bible_corpus, removeNumbers)
+bible_corpus <- tm_map(bible_corpus, removeWords, stopwords())
+bible_corpus <- tm_map(bible_corpus, removePunctuation)
+bible_corpus <- tm_map(bible_corpus, stripWhitespace)
+
+buddha_corpus <- tm_map(buddha_corpus, content_transformer(tolower))
+buddha_corpus <- tm_map(buddha_corpus, removeNumbers)
+buddha_corpus <- tm_map(buddha_corpus, removeWords, stopwords())
+buddha_corpus <- tm_map(buddha_corpus, removePunctuation)
+buddha_corpus <- tm_map(buddha_corpus, stripWhitespace)
+
+koran_corpus <- tm_map(koran_corpus, content_transformer(tolower))
+koran_corpus <- tm_map(koran_corpus, removeNumbers)
+koran_corpus <- tm_map(koran_corpus, removeWords, stopwords())
+koran_corpus <- tm_map(koran_corpus, removePunctuation)
+koran_corpus <- tm_map(koran_corpus, stripWhitespace)
+
+meditations_corpus <- tm_map(meditations_corpus, content_transformer(tolower))
+meditations_corpus <- tm_map(meditations_corpus, removeNumbers)
+meditations_corpus <- tm_map(meditations_corpus, removeWords, stopwords())
+meditations_corpus <- tm_map(meditations_corpus, removePunctuation)
+meditations_corpus <- tm_map(meditations_corpus, stripWhitespace)
+
+mormon_corpus <- tm_map(mormon_corpus, content_transformer(tolower))
+mormon_corpus <- tm_map(mormon_corpus, removeNumbers)
+mormon_corpus <- tm_map(mormon_corpus, removeWords, stopwords())
+mormon_corpus <- tm_map(mormon_corpus, removePunctuation)
+mormon_corpus <- tm_map(mormon_corpus, stripWhitespace)
+
+
+#creating sparse matrix - tokenization..
+
+bible_dtm <- DocumentTermMatrix(bible_corpus)
+buddha_dtm <- DocumentTermMatrix(buddha_corpus)
+koran_dtm <- DocumentTermMatrix(koran_corpus)
+meditations_dtm <- DocumentTermMatrix(meditations_corpus)
+mormon_dtm <- DocumentTermMatrix(mormon_corpus)
+
+
+#Remove unecessary items
+
+rm(Bible)
+rm(Buddha)
+rm(Koran)
+rm(Meditations)
+rm(Mormon)
+rm(toSpace)
+rm(bible_corpus)
+rm(buddha_corpus)
+rm(koran_corpus)
+rm(meditations_corpus)
+rm(mormon_corpus)
+rm(Bible_filter)
+rm(Buddha_filter)
+rm(Koran_filter)
+rm(Meditations_filter)
+rm(Mormon_filter)
+
+#Clear Junk Memory 
+gc()
+
+```
+
+
+### Visualizing
+
+Having converted the data into the required format, visualizing techniques can be applied on it. As this is text data, the most insightful approach would be to visualize the frequency of words occuring in each of the sacred texts. Two different techniques will be used here; a standard bar chart (interactive) and the more specific WordClouds. As these graphics are fairly self-explanatory, no additional commentary is required. The visualizations are as follows:
+
+#### King James Bible
+```{r message=FALSE, warning=FALSE, fig.width=9, fig.height=6}
+bible_freq <- sort(colSums(as.matrix(bible_dtm)), decreasing = TRUE) #temporary dataframe
+bible_wf <- data.frame(word = names(bible_freq), freq = bible_freq) #temporary dataframe
+
+x <- subset(bible_wf, bible_freq > 500) %>%
+  ggplot(aes(word, freq)) +
+  geom_bar(stat = "identity", fill = "lightblue", color = "black") +
+  theme_minimal() +
+  theme(axis.text.x=element_text(angle=45, hjust=1))#plotting the words with frequency of above 500
+
+ggplotly(x)
+```
+
+```{r message=FALSE, warning=FALSE, fig.width=9, fig.height=9}
+set.seed(1234)
+wordcloud(names(bible_freq), bible_freq, 
+          min.freq = 50, colors = brewer.pal(6, "Dark2"),
+          fixed.asp = TRUE, random.order = FALSE) #words with a minimum frequency of at least 50
+
+rm(bible_freq) #remove temporary dataframe
+rm(bible_wf) #remove temporary dataframe
+rm(x) #remove temporary dataframe
+```
+
+#### Gospel of Buddha
+
+```{r message=FALSE, warning=FALSE, fig.width=9, fig.height=6}
+buddha_freq <- sort(colSums(as.matrix(buddha_dtm)), decreasing = TRUE) #temp df
+buddha_wf <- data.frame(word = names(buddha_freq), freq = buddha_freq) #temp df
+
+x <- subset(buddha_wf, buddha_freq > 50) %>%
+  ggplot(aes(word, freq)) +
+  geom_bar(stat = "identity", fill = "goldenrod2", color = "black") +
+  theme_minimal() +
+  theme(axis.text.x=element_text(angle=45, hjust=1)) #frequency > 50
+
+ggplotly(x)
+```
+
+```{r message=FALSE, warning=FALSE, fig.width=9, fig.height=9}
+set.seed(1234)
+wordcloud(names(buddha_freq), buddha_freq, 
+          min.freq = 10, colors = brewer.pal(6, "Dark2"),
+          fixed.asp = TRUE, random.order = FALSE) #frequency at least 10
+
+rm(buddha_freq)
+rm(buddha_wf)
+rm(x) #remove temporary dataframe
+```
+
+#### The Koran
+
+```{r message=FALSE, warning=FALSE, fig.width=9, fig.height=6}
+koran_freq <- sort(colSums(as.matrix(koran_dtm)), decreasing = TRUE)
+koran_wf <- data.frame(word = names(koran_freq), freq = koran_freq)
+
+x <- subset(koran_wf, koran_freq > 110) %>%
+  ggplot(aes(word, freq)) +
+  geom_bar(stat = "identity", fill = "lightgreen", color = "black") +
+  theme_minimal() +
+  theme(axis.text.x=element_text(angle=45, hjust=1))
+
+ggplotly(x)
+```
+
+```{r message=FALSE, warning=FALSE, fig.width=9, fig.height=9}
+set.seed(1234)
+wordcloud(names(koran_freq), koran_freq, 
+          min.freq = 15, colors = brewer.pal(6, "Dark2"),
+          fixed.asp = TRUE, random.order = FALSE)
+
+rm(koran_freq)
+rm(koran_wf)
+rm(x)
+```
+
+#### Meditations
+
+```{r message=FALSE, warning=FALSE, fig.width=9, fig.height=6}
+meditations_freq <- sort(colSums(as.matrix(meditations_dtm)), decreasing = TRUE)
+meditations_wf <- data.frame(word = names(meditations_freq), 
+                             freq = meditations_freq)
+
+x <- subset(meditations_wf, meditations_freq > 60) %>%
+  ggplot(aes(word, freq)) +
+  geom_bar(stat = "identity", fill = "indianred2", color = "black") +
+  theme_minimal() +
+  theme(axis.text.x=element_text(angle=45, hjust=1))
+
+
+ggplotly(x)
+```
+
+```{r message=FALSE, warning=FALSE, fig.width=9, fig.height=9}
+set.seed(1234)
+wordcloud(names(meditations_freq), meditations_freq, 
+          min.freq = 10, colors = brewer.pal(6, "Dark2"),
+          fixed.asp = TRUE, random.order = FALSE)
+
+rm(meditations_freq)
+rm(meditations_wf)
+rm(x)
+```
+
+#### Book of Mormon
+
+```{r message=FALSE, warning=FALSE, fig.width=9, fig.height=6}
+mormon_freq <- sort(colSums(as.matrix(mormon_dtm)), decreasing = TRUE)
+mormon_wf <- data.frame(word = names(mormon_freq), freq = mormon_freq)
+
+x <- subset(mormon_wf, mormon_freq > 250) %>%
+  ggplot(aes(word, freq)) +
+  geom_bar(stat = "identity", fill = "slategray3", color = "black") +
+  theme_minimal() +
+  theme(axis.text.x=element_text(angle=45, hjust=1))
+
+
+ggplotly(x)
+```
+
+```{r message=FALSE, warning=FALSE, fig.width=9, fig.height=9}
+set.seed(1234)
+wordcloud(names(mormon_freq), mormon_freq, 
+          min.freq = 30, colors = brewer.pal(6, "Dark2"),
+          fixed.asp = TRUE, random.order = FALSE)
+
+rm(mormon_freq)
+rm(mormon_wf)
+rm(x)
+```
+
+
+### Clustering
+
+The second phase of this text mining analysis to identify whether there are any naturally occurring clusters (groupings) in the data that can be used to classify the texts into further segments, thus providing further insights. A simple K-means clustering algorithim will be applied here, as it is simpler to interpret than other methods. The main objective here is to simply examine an example of applying an unsupervised learning technique, on the basis of which more advanced techniques can be utilised. Before progressing straight to the algorithim, a slight modification needs to be made to the data. The filtering section has to be altered, as when calculating distance measures required for the clustering algorithim, the sparse martrix produced is exceptionally large and thus the distance calculations take a long time to process (due to limited computing power). To improve efficiency, specfic proportions of the data are filtered, based on the origninal text file size to result in smaller sized sparse matrices (Bible = 0.1, Buddha = 0.5, Koran = 0.4, Meditations = 0.5, Mormon = 0.2). This approach does have its downsides, as will be discussed later. The only reason for this is to reduce the load on the CPU (no GPU was available during this process). The code is exactly the same as it was earlier, and will therefore not be shown. 
+
+```{r message=FALSE, warning=FALSE, fig.width=9, fig.height=9, results='hide', echo=FALSE}
+Meditations <- read_lines("Meditations.txt")
+Koran <- read_lines("The-Koran.txt")
+Mormon <- read_lines("Book-of-Mormon.txt")
+Buddha <- read_lines("Gospel-of-Buddha.txt")
+Bible <- read_lines("King-James-Bible.txt")
+
+
+#Filtering..
+set.seed(1234)
+
+Bible_filter <- sample(Bible, length(Bible) * 0.1) 
+Buddha_filter <- sample(Buddha, length(Buddha) * 0.5)
+Koran_filter <- sample(Koran, length(Koran) * 0.4) 
+Meditations_filter <- sample(Meditations, length(Meditations) * 0.5) 
+Mormon_filter <- sample(Mormon, length(Mormon) * 0.2) 
+
+#Create individual corpus for each book, as doing cluster analysis on each
+
+bible_corpus <- Corpus(VectorSource(Bible_filter))
+buddha_corpus <- Corpus(VectorSource(Buddha_filter))
+koran_corpus <- Corpus(VectorSource(Koran_filter))
+meditations_corpus <- Corpus(VectorSource(Meditations_filter))
+mormon_corpus <- Corpus(VectorSource(Mormon_filter))
+
+
+#Cleaning each corpus..
+
+bible_corpus <- tm_map(bible_corpus, content_transformer(tolower))
+bible_corpus <- tm_map(bible_corpus, removeNumbers)
+bible_corpus <- tm_map(bible_corpus, removeWords, stopwords())
+bible_corpus <- tm_map(bible_corpus, removePunctuation)
+bible_corpus <- tm_map(bible_corpus, stripWhitespace)
+
+buddha_corpus <- tm_map(buddha_corpus, content_transformer(tolower))
+buddha_corpus <- tm_map(buddha_corpus, removeNumbers)
+buddha_corpus <- tm_map(buddha_corpus, removeWords, stopwords())
+buddha_corpus <- tm_map(buddha_corpus, removePunctuation)
+buddha_corpus <- tm_map(buddha_corpus, stripWhitespace)
+
+koran_corpus <- tm_map(koran_corpus, content_transformer(tolower))
+koran_corpus <- tm_map(koran_corpus, removeNumbers)
+koran_corpus <- tm_map(koran_corpus, removeWords, stopwords())
+koran_corpus <- tm_map(koran_corpus, removePunctuation)
+koran_corpus <- tm_map(koran_corpus, stripWhitespace)
+
+meditations_corpus <- tm_map(meditations_corpus, content_transformer(tolower))
+meditations_corpus <- tm_map(meditations_corpus, removeNumbers)
+meditations_corpus <- tm_map(meditations_corpus, removeWords, stopwords())
+meditations_corpus <- tm_map(meditations_corpus, removePunctuation)
+meditations_corpus <- tm_map(meditations_corpus, stripWhitespace)
+
+mormon_corpus <- tm_map(mormon_corpus, content_transformer(tolower))
+mormon_corpus <- tm_map(mormon_corpus, removeNumbers)
+mormon_corpus <- tm_map(mormon_corpus, removeWords, stopwords())
+mormon_corpus <- tm_map(mormon_corpus, removePunctuation)
+mormon_corpus <- tm_map(mormon_corpus, stripWhitespace)
+
+
+#creating sparse matrix - tokenization..
+
+bible_dtm <- DocumentTermMatrix(bible_corpus)
+buddha_dtm <- DocumentTermMatrix(buddha_corpus)
+koran_dtm <- DocumentTermMatrix(koran_corpus)
+meditations_dtm <- DocumentTermMatrix(meditations_corpus)
+mormon_dtm <- DocumentTermMatrix(mormon_corpus)
+
+
+#Remove unecessary items and clear memory
+
+rm(Bible)
+rm(Buddha)
+rm(Koran)
+rm(Meditations)
+rm(Mormon)
+rm(toSpace)
+rm(bible_corpus)
+rm(buddha_corpus)
+rm(koran_corpus)
+rm(meditations_corpus)
+rm(mormon_corpus)
+rm(Bible_filter)
+rm(Buddha_filter)
+rm(Koran_filter)
+rm(Meditations_filter)
+rm(Mormon_filter)
+gc()
+
+```
+
+After collecting the data (again), the next steps towards applying the algorithim were to first remove excessive sparse terms from the DTM. This would further reduce the computing time and power required by the distance function. After this conversion, the DTM is converted to a regular matrix, after which the distance function is applied. Terms with 99.5% sparsity are removed from the set. The code for this is shown below:
+
+```{r message=FALSE, warning=FALSE, fig.width=9, fig.height=9}
+meditations_rmsp <- removeSparseTerms(meditations_dtm, 0.995)
+bible_rmsp <- removeSparseTerms(bible_dtm, 0.995)
+koran_rmsp <- removeSparseTerms(koran_dtm, 0.995)
+buddha_rmsp <- removeSparseTerms(buddha_dtm, 0.995)
+mormon_rmsp <- removeSparseTerms(mormon_dtm, 0.995)
+
+
+meditations_m <- as.matrix(meditations_rmsp)
+bible_m <- as.matrix(bible_rmsp)
+koran_m <- as.matrix(koran_rmsp)
+buddha_m <- as.matrix(buddha_rmsp)
+mormon_m <- as.matrix(mormon_rmsp)
+
+meditations_dist <- dist(meditations_m)
+bible_dist <- dist(bible_m)
+koran_dist <- dist(koran_m)
+buddha_dist <- dist(buddha_m)
+mormon_dist <- dist(mormon_m)
+```
+
+The parameter value to determine when applying a k-means clustering is of course the value of k. However, instead of blindly searching for k values, or applying grid searches that can take too much time to compute, there is a method that first determines how many k values can be used. This is called the Elbow method, where the number of potential k values are plotted against the sum of squared distances (calculated earlier). When an "elbow" is seen in the plot, the number of k's at that elbow point is determined to be the optimal value of k for applying the algorithim. Therefore, before going forward with the actual algorithim itself, the elbow method is first applied, for each text. 
+
+```{r message=FALSE, warning=FALSE, fig.width=9, fig.height=6}
+meditations_nclust <- fviz_nbclust(meditations_m,
+                   kmeans,
+                   k.max = 50,
+                   method = "wss",
+                   diss = meditations_dist)
+
+
+mormon_nclust <- fviz_nbclust(mormon_m,
+                                   kmeans,
+                                   k.max = 50,
+                                   method = "wss",
+                                   diss = mormon_dist)
+
+
+bible_nclust <- fviz_nbclust(bible_m,
+                                   kmeans,
+                                   k.max = 50,
+                                   method = "wss",
+                                   diss = bible_dist)
+
+
+koran_nclust <- fviz_nbclust(koran_m,
+                                   kmeans,
+                                   k.max = 50,
+                                   method = "wss",
+                                   diss = koran_dist)
+
+buddha_nclust <- fviz_nbclust(buddha_m,
+                                   kmeans,
+                                   k.max = 50,
+                                   method = "wss",
+                                   diss = buddha_dist)
+
+meditations_nclust
+mormon_nclust
+bible_nclust
+koran_nclust
+buddha_nclust
+```
+
+
+### Conclusion
+
+From the plots shown, there is no distinct elbow seen in either of the texts. This can mean that either there are no clusters present, or that because small proportions of the data have been selected, there is not enough evidence for the method to detect any clusters. This may be plausible as religious and sacred texts do infact cover numerous themes, and since the filtered data is limited, the method was unable to capture any complete picture. It should be noted however that the elbow method is based on visual interpretation, which is not always the most reliable. It is also possible that the range of k's selected (1:50) is not enough, but this is unlikely. A final possibility is that maybe the k-means algorithim itself isn't suitable, and perhaps more advanced techniques such as model based clustering or autoencoders can help capture any highly complex clusters and patterns present in the data. 
+

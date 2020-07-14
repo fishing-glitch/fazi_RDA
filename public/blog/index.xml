@@ -12,12 +12,76 @@
     
     
     <item>
+      <title>Brent Oil Prices - Time Series with ML Models</title>
+      <link>/blog/brent-oil/</link>
+      <pubDate>Mon, 01 Jan 0001 00:00:00 +0000</pubDate>
+      
+      <guid>/blog/brent-oil/</guid>
+      <description>IntroductionWhile traditional time series models such as the Exponential Smoothing and ARIMA families are perfectly capable of making sound forecasts, there are some instances where such models are unable to fully capture what the data is portraying. In such cases, especially where the highest predictive power is required and favoured over model interpretability, advanced machine learning methods can be useful. In this analysis, the daily prices of Brent Oil(20th May 1987 - 21st April 2020) are going to be examined.</description>
+    </item>
+    
+    <item>
+      <title>Classifying Divorce</title>
+      <link>/blog/divorce/</link>
+      <pubDate>Mon, 01 Jan 0001 00:00:00 +0000</pubDate>
+      
+      <guid>/blog/divorce/</guid>
+      <description>IntroductionThe following analysis is a classification problem, where the goal is to try and predict divorce based on a “Divorce Predictors Scale”. The data was developed based on a psychology study named Gottman couples therapy, and was freely obtained via http://archive.ics.uci.edu/ml/datasets/Divorce+Predictors+data+set. The link to the original study from which this data emerged is https://dergipark.org.tr/en/pub/nevsosbilen/issue/46568/549416. The aim here is to utilise the answers by couples to 54 questions regarding their marriage to try and predict whether the marriage is intact or if divorce is imminent.</description>
+    </item>
+    
+    <item>
+      <title>Cocaine Trees - Predicting Prices with Random Forests</title>
+      <link>/blog/cocaine-prices/</link>
+      <pubDate>Mon, 01 Jan 0001 00:00:00 +0000</pubDate>
+      
+      <guid>/blog/cocaine-prices/</guid>
+      <description>IntroductionThe following analysis utilises data comprising of cocaine prices available on an online hidden marketplace called Dream Market, available on the deep web. This data was freely obtained at https://www.kaggle.com/everling/cocaine-listings, with further details about the data available in the description. As the title might suggest, the goal of this analysis is attempting to accurately predict the cocaine prices based on the variables provided, utlising the Random Forests (RF) method.</description>
+    </item>
+    
+    <item>
+      <title>Computer Prices with Simple Regression</title>
+      <link>/blog/computers/</link>
+      <pubDate>Mon, 01 Jan 0001 00:00:00 +0000</pubDate>
+      
+      <guid>/blog/computers/</guid>
+      <description>IntroductionThis analysis involves a simple prediction problem. The dataset has been designed for basic data analysis, and is suitable for applying introductory predictive methods. The goal is to simply gain an understanding into the analytical process using two basic predictive models: Linear Regression and Multiple Adaptive Regression Splines (MARS).
+The dataset contains some information about computers, with the dependant variable in this case being price, and other features including speed, RAM, screen etc.</description>
+    </item>
+    
+    <item>
       <title>Drugs and Memories - The impact of Interaction in Regressions</title>
       <link>/blog/drugs-and-memories/</link>
       <pubDate>Mon, 01 Jan 0001 00:00:00 +0000</pubDate>
       
       <guid>/blog/drugs-and-memories/</guid>
       <description>IntroductionThis is a simple analysis examining how variables interacting with each other can impact regression performance. The data set has only nine features, out of which there will be further feature selection, thereby making it easy to understand the effects. The data was freely obtained from https://www.kaggle.com/steveahn/memory-test-on-drugged-islanders-data. It describes the results of an experiment which observes the effects of anti-anxiety medicine on memory recall, while simultaneously including the effect of happy and sad memories.</description>
+    </item>
+    
+    <item>
+      <title>Mining Religious and Sacred Texts</title>
+      <link>/blog/religious-and-sacred-texts/</link>
+      <pubDate>Mon, 01 Jan 0001 00:00:00 +0000</pubDate>
+      
+      <guid>/blog/religious-and-sacred-texts/</guid>
+      <description>IntroductionThis is an exercise in simple text mining. Five different religious and sacred texts are analysed, namely the King James Bible, the Koran, the Book of Meditations, the Gospel of Buddha and the Book of Mormon. The analysis is structured in two segments. First, the text data is processed and some visual analysis is performed, simply to gather a better understanding about these texts.</description>
+    </item>
+    
+    <item>
+      <title>Predicting Forest Fires with Regressions</title>
+      <link>/blog/forest-fires/</link>
+      <pubDate>Mon, 01 Jan 0001 00:00:00 +0000</pubDate>
+      
+      <guid>/blog/forest-fires/</guid>
+      <description>IntroductionThe following analysis aims to attempt a difficult regression task of predicting the burned area caused by forest fires. The data is based on the north-east region of Portugal, and comprises of meteorological and other data. The link to the data set is http://archive.ics.uci.edu/ml/datasets/Forest+Fires. This is based on the original work done by Cortez and Morais (2007), where the authors utilised data mining techniques to predict forest fires. A somewhat simpler approach is utlised in this analysis as compared to the original, with similarities in terms of feature engineering and error metrics.</description>
+    </item>
+    
+    <item>
+      <title>Sao Paulo Temperature - Time Series with Exponential Smoothing Models</title>
+      <link>/blog/sao-paulo-temperature/</link>
+      <pubDate>Mon, 01 Jan 0001 00:00:00 +0000</pubDate>
+      
+      <guid>/blog/sao-paulo-temperature/</guid>
+      <description>IntroductionThis time series analysis involves modelling the average monthly temperature in the city of Sao Paulo, Brazil. The data spans across 74 years, and was freely obtained from the following link: https://www.kaggle.com/volpatto/temperature-timeseries-for-some-brazilian-cities?select=station_sao_paulo.csv. The goal of the analysis is to utilise three exponential smoothing models (Simple Exponential Smoothing (SES), Holt Method, Holt-Winters (HW) method) and determine which of these three models performs the best for forecasting the monthly average temperature.</description>
     </item>
     
     <item>

@@ -1,0 +1,196 @@
+---
+title: "Computer Prices with Simple Regression"
+output: html_notebook
+---
+
+### Introduction
+
+This analysis involves a simple prediction problem. The dataset has been designed for basic data analysis, and is suitable for applying introductory predictive methods. The goal is to simply gain an understanding into the analytical process using two basic predictive models: Linear Regression and Multiple Adaptive Regression Splines (MARS).
+
+The dataset contains some information about computers, with the dependant variable in this case being price, and other features including speed, RAM, screen etc. The data is freely avaibale from this link: https://www.kaggle.com/kingburrito666/basic-computer-data-set
+
+Before beginning, first the required libraries are loaded, along with the data itself.
+
+```{r message=FALSE, warning=FALSE}
+#Libraries
+library(ggplot2)
+library(magrittr)
+library(rsample)
+library(caret)
+library(plyr)
+#Load the Data
+computers <- read.csv("computers.csv", stringsAsFactors = TRUE)
+```
+
+
+### Data Preprocessing
+
+The next step before jumping into the analysis is to clean up the data a bit and fix any potential issues that may arise. Doing this requires some initial exploring.
+
+```{r message=FALSE, warning=FALSE}
+str(computers) #indicating the data type for each variable
+
+sum(is.na(computers)) #whether there are any NA values
+```
+
+There are a few things that can be done to make this analysis a bit more simple. Some unnecessary features are removed, since there is no clear description about what these features actually mean with regards to computer pricing. This is more of an arbitrary judgement in this case. The features being removed are "X", "ads", and "trend". Alongside this, the features "speed", "ram" and "screen" are converted from integer to factor types as these variables are actually categorical instead of simple numerical values.  
+
+```{r message=FALSE, warning=FALSE}
+computers.clean <- computers[, -1] #removing X
+computers.clean <- computers.clean[, -10] #removing trend
+computers.clean <- computers.clean[, -9] #removing ads
+
+computers.clean$speed <- as.factor(computers.clean$speed) 
+computers.clean$ram <- as.factor(computers.clean$ram)
+computers.clean$screen <- as.factor(computers.clean$screen)
+```
+
+A glimpse of the data can be helpful. 
+
+```{r message=FALSE, warning=FALSE}
+head(computers.clean)
+```
+
+It is also useful to convert the characters "yes" and "no" into 1 and 0 numbers respectively. While some predictive models do not require this conversion, other more simple methods do need numeric values. Therefore it is better to simply convert such variables to numeric, as opposed to risking an error. 
+
+```{r message=FALSE, warning=FALSE}
+computers.clean$premium<- revalue(computers.clean$premium, c("yes"=1))
+computers.clean$premium<- revalue(computers.clean$premium, c("no"=0))
+computers.clean$multi<- revalue(computers.clean$multi, c("yes"=1))
+computers.clean$multi<- revalue(computers.clean$multi, c("no"=0))
+computers.clean$cd<- revalue(computers.clean$cd, c("yes"=1))
+computers.clean$cd<- revalue(computers.clean$cd, c("no"=0))
+
+summary(computers.clean) #Summarizing all the variables
+
+```
+
+
+### Visualizing and Exploring
+
+Following the preprocessing stage, the next step in this analysis is to visualize the features. This will provide any insights about the specific distributions and other aspects about the nature of each feature. As the dataset is quite simple, there is no expectation that any complicated insight will be generated. Still, it is useful to get a visual perspective. 
+
+```{r message=FALSE, warning=FALSE, fig.width=9, fig.height=6}
+computers.clean %>%
+  ggplot(aes(x = price)) +
+  geom_histogram(bins = 30) + 
+  theme_minimal() #histogram for Price
+computers.clean %>%
+  ggplot(aes(x = price)) +
+  geom_boxplot() + 
+  theme_minimal() #boxplot for Price
+```
+
+Initial impressions of the histogram indicate a right-skewed distribution for computer prices. This is confirmed by the presence of some outliers indicated by high-priced computers. The outliers can be visualized by the boxplot. While generally it is recommended to transform the dependent variable in order to reduce skewness, here it is ignored as firstly it is really not that severe, and for the purpose of this exercise it is not necessary to strictly ensure Gaussian distributions as this is more about describing the process of analysis, as opposed to analytical accuracy. 
+
+```{r message=FALSE, warning=FALSE, fig.width=9, fig.height=6}
+computers.clean %>%
+  ggplot(aes(x = hd)) +
+  geom_histogram(bins = 20) + 
+  theme_minimal() #historgram for HD
+computers.clean %>%
+  ggplot(aes(x = hd)) +
+  geom_boxplot() +
+  theme_minimal() #boxplot for HD
+```
+
+Similarly skewed distributions and outliers are observed for the HD variable as well. As RAM and Screen are categorical variables, simple bar plots can be used to visualize them. A useful insight into these variables is the imbalanced count between them, with large RAM and Screen size accounting for a small proportion of the data. This can be a problem for predictive models, especially with small sample sizes such as this data, as there are not enough observations for the model to provide a robust prediction at these specific categories. This problem can be solved by random sampling techniques. 
+
+```{r message=FALSE, warning=FALSE, fig.width=9, fig.height=6}
+computers.clean %>%
+  ggplot(aes(x = ram)) +
+  geom_bar(aes(fill = ram)) +
+  theme_minimal() #bar plot for RAM
+computers.clean %>%
+  ggplot(aes(x = screen)) +
+  geom_bar(aes(fill = screen)) +
+  theme_minimal() #bar plot for screen size
+
+```
+
+Finally, proportion tables can also be used to visualize and understand the remaining variables; premium, multi and cd. Disproportionate categories can be seen in the Premium and Multi variables as well, while CD remains somewhat balanced. 
+
+```{r message=FALSE, warning=FALSE}
+prop.table(table(computers.clean$premium)) * 100
+prop.table(table(computers.clean$multi)) * 100
+prop.table(table(computers.clean$cd)) * 100
+```
+
+
+### Modelling
+
+Having completed the visualizing and exploring phase, the next step is the actual modelling. For this analysis, two models are being used, as mentioned earlier. The simple Linear Regression Model will first be applied, serving as the benchmark performer. Following this, the MARS model will be applied to observe if there is any improvement in accuracy. 
+
+Before moving on to the actual models, the data first needs to be split into training and testing partitions. A 65/35 split is used here, as the data size is small and this split reserves a fair portion for testing to avoid overfitting models. 
+
+```{r message=FALSE, warning=FALSE}
+set.seed(1234)
+split <- initial_split(computers.clean, prop = 0.65)
+comp_train <- training(split) #4069 rows
+comp_test <- testing(split) #2190 rows
+```
+
+The next step is choosing a resampling strategy. Repeated cross-validation generally works quite well to improve accuracy and performance. However, on very large datasets this will obviously be more computationally taxing than regular cross-validation or bootstrapping.
+
+```{r message = FALSE, warning=FALSE}
+cv <- trainControl(
+  method = "repeatedcv",
+  number = 20,
+  repeats = 10
+) #20-fold cross validation with 10 repititions. Seems a bit overkill but it's okay. 
+```
+
+The modelling process can now begin. The caret() package is being used for model training and testing. Below is the Linear Model being implemented:
+
+```{r message = FALSE, warning=FALSE}
+set.seed(1234)
+comp_model_lm <- train(form = price ~ .,
+                     data = comp_train,
+                     method = "lm",
+                     trControl = cv) 
+
+comp_model_lm #Linear Model
+```
+
+Initial impressions of the LM model state that the model performed somewhat average. The R-square is nothing spectacular. As this is simply a benchmark model, the RMSE value and R square will be used as a comparison with future model performances. 
+
+The next step is applying the MARS model. This model may work better than the standard linear model if there is a lack of a strictly linear relationship between the predictors and the dependant variable. A basic implementation of the MARS model is being applied here, without any hyperparameter tuning or grid searches. This will utilise default values for interaction complexity (degree) and find the number of terms to retain (nprune). It should be noted that the number of degrees selected is very unlikely to be above 3 as there tends to be very little benefit in performance beyond this number. 
+
+```{r message = FALSE, warning=FALSE}
+set.seed(1234)
+
+comp_model_mars <- train(form = price ~ .,
+                     data = comp_train,
+                     method = "earth",
+                     metric = "RMSE",
+                     trControl = cv)
+
+comp_model_mars #MARS model
+```
+
+The three metrics used to compare the two models are the RMSE (Root Mean Squared Error), R-squared and MAE (Mean Absolute Error). Generally the RMSE is used more frequently as it penalizes larger errors more than the MAE, but in this case all three are used. 
+
+```{r message = FALSE, warning=FALSE}
+summary(resamples(list(
+  lm_model = comp_model_lm,
+  mars_model = comp_model_mars
+)))
+```
+
+It can be seen that the average RMSE and MAE are both lower for the MARS model as opposed to the Linear Model. The average R-square for the MARS model is also higher. However, it should be noted that these differences are very marginal. Also, these tests are done on the training sets, and the metrics need to be calculated on the testing partition as well to assess whether there was any overfitting. 
+
+```{r message = FALSE, warning=FALSE}
+lm_pred <- predict(comp_model_lm, comp_test) #predicting using the trained model on the test sets
+mars_pred <- predict(comp_model_mars, comp_test)
+
+postResample(lm_pred, comp_test$price)
+postResample(mars_pred, comp_test$price)
+```
+
+The above results again indicate that the MARS model performs better, yet still only being a marginal improvement. It is also a good indication that there is no significant overfitting, as the RMSE and R-square values are fairly close to each other for both training and testing sets. 
+
+
+### Conclusion
+
+The above analysis can be considered a simplified version of the analytical process, starting from data cleaning and processing, moving on to visualizing and exploration and ending at the modelling phase. From the modelling phase, it was determined that the MARS model performs better at predicting the computer prices. However, this result should not be taken for granted, at least not without any further exploration. It was seen that some features of the data were skewed, and training models on such skewed data without correcting for this can lead to unreliable testing results, especially in models such as the simple Linear Model. Along with this, feature testing can also be conducted to determine which features are more important for the predictions. Also, it is useful to run numerous iterations of the models, specifically with hyperparameter tuning as this tends to produce more accurate results. 
+

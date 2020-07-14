@@ -1,0 +1,285 @@
+---
+title: "Classifying Divorce"
+output: html_notebook
+---
+
+### Introduction
+
+The following analysis is a classification problem, where the goal is to try and predict divorce based on a "Divorce Predictors Scale". The data was developed based on a psychology study named Gottman couples therapy, and was freely obtained via http://archive.ics.uci.edu/ml/datasets/Divorce+Predictors+data+set. The link to the original study from which this data emerged is https://dergipark.org.tr/en/pub/nevsosbilen/issue/46568/549416. The aim here is to utilise the answers by couples to 54 questions regarding their marriage to try and predict whether the marriage is intact or if divorce is imminent. 
+
+Loading the data and required libraries:
+
+```{r message=FALSE, warning=FALSE}
+#Libraries...
+library(corrplot)
+library(caret)
+library(tidyverse)
+library(rsample)
+library(ROCR)
+library(vip)
+
+#Loading data...
+divorce <- read.csv("divorce.csv", sep = ";")
+```
+
+### Visualizing and Exploring
+
+Before progressing forward, it may be helpful to list all the questions as a quick reference if required. The 54 questions are as follows:
+
+Status (dependent variable) - describes whether divorced (1) or married (0)
+
+1.  If one of us apologizes when our discussion deteriorates, the discussion ends.
+2.  I know we can ignore our differences, even if things get hard sometimes.
+3.  When we need it, we can take our discussions with my spouse from the beginning and correct it.
+4.  When I discuss with my spouse, to contact him will eventually work.
+5.  The time I spent with my wife is special for us.
+6.  We don't have time at home as partners.
+7.  We are like two strangers who share the same environment at home rather than family.
+8.  I enjoy our holidays with my wife.
+9.  I enjoy traveling with my wife.
+10. Most of our goals are common to my spouse.
+11. I think that one day in the future, when I look back, I see that my spouse and I have been in harmony with each other.
+12. My spouse and I have similar values in terms of personal freedom.
+13. My spouse and I have similar sense of entertainment.
+14. Most of our goals for people (children, friends, etc.) are the same.
+15. Our dreams with my spouse are similar and harmonious.
+16. We're compatible with my spouse about what love should be.
+17. We share the same views about being happy in our life with my spouse
+18. My spouse and I have similar ideas about how marriage should be
+19. My spouse and I have similar ideas about how roles should be in marriage
+20. My spouse and I have similar values in trust.
+21. I know exactly what my wife likes.
+22. I know how my spouse wants to be taken care of when she/he sick.
+23. I know my spouse's favorite food.
+24. I can tell you what kind of stress my spouse is facing in her/his life.
+25. I have knowledge of my spouse's inner world.
+26. I know my spouse's basic anxieties.
+27. I know what my spouse's current sources of stress are.
+28. I know my spouse's hopes and wishes.
+29. I know my spouse very well.
+30. I know my spouse's friends and their social relationships.
+31. I feel aggressive when I argue with my spouse.
+32. When discussing with my spouse, I usually use expressions such as ‘you always’ or ‘you never’ .
+33. I can use negative statements about my spouse's personality during our discussions.
+34. I can use offensive expressions during our discussions.
+35. I can insult my spouse during our discussions.
+36. I can be humiliating when we discussions.
+37. My discussion with my spouse is not calm.
+38. I hate my spouse's way of open a subject.
+39. Our discussions often occur suddenly.
+40. We're just starting a discussion before I know what's going on.
+41. When I talk to my spouse about something, my calm suddenly breaks.
+42. When I argue with my spouse, ı only go out and I don't say a word.
+43. I mostly stay silent to calm the environment a little bit.
+44. Sometimes I think it's good for me to leave home for a while.
+45. I'd rather stay silent than discuss with my spouse.
+46. Even if I'm right in the discussion, I stay silent to hurt my spouse.
+47. When I discuss with my spouse, I stay silent because I am afraid of not being able to control my anger.
+48. I feel right in our discussions.
+49. I have nothing to do with what I've been accused of.
+50. I'm not actually the one who's guilty about what I'm accused of.
+51. I'm not the one who's wrong about problems at home.
+52. I wouldn't hesitate to tell my spouse about her/his inadequacy.
+53. When I discuss, I remind my spouse of her/his inadequacy.
+54. I'm not afraid to tell my spouse about her/his incompetence.
+
+As all the answers are categorical by nature (a single value between 0 and 4), the variables need to be converted to a factor first before moving forward with the analysis. 
+
+```{r message=FALSE, warning=FALSE}
+divorce[,1:55] <- lapply(divorce[,1:55], factor) # convert all to factor
+colnames(divorce)[55] <- "Status" #change dependent variable name
+
+summary(divorce$Status) #a summary of the dependent variable
+```
+
+From the summary values above, it is clear that the two classes (1 and 0) are almost equal in quantity, therefore there is no class imbalance problem. This luckily makes the analysis simpler to perform.
+
+To further understand the independent variables, a correlation plot is developed to see if any of the questions provide approximately the same information to the data. 
+
+```{r message=FALSE, warning=FALSE, fig.width=12, fig.height=12}
+divorce_num <- divorce[,1:54] #temporary dataframe created
+divorce_num[,1:54] <- sapply(divorce_num[,1:54], as.numeric) #reconverting back to numeric 
+#for the correlation function to work
+
+div_cor <- cor(divorce_num)
+corrplot(div_cor, method = "shade")
+```
+
+The correlation plot does provide some interesting insights. Questions 6 and 7 have very little to no correlation with any of the other questions. There are also certain chunks of questions that apparently have a higher correlation with each other than the general average, such as from Question 8 to 30. However, the overall high correlations are not that surprising, as the questions all do have a central theme of marriage and relationships in common, so in some way it is plausible to assume they will all be interlinked with each other in some way. Despite this, some extremely high correlated questions can be removed to get rid of any redundant features.  
+
+```{r message=FALSE, warning=FALSE, fig.width=12, fig.height=12}
+findCorrelation(div_cor,
+                cutoff = 0.95,
+                names = TRUE) #finding questions that have a correlation of 0.95 or higher. 
+
+divorce <- divorce[,c(-19, -36)]
+```
+
+Questions 19, 36 and 20 are highly correlated with each other, so 19 and 36 are removed, leaving 20 (a personal choice). To conclude visualizing, the class distribution of the dependent variable can also be plotted. 
+
+```{r message=FALSE, warning=FALSE, fig.width=9, fig.height=6}
+#Visualizing class distribution of dependent variable...
+x <- as.data.frame(table(divorce[,53]))
+names(x)[1] <- "Status"
+ggplot(x, aes(Status, Freq, label = Freq, fill = Status)) +
+  geom_col() +
+  geom_text(nudge_y = 1.5) +
+  scale_fill_discrete(name = "Marital Status",
+                      breaks = c(0, 1),
+                      labels = c("Married","Divorced"))
+
+#Removing temporary dataframes
+rm(divorce_num)
+rm(x)
+```
+
+As previously mentioned, the number of married and divorced couples answering the questions is almost equally balanced. 
+
+
+### Modelling
+
+As this is a simple binary classifaction problem (only two outcomes), the interpretability of the process is not too complicated. The data is partitioned using a 70/30 train-test split, and a 10-fold repeated cross validation resampling strategy is applied. The models used for classification predictions are Naive Bayes (NB), Logistic Regression (Logi), Generalized Linear Model with Regularization Parameters (RGZ) and Support Vector Machines (SVM). To sccuinctly and briefly describe the methods: NB uses probabilistic theory based on Bayes Theorum to classify variables,  Logi is a log transformed version of the standard linear regression model making it suitable for classification as opposed to regression, RGZ is version of generalized linear models involving penalty parameters aimed to improve performance when there are numerous feaures involved, and SVM is an advanced technique where features classified on a simulated feature by a specific function utilising linear algebra techniques. 
+
+The goal is to find the best model among these four that produces the most accurate predictions. Along with the standard accuracy metric used in the confusion matrices in classification problem, the Receiver Operating Characteristics (ROC) curve will also be utilised, since it provides a more robust validation of the accuracy. It should be noted however, that in cases of binary classifactions, the area under the curve (AUC) for the ROC and the accuracy values are the same. The data is split and the models are run in the following code block. 
+
+```{r message=FALSE, warning=FALSE, fig.width=9, fig.height=6}
+#Train-Test Split...
+set.seed(1234)
+split <- initial_split(divorce, prop = 0.7, strata = "Status")
+train <- training(split)
+test <- testing(split)
+
+cv <- trainControl(method = "repeatedcv", number = 10, repeats = 10)
+
+#Naive Bayes... (benchmark)
+set.seed(1234)
+divorce_nbayes <- train(Status ~ .,
+                        data = train,
+                        method = "nb",
+                        trControl = cv)
+#Logistic..
+set.seed(1234)
+divorce_logi <- train(Status ~ .,
+                      data = train,
+                      method = "glm",
+                      family = "binomial",
+                      trControl = cv)
+#GLM Regularized..
+set.seed(1234)
+divorce_rgz <- train(Status ~ .,
+                     data = train,
+                     method = "glmnet",
+                     trControl = cv)
+#SVM...
+set.seed(1234)
+divorce_svm <- train(Status ~ .,
+                     data = train,
+                     method = "svmRadial",
+                     trControl = cv)
+
+```
+
+To compare the accuracy of the models on the training set, both the accuracy and the Kappa values are compared. The Kappa value is thought to be more robust as it takes into account the success of the predictions based solely on chance. 
+
+```{r message=FALSE, warning=FALSE, fig.width=9, fig.height=6}
+summary(resamples(list(
+  N_Bayes = divorce_nbayes,
+  Logistic = divorce_logi,
+  Regularized = divorce_rgz,
+  SVM  = divorce_svm
+)))$statistics$Accuracy
+
+
+summary(resamples(list(
+  N_Bayes = divorce_nbayes,
+  Logistic = divorce_logi,
+  Regularized = divorce_rgz,
+  SVM  = divorce_svm
+)))$statistics$Kappa
+```
+
+The top table highlights the accuracy values, while the bottom table highlights the Kappa values. In both cases, the Naive Bayes (benchmark model) performed the worst, with SVM performing the best. However, the RGZ Model is also very close, which warrants further inspection. It is also highly possible that the SVM due to its complexity may be overfitting. The next step is to analyse the confusion matrices for each of the models. The "positive" class in this case is 1 (divorce).
+
+```{r message=FALSE, warning=FALSE, fig.width=9, fig.height=6}
+nbayes_pred <- predict(divorce_nbayes, test) #Naive Bayes 
+confusionMatrix(data = relevel(nbayes_pred, ref = 2),
+                reference = relevel(test$Status, ref = 2)) 
+
+logi_pred <- predict(divorce_logi, test) #Logistic
+confusionMatrix(data = relevel(logi_pred, ref = 2),
+                reference = relevel(test$Status, ref = 2)) 
+
+rgz_pred <- predict(divorce_rgz, test) #Regularized
+confusionMatrix(data = relevel(rgz_pred, ref = 2),
+                reference = relevel(test$Status, ref = 2)) 
+
+svm_pred <- predict(divorce_svm, test) #SVM
+confusionMatrix(data = relevel(svm_pred, ref = 2),
+                reference = relevel(test$Status, ref = 2)) 
+```
+
+Once again, the Naive Bayes model produces the worst results. However, this time the RGZ model and the SVM model have performed exactly the same, with equal accuracy, Kappa and confusion matrix values. This allows for the possibility of actually choosing the RGZ model instead of the SVM, as they are both performing equally, and the RGZ model is preferable as it is much easier to interpret. However, just to be sure, the AUC values for the models can be computed as well. 
+
+```{r message=FALSE, warning=FALSE, fig.width=9, fig.height=6}
+
+pred_ROCR_nbayes <- prediction(as.numeric(nbayes_pred), 
+                               as.numeric(test$Status))
+
+perf_ROCR_nbayes <- performance(pred_ROCR_nbayes, 
+                                measure = "tpr", x.measure = "fpr")
+
+auc_ROCR_nbayes <- performance(pred_ROCR_nbayes, measure = "auc")
+auc_ROCR_nbayes <- auc_ROCR_nbayes@y.values[[1]]
+
+pred_ROCR_logi <- prediction(as.numeric(logi_pred), 
+                             as.numeric(test$Status))
+
+perf_ROCR_logi <- performance(pred_ROCR_logi, 
+                              measure = "tpr", x.measure = "fpr")
+
+auc_ROCR_logi <- performance(pred_ROCR_logi, measure = "auc")
+auc_ROCR_logi <- auc_ROCR_logi@y.values[[1]]
+
+pred_ROCR_rgz <- prediction(as.numeric(rgz_pred), 
+                             as.numeric(test$Status))
+
+perf_ROCR_rgz <- performance(pred_ROCR_rgz, 
+                              measure = "tpr", x.measure = "fpr")
+
+auc_ROCR_rgz <- performance(pred_ROCR_rgz, measure = "auc")
+auc_ROCR_rgz <- auc_ROCR_rgz@y.values[[1]]
+
+pred_ROCR_svm <- prediction(as.numeric(svm_pred), 
+                            as.numeric(test$Status))
+
+perf_ROCR_svm <- performance(pred_ROCR_svm, 
+                             measure = "tpr", x.measure = "fpr")
+
+auc_ROCR_svm <- performance(pred_ROCR_svm, measure = "auc")
+auc_ROCR_svm <- auc_ROCR_svm@y.values[[1]]
+
+data.frame("Naive Bayes" = auc_ROCR_nbayes,"Logistic" = auc_ROCR_logi, "RGZ" = auc_ROCR_rgz, "SVM" = auc_ROCR_svm) 
+
+```
+
+As expected, the accuracy and the AUC values for the RGZ and SVM models are the same. As both the RGZ and SVM are performing equally well, the RGZ model is preferred to be the final model. Just for a visual, the ROC curves for Naive Bayes, Logistic and RGZ models are plotted below. The curve for RGZ resembles an almost perfect ROC curve, which is backed up by the exceptionally high accuracy. 
+
+```{r message=FALSE, warning=FALSE, fig.width=9, fig.height=6}
+plot(perf_ROCR_nbayes, col = "black", lty = 1)
+plot(perf_ROCR_logi, add = TRUE, col = "red", lty = 2)
+plot(perf_ROCR_rgz, add = TRUE, col = "blue", lty = 3)
+legend(0.8, 0.2, legend = c("Naive Bayes", "Logistic", "RGZ"),
+       col = c("black", "red", "blue"), lty = c(1, 2, 3), cex = 1)
+```
+
+
+### Conclusion
+
+Since the Generalized Linear Models with Regularization Parameters is being used, the actual parameter values should be noted as well. 
+
+```{r message=FALSE, warning=FALSE}
+divorce_rgz
+```
+
+The model maximized accuracy with an alpha value of 0.1 and lambda value of 0.025. Having found the exact model parameters, an easy to interpret model has been developed for this specific use case which provides exceptionally accurate results.  
+

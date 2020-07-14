@@ -1,0 +1,505 @@
+---
+title: "Predicting Forest Fires with Regressions"
+output: html_notebook
+---
+
+### Introduction
+
+The following analysis aims to attempt a difficult regression task of predicting the burned area caused by forest fires. The data is based on the north-east region of Portugal, and comprises of meteorological and other data. The link to the data set is http://archive.ics.uci.edu/ml/datasets/Forest+Fires. This is based on the original work done by Cortez and Morais (2007), where the authors utilised data mining techniques to predict forest fires. A somewhat simpler approach is utlised in this analysis as compared to the original, with similarities in terms of feature engineering and error metrics. The goal is simply to gain an understanding of how regression techniques can be used with data composed of unique characteristics and properties. The link to the original paper is http://www3.dsi.uminho.pt/pcortez/fires.pdf.
+
+Loading the data and libraries:
+
+```{r message=FALSE, warning=FALSE}
+#Libraries
+library(ggplot2)
+library(reshape2)
+library(corrplot)
+library(GGally)
+library(dplyr)
+library(magrittr)
+library(rsample)
+library(recipes)
+library(caret)
+library(caretEnsemble)
+library(auditor)
+
+#Load the data
+forfire <- read.csv("forestfires.csv")
+```
+
+
+### Visualizing and Exploring
+
+To begin exploring, the distribution of the target variable (burned area) is plotted. 
+
+```{r message=FALSE, warning=FALSE, fig.width=9, fig.height=6}
+ggplot(forfire, aes(area)) +
+  geom_histogram(bins = 40) +
+  theme_bw() 
+```
+
+The histogram of the burned area introduces the first difficult aspect of this analysis. The data is seen to be extremely skewed, with a vast majority of the values being zero or comparatively quite small, and very few outliers. As the number of observations are also not abundant, these aspects may cause problems for the models to accurately predict the exact burned areas if they fall out of the range of the majority. Techniques to correct for skewness will need to applied here. 
+
+```{r message=FALSE, warning=FALSE, fig.width=9, fig.height=6}
+ff_num <- forfire[,-1:-4]
+ff_num_m <- melt(ff_num)
+
+ggplot(ff_num_m, aes(x = variable, y = value)) +
+  geom_boxplot(fill = "lightblue") + 
+  coord_flip() +
+  facet_wrap(~variable, scales = "free") +
+  theme_minimal() 
+```
+
+The boxplots visualize the distributions of all the numeric variables (excluding X, Y, month and day). Similarly skewed distributions can be observed for the independent variables as well, especially for rain, FFMC, and ISI. These variables will also have to be centered and scaled to correct for range disparities and generally make the data more centralized. While mentioning the numeric variables, a correlation plot has been shown below. 
+
+```{r message=FALSE, warning=FALSE, fig.width=9, fig.height=6}
+corr_fire <- cor(ff_num)
+corrplot(corr_fire) 
+```
+
+The correlation plot shows some correlation among the numeric independent variables, however it is not too strong so there is nothing in particular to be worried about. An interesting observation is how the correlations are extremely weak with the dependent variable. This can be emphasised in more detail with the following plot. 
+
+```{r message=FALSE, warning=FALSE, fig.width=9, fig.height=6}
+ggpairs(ff_num, lower = list(continuous = wrap("smooth", alpha = 0.3,
+                                              size = 0.1))) 
+```
+
+Another aspect of the data that can be explored is the relationship between the burned area and the day and month variables. The code below sorts out the data to enable the visualizations that will follow. 
+
+```{r message=FALSE, warning=FALSE}
+forfiredays <- forfire[,c(-1,-2,-3,-5:-12)] #selecting only the days variable
+
+days <- forfiredays %>%
+  group_by(day) %>%
+  summarize(totalarea = sum(area)) #total area per day
+
+forfiremonth <- forfire[,c(-1,-2,-4:-12)] #selecting only the month variable
+
+month <- forfiremonth %>%
+  group_by(month) %>%
+  summarize(totalarea = sum(area)) #total area per month
+
+x <- c("mon","tue","wed","thu","fri","sat","sun") #renaming days
+y <- c("jan","feb","mar","apr","may","jun","jul","aug","sep","oct","nov","dec") #renaming months
+
+days <- days %>%
+  mutate(day = factor(day, levels = x)) %>%
+  arrange(day) # in order
+
+month <- month %>%
+  mutate(month = factor(month, levels = y)) %>%
+  arrange(month) # in order
+```
+
+Below are the plots visualizing how the total burned area differs between the days and months. The plots show that Saturday has the highest total burned area, and that a significantly large area burned during August and September. This is perhaps due to some of the large outlier values observed in the histogram, indicating a unique event during the specific day/month in which a large area was burned. It's also interesting how there is apparently no burned area in November. 
+
+```{r message=FALSE, warning=FALSE, fig.width=9, fig.height=6}
+ggplot(month, aes(x = month, y = totalarea)) +
+  geom_col(aes(fill = totalarea))
+
+ggplot(days, aes(x = day, y = totalarea)) +
+  geom_col(aes(fill = totalarea))
+```
+
+```{r message=FALSE, warning=FALSE}
+#removing uneccessary dataframes (just to clean things up)
+rm(forfiredays)
+rm(forfiremonth)
+rm(month)
+rm(days)
+rm(ff_num_m)
+rm(corr_fire)
+rm(x)
+rm(y)
+```
+
+
+### Splitting and Feature Engineering (First Iteration)
+
+Having explored the data in the previous section, it is now time to prepare the data for modelling. As it was seen, the data does have some unique characteristics, which means feature engineering and selection is crucial if accurate predictions are required. In this report, three iterations of the modelling steps are run, each with different feature engineering and selection procedures based on the results from the previous iteration. The common aspect among all three iterations is that the dependent variable is log transformed, and all numeric variables are standardized to a normal distribution (mean = 0, std.deviation = 1). This step is also verified in Cortez and Morais(2007), where the original authors also performed these transformations to assist with the previously highlighted skewness and scaling issues.  
+
+The piece of code below prepares the data for the first iteration of modelling. The cross-validation method is also defined, as 10-fold repeated cross validation. 
+
+```{r message=FALSE, warning=FALSE}
+forfire_log <- forfire
+forfire_log$area <- log((forfire_log$area) + 1) #plus one because of values being zero
+
+set.seed(12345)
+
+split <- initial_split(forfire_log, prop = 0.8) #an 80-20 train test split
+fire_train <- training(split)
+fire_test <- testing(split)
+
+fire_recipe <- recipe(area ~ ., data = fire_train)
+
+fire_recipe_step <- fire_recipe %>%
+  step_normalize(all_numeric()) %>% #normalizing all numeric
+  step_dummy(all_nominal()) #dummy encoding all nominal values
+
+fire_recipe_prep <- prep(fire_recipe_step, training = fire_train)
+
+fire_new_train <- bake(fire_recipe_prep, fire_train)
+fire_new_test <- bake(fire_recipe_prep, fire_test)
+
+
+cv <- trainControl(method = "repeatedcv", number = 10, repeats = 10)#defining the cross validation method
+```
+
+The next step is to now run various models on this data and compare the error metrics generated to find the best performing method. For this analysis, five models have been chosen: the Multiple Adaptive Regression Splines (MARS) model, Random Forests (RF), K-Nearest Neighbours (KNN), Support Vector Machines (SVM) and a Stacked Ensemble model of the RF, KNN and SVM models. The MARS model is a good place to start and develop benchmarks for performance as it is simple yet flexible enough to incorporate different kinds of data. The more complicated models are the RF, KNN, SVM and the Ensemble of the three. From the three, SVM and RF are expected to perform the best, as KNN is generally weak performing in such irregular data. SVM has a good advantage of being able to handle outlier values well, while the RF model aims to improve results by reducing potential correlations between features due to the random nature of tree constructions. No grid searches are being conducted, and only the default parameter settings set by the model itself will be used. This is because the main goal here is not to obtain a final accurate prediction, but rather compare the various iterative stages and find the right direction towards obtaining a highly accurate model. The models are run in the code below. 
+
+```{r message=FALSE, warning=FALSE}
+
+set.seed(1234)
+
+mars_model <- train(
+  area ~ .,
+  data = fire_new_train,
+  method = "earth",
+  metric = "RMSE",
+  trControl = cv
+) #MARS (benchmark)
+
+set.seed(1234)
+
+knn_model <- train(
+  area ~ ., 
+  data = fire_new_train,
+  method = "knn",
+  trControl = cv,
+  metric = "RMSE"
+) #KNN  
+
+set.seed(1234)
+
+rforest_model <- train(
+  area ~ .,
+  data = fire_new_train,
+  method = "rf",
+  trControl = cv,
+  metric = "RMSE"
+) #RF
+
+set.seed(1234)
+
+svm_model <- train(
+  area ~ .,
+  data = fire_new_train,
+  method = "svmRadial",
+  metric = "RMSE",
+  trControl = cv
+) #SVM
+
+set.seed(1234)
+
+stack_model_list <- caretList(
+  area ~ ., data = fire_new_train,
+  trControl = cv, methodList = c("knn", "rf", "svmRadial")
+)
+
+stack_ensemble <- caretEnsemble(
+  stack_model_list,
+  metric = "RMSE",
+  trControl = cv
+)#Stacked Ensemble Model
+```
+
+Having run the models, the next step is to compare the error metrics. In this case, a different error metric than the usual RMSE is being used, namely the Regression Error Characteristic (REC) curve. The REC curve is a variation of the ROC curve usually used in classification tasks, whereas now as the name suggests, the REC is used for regressions. That advantage of using REC curves is that it provides an easy to interpret metric to evaluate along with a visualization. Similar to using the area under the curve (AUC) for evaluating the ROC, the area over the curve (AOC) is used for evaluating the REC, with the aim of it being as small as possible. The AOCs for all five models are calculated below.
+
+```{r message=FALSE, warning=FALSE, results='hide'}
+mars_exp <- DALEX::explain(mars_model, data = fire_new_train,
+                           y = fire_new_train$area)
+knn_exp <- DALEX::explain(knn_model, data = fire_new_train,
+                           y = fire_new_train$area)
+rforest_exp <- DALEX::explain(rforest_model, data = fire_new_train,
+                           y = fire_new_train$area)
+svm_exp <- DALEX::explain(svm_model, data = fire_new_train,
+                           y = fire_new_train$area)
+stack_ensemble_exp <- DALEX::explain(stack_ensemble, data = fire_new_train,
+                           y = fire_new_train$area)
+```
+
+```{r message=FALSE, warning=FALSE}
+mars_aoc <- score_rec(mars_exp)
+knn_aoc <- score_rec(knn_exp)
+rf_aoc <- score_rec(rforest_exp)
+svm_aoc <- score_rec(svm_exp)
+stack_aoc <- score_rec(stack_ensemble_exp)
+
+data.frame("Model" = c("mars_aoc", "knn_aoc", "rf_aoc", "svm_aoc", "stack_aoc"),
+           "AOC" = c(mars_aoc$score, knn_aoc$score, rf_aoc$score, svm_aoc$score, stack_aoc$score))
+```
+
+From the AOC results for the REC curve, it is apparent that the RF model performs the best out of the 5 models, with the benchmark MARS model performing the worse. The stacked model has also not performed well enough, perhaps due to its result being dragged down by the KNN model. The REC curves for the RF and MARS are plotted for comparison. The curve for the RF is more streamlined along the X axis, where the X axis can be defined as the squared error, and the Y-axis as the cumulative accuracy. It is interesting to note however that the MARS model reaches a high cumulative accuracy at a lower squared error than the RF model.
+
+```{r message=FALSE, warning=FALSE}
+rforest_resid <- model_residual(rforest_exp)
+mars_resid <- model_residual(mars_exp)
+
+plot(rforest_resid, type = "rec") #RF REC
+plot(mars_resid, type = "rec") #MARS REC
+```
+
+
+### Second Iteration - Numeric
+
+To improve upon the results of the first iteration, the second round of modelling is now going to be run using only the numeric variables. This therefore discards the spatial coordinates (X,Y) and the month and day variables. Discarding the spatial coordinates simplifies the modelling process, and from the earlier exploration it was observed that with the exception of some outliers, the days or the months don't have any significant impact on the area. Therefore, these 4 variables will be removed and the modelling process will be repeated. The code is exactly the same as the first iteration, with the only change being that the original data frame is replaced with a new dataframe comprising of only the numeric variables. Therefore, the code will not be shown, and only the AOC scores will be displayed. Also, variables that have zero or near zero variance are excluded.  
+
+```{r message=FALSE, warning=FALSE, echo=FALSE, results='hide'}
+ff_num_log <- log((ff_num) + 1)
+names(ff_num_log) <- paste0(names(ff_num), "_log")
+#Splitting
+
+set.seed(1234)
+
+split_num <- initial_split(ff_num_log, prop = 0.8)
+fire_train_num <- training(split_num)
+fire_test_num <- testing(split_num)
+
+
+fire_num_recipe <- recipe(area_log ~ ., data = fire_train_num)
+summary(fire_num_recipe)
+
+fire_num_recipe_steps <- fire_num_recipe %>%
+  step_nzv(all_numeric()) %>%
+  step_normalize(all_numeric())
+
+fire_num_recipe_prep <- prep(fire_num_recipe_steps, training = fire_train_num)
+
+fire_train_num_new <- bake(fire_num_recipe_prep, fire_train_num)
+fire_test_num_new <- bake(fire_num_recipe_prep, fire_test_num)
+
+#Modeling
+
+#MARS Model (benchmark)
+
+set.seed(1234)
+
+mars_model_num <- train(
+  area_log ~ .,
+  data = fire_train_num_new,
+  method = "earth",
+  metric = "RMSE",
+  trControl = cv
+)
+#KNN Model 
+
+set.seed(1234)
+
+knn_model_num <- train(
+  area_log ~ ., 
+  data = fire_train_num_new,
+  method = "knn",
+  trControl = cv,
+  metric = "RMSE"
+)
+
+#Random Forests
+
+set.seed(1234)
+
+rforest_model_num <- train(
+  area_log ~ .,
+  data = fire_train_num_new,
+  method = "rf",
+  trControl = cv,
+  metric = "RMSE"
+)
+
+#SVM
+set.seed(1234)
+
+svm_model_num <- train(
+  area_log ~ .,
+  data = fire_train_num_new,
+  method = "svmRadial",
+  metric = "RMSE",
+  trControl = cv
+)
+
+#Stacked Ensemble Model
+set.seed(1234)
+
+stack_model_num_list <- caretList(
+  area_log ~ ., data = fire_train_num_new,
+  trControl = cv, methodList = c("knn", "rf", "svmRadial"),
+  trace = FALSE
+)
+
+stack_num_ensemble <- caretEnsemble(
+  stack_model_num_list,
+  metric = "RMSE",
+  trControl = cv
+)
+
+```
+
+```{r message=FALSE, warning=FALSE, echo=FALSE, results='hide'}
+#Visualizing and examining Residuals
+
+mars_num_exp <- DALEX::explain(mars_model_num, data = fire_train_num_new,
+                           y = fire_train_num_new$area_log)
+knn_num_exp <- DALEX::explain(knn_model_num, data = fire_train_num_new,
+                          y = fire_train_num_new$area_log)
+rforest_num_exp <- DALEX::explain(rforest_model_num, data = fire_train_num_new,
+                              y = fire_train_num_new$area_log)
+svm_num_exp <- DALEX::explain(svm_model_num, data = fire_train_num_new,
+                          y = fire_train_num_new$area_log)
+stack_ensemble_num_exp <- DALEX::explain(stack_num_ensemble, 
+                                         data = fire_train_num_new,
+                                     y = fire_train_num_new$area_log)
+```
+```{r message=FALSE, warning=FALSE, echo=FALSE}
+mars_num_aoc <- score_rec(mars_num_exp)
+knn_num_aoc <- score_rec(knn_num_exp)
+rf_num_aoc <- score_rec(rforest_num_exp)
+svm_num_aoc <- score_rec(svm_num_exp)
+stack_num_aoc <- score_rec(stack_ensemble_num_exp)
+
+data.frame("Model" = c("mars_num_aoc", "knn_num_aoc", "rf_num_aoc", "svm_num_aoc", "stack_num_aoc"),
+           "AOC" = c(mars_num_aoc$score, knn_num_aoc$score, rf_num_aoc$score, svm_num_aoc$score, stack_num_aoc$score))
+```
+
+It can be seen that the AOC scores for RF and SVM have improved, especially for RF after removing the non-numeric variables, while it has worsened for the other models (the ensemble is still probably being impacted by the KNN). However, the RF model is showing very promising results, so the third iteration will focus on some more feature engineering. The REC plots for the second iteration RF and MARS model are shown below. 
+
+```{r message=FALSE, warning=FALSE}
+rforest_num_resid <- model_residual(rforest_num_exp)
+mars_num_resid <- model_residual(mars_num_exp)
+
+plot(rforest_num_resid, type = "rec") #RF REC
+plot(mars_num_resid, type = "rec") #MARS REC
+```
+
+
+### Third (and final) Iteration - Weather
+
+This iteration is based on the existing literature conducted by the original authors. In an effort to improve the accuracy, further feature selection is conducted. This time, only the variables directly related to weather conditions are retained. This leaves only the wind, relative humidity (RH) and the temp variables in the dataset. This is in tandem to the original study that was published (linked at the start), where the authors were able to obtain one their best results using variables only related to the weather. Rain has also been excluded as it is a variable that has zero/near-zero variance. Once again, apart from the difference in variables, the rest of the process is the same, so the AOC scores will be shown directly.
+
+```{r message=FALSE, warning=FALSE, echo=FALSE, results='hide'}
+ff_num_w <- ff_num_log[,c(-1:-4, -8)]
+
+#splitting
+
+set.seed(12345)
+
+split_w <- initial_split(ff_num_w, prop = 0.8)
+fire_train_w <- training(split_w)
+fire_test_w <- testing(split_w)
+
+
+fire_w_recipe <- recipe(area_log ~ ., data = fire_train_w)
+summary(fire_w_recipe)
+
+fire_w_recipe_steps <- fire_w_recipe %>%
+  step_normalize(all_numeric())
+
+fire_w_recipe_prep <- prep(fire_w_recipe_steps, training = fire_train_w)
+
+fire_train_w_new <- bake(fire_w_recipe_prep, fire_train_w)
+fire_test_w_new <- bake(fire_w_recipe_prep, fire_test_w)
+
+#Modeling
+
+#MARS Model (benchmark)
+
+set.seed(1234)
+
+mars_model_w <- train(
+  area_log ~ .,
+  data = fire_train_w_new,
+  method = "earth",
+  metric = "RMSE",
+  trControl = cv
+)
+
+#KNN Model 
+
+set.seed(1234)
+
+knn_model_w <- train(
+  area_log ~ ., 
+  data = fire_train_w_new,
+  method = "knn",
+  trControl = cv,
+  metric = "RMSE"
+)
+
+#Random Forests
+
+set.seed(1234)
+
+rforest_model_w <- train(
+  area_log ~ .,
+  data = fire_train_w_new,
+  method = "rf",
+  trControl = cv,
+  metric = "RMSE"
+)
+
+#SVM
+
+set.seed(1234)
+
+svm_model_w <- train(
+  area_log ~ .,
+  data = fire_train_w_new,
+  method = "svmRadial",
+  metric = "RMSE",
+  trControl = cv
+)
+
+#Stacked Ensemble Model
+
+stack_model_w_list <- caretList(
+  area_log ~ ., data = fire_train_w_new,
+  trControl = cv, methodList = c("knn", "rf", "svmRadial"),
+  trace = FALSE
+)
+
+stack_w_ensemble <- caretEnsemble(
+  stack_model_w_list,
+  metric = "RMSE",
+  trControl = cv
+)
+
+
+#Visualizing and examining Residuals
+
+mars_w_exp <- DALEX::explain(mars_model_w, data = fire_train_w_new,
+                               y = fire_train_w_new$area_log)
+knn_w_exp <- DALEX::explain(knn_model_w, data = fire_train_w_new,
+                              y = fire_train_w_new$area_log)
+rforest_w_exp <- DALEX::explain(rforest_model_w, data = fire_train_w_new,
+                                  y = fire_train_w_new$area_log)
+svm_w_exp <- DALEX::explain(svm_model_w, data = fire_train_w_new,
+                              y = fire_train_w_new$area_log)
+stack_ensemble_w_exp <- DALEX::explain(stack_w_ensemble, data = fire_train_w_new,
+                                         y = fire_train_w_new$area_log)
+
+```
+
+```{r message=FALSE, warning=FALSE, echo=FALSE}
+mars_w_aoc <- score_rec(mars_w_exp)
+knn_w_aoc <- score_rec(knn_w_exp)
+rf_w_aoc <- score_rec(rforest_w_exp)
+svm_w_aoc <- score_rec(svm_w_exp)
+stack_w_aoc <- score_rec(stack_ensemble_w_exp)
+
+data.frame("Model" = c("mars_w_aoc", "knn_w_aoc", "rf_w_aoc", "svm_w_aoc", "stack_w_aoc"),
+           "AOC" = c(mars_w_aoc$score, knn_w_aoc$score, rf_w_aoc$score, svm_w_aoc$score, stack_w_aoc$score))
+```
+
+The new AOC scores for the third iteration show variable results. The SVM has lost some performance, whereas the KNN has marginally improved. However, the RF model has improved even further, although marginally. This is a good indication that the feature engineering and selection methods applied have worked in improving predictive accuracy for this regression problem. Once again, the REC plots for RF and MARS model are shown below. 
+
+```{r message=FALSE, warning=FALSE}
+rforest_w_resid <- model_residual(rforest_w_exp)
+mars_w_resid <- model_residual(mars_w_exp)
+
+plot(rforest_w_resid, type = "rec") #RF REC
+plot(mars_w_resid, type = "rec") #MARS REC
+```
+
+
+### Conclusion
+
+The above analysis has identified the importance of feature engineering in predictive problems. Given the difficulty of this regression exercise due to the nature and characteristics of the data, a lot of care and consideration needs to be taken during the modelling process, as opposed to blindly throwing models at the data and hoping the computer does its best. By undergoing the iterative process involving feature engineering, a somewhat clear direction in model choice has been reached, with the RF model showing the most promising results. To further improve accuracy, grid searches may be run on the RF model to find the best tuning parameters. Also, other combinations of the features can also be tested, as it is possible that different models will behave differently for various feature combinations. 

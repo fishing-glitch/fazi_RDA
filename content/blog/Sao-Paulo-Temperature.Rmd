@@ -1,0 +1,286 @@
+---
+title: "Sao Paulo Temperature - Time Series with Exponential Smoothing Models"
+output: html_notebook
+---
+
+### Introduction
+
+This time series analysis involves modelling the average monthly temperature in the city of Sao Paulo, Brazil. The data spans across 74 years, and was freely obtained from the following link: https://www.kaggle.com/volpatto/temperature-timeseries-for-some-brazilian-cities?select=station_sao_paulo.csv. The goal of the analysis is to utilise three exponential smoothing models (Simple Exponential Smoothing (SES), Holt Method, Holt-Winters (HW) method) and determine which of these three models performs the best for forecasting the monthly average temperature. 
+
+Loading required libraries and the data:
+```{r message=FALSE, warning=FALSE}
+#Libraries
+library(tidyverse)
+library(TSstudio)
+library(xts)
+library(forecast)
+library(lubridate)
+library(plotly)
+library(dplyr)
+
+#Data
+SP_temp <- read.csv("saopaulostation.csv")
+```
+
+
+### Data Preprocessing
+
+Before progressing any further with the analysis, the data needs to be processed. The missing values are denoted as 999.9, which will be replaced by the corresponding monthly mean (i.e. if one January entry is missing, it will be replaced by the mean of all January readings). There are four additional columns at the end of the data that are not required for this analysis and will be removed. Along with this, the data has to be converted from wide to tall format, and finally converted into a time series object for further exploring. The following code chunk performs this processing:
+
+```{r message=FALSE, warning=FALSE}
+
+SP_temp <- SP_temp[,-14:-18] #removing unecessary variables
+
+SP_temp[SP_temp == 999.90] <- NA #converting 999.9 to NA
+
+for (i in c(2:13)) {
+  SP_temp[is.na(SP_temp[,i]), i] <- round(mean(SP_temp[,i],
+                                                 na.rm = TRUE), 2) 
+}#replacing NA value with monthly (column) mean temperature
+
+SP_temp <- SP_temp %>%
+  rename(
+    Year = YEAR
+  )
+
+SP_temp <- SP_temp %>%
+  gather("Month", "Temp", -Year) %>%
+  arrange(Year) # convert from wide to tall
+
+numMonth<-function(x) 
+  c(jan=01,feb=02,mar=03,apr=04,may=05,jun=06,jul=07,aug=08,
+    sep=09,oct=10,nov=11,dec=12)[tolower(x)] #assigning numeric values of each month
+
+SP_temp$Month <- numMonth(SP_temp$Month)
+
+SP_temp <- SP_temp %>%
+  unite(Time_p, Year, Month, sep = "-") #combining month and year in a single column
+
+SP_temp_zoo<- read.zoo(SP_temp, FUN = as.yearmon) #convert to zoo
+
+SP_temp_ts <- zoo_to_ts(SP_temp_zoo) #convert to ts object
+```
+
+A glimpse at the processed data and time series object:
+
+```{r message=FALSE, warning=FALSE}
+head(SP_temp)
+ts_info(SP_temp_ts)
+```
+
+
+### Visualizing and Exploring
+
+The exploring phase can begin with a simple plot of the time series data:
+
+```{r message=FALSE, warning=FALSE, fig.width=9, fig.height=6}
+ts_plot(SP_temp_ts,
+        title = "Sao Paulo Temperature Jan 1946 - Dec 2019",
+        Ytitle = "Temperature in Celsius",
+        Xtitle = "Years",
+        Xgrid = TRUE,
+        Ygrid = TRUE) #Interactive plot
+```
+
+The above plot shows no clear pattern or visual about how the monthly temperature progressed. Apart from a reasonable insight of the temperature ranging between 14 to 26 degree Celsius (approximately), nothing else is clear. In such a case, it can be helpful to plot a moving average chart of the data, which gives a smoother picture of how the series progresses by reducing the strength of the oscillations present. A two-sided 12-order moving average (MA) function is used with a window of 12 months on either side.
+
+```{r message=FALSE, warning=FALSE, fig.width=9, fig.height=6}
+ma_SP_temp_twosd <- ts_ma(SP_temp_ts, 
+                    n = NULL, 
+                    n_left = 12, n_right = 12, 
+                    plot = FALSE) #moving average function
+
+ma_avg <- ma_SP_temp_twosd$unbalanced_ma_25
+
+ma <- cbind(SP_temp_ts, ma_avg) #temporary dataframe to combine averaged and actual values
+
+plot_ma <- ts_plot(ma,
+             Xgrid = TRUE,
+             Ygrid = TRUE,
+             type = "single",
+             title = "Moving Average")
+
+
+plot_ma <- plot_ma %>%
+  layout(legend = list(x = 0.05, y = 0.95),
+         yaxis = list(title = "Temperature in Celsius"),
+         xaxis = list(title = "Year"))
+
+plot_ma #plotting the actual and MA lines #Interactive Plot
+```
+
+The plot above shows a more smoothed visual of the series (with 12 months from each side deducted). A slight increase in the average temperature can be seen as the years go by. It's probably global warming. 
+
+A closer look at the data can be provided by a heatmap. There is evidence of a seasonal pattern occurring, with the lowest temperatures observed in the middle of the year, and the highest towards the start and the end. 
+
+```{r message=FALSE, warning=FALSE, fig.width=9, fig.height=6}
+ts_heatmap(SP_temp_ts,
+           title = "Sau Paulo Temperature (Heatmap)") #Interactive Plot
+```
+
+The series can now be decomposed even further to provide additional information. There are clear indications of a slight trend and a strong seasonal pattern. 
+
+```{r message=FALSE, warning=FALSE, fig.width=9, fig.height=6}
+ts_decompose(SP_temp_ts) #Interactive Plot
+```
+
+The distribution of the seasonality can be visualized even further via boxplots. As observed earlier, the temperature drops to its lowest point in July, and is the highest in February. The distribution of the average temperature is approximately the same across each month. 
+
+```{r message=FALSE, warning=FALSE, fig.width=9, fig.height=6}
+ts_seasonal(SP_temp_ts, type = "box") #Interactive Plot
+```
+
+Finally, the autocorrelation of the average temperature can be visualized using ACF and lag plots. The shape of the ACF plot reflects the seasonality pattern involved, and shows a significant relationship with every half-yearly lag (every 6 months). This is shown by the scatter plots, where there is a strong relationship at lag1, lag6 and lag12.
+
+```{r message=FALSE, warning=FALSE, fig.width=9, fig.height=6}
+auto_Corr <- acf(SP_temp_ts, plot = FALSE)
+plot(auto_Corr, main = "")
+ts_lags(SP_temp_ts, lags = c(1:12)) #Interactive Plot
+```
+
+The importance of seasonality and trend analysis is highlighted when utilising typical time series models as it influences the decision of choosing the correct model to forecast the series. The prevelance of seasonality and trend in the average temperature makes a good case to use exponential smoothing models for forecasting, as these models utilise both these aspects. 
+
+
+### Modelling
+
+To start the modelling phase, training and testing partitions are created. The last 2 years (24 months) are used for testing. 
+
+```{r message=FALSE, warning=FALSE}
+SP_temp_part <- ts_split(SP_temp_ts, sample.out = 24)
+train <- SP_temp_part$train
+test <- SP_temp_part$test
+```
+
+The first model used is the SES model, which due to its simplicity will serve as a benchmark to compare the performance of more advanced models. The SES model does not account for trends and seasonality, and focuses only on forecasting the level of a current time series. 
+
+```{r message=FALSE, warning=FALSE}
+SP_temp_ses <- ses(train, h = 24, initial = "optimal")
+SP_temp_ses$model
+```
+
+With the alpha parameter set to almost 1, the model is behaving almost exactly like a naive model, which is suitable for being a benchmark. The performance of this model on the test set can be seen with the metrics below. The Theil's U indicates that this model performs slightly worse than a naive model in forecasting the series. 
+
+```{r message=FALSE, warning=FALSE}
+accuracy(SP_temp_ses, test)
+```
+
+The following plot provides a visual inspection of the performance of the SES model. 
+
+```{r message=FALSE, warning=FALSE, fig.width=9, fig.height=6}
+test_forecast(actual = SP_temp_ts,
+              forecast.obj = SP_temp_ses,
+              test = test) %>%
+  layout(title = "SP Temperature Forecast vs. Actual (SES)") #Interactive Plot
+```
+
+The next model to consider is the Holt method. This method differs from the SES model by including a second smoothing parameter to capture the series trend along with the level, thereby using two parameters to develop forecasts. 
+
+```{r message=FALSE, warning=FALSE}
+SP_temp_holt <- holt(train, h = 24, initial = "optimal")
+SP_temp_holt$model
+```
+
+The initial impression of the Holt method is that it actually performs a bit worse than the SES model, based on the AIC values. The alpha parameter is still exactly the same, with the beta estimate being very small. Perhaps the reason for this is that the trend aspect of the series is not pronounced enough. Comparing the Theil's U value shows no significant difference between the Holt and SES models performance on the test data. 
+
+```{r message=FALSE, warning=FALSE}
+accuracy(SP_temp_holt, test)
+```
+
+
+```{r message=FALSE, warning=FALSE, fig.width=9, fig.height=6}
+test_forecast(actual = SP_temp_ts,
+              forecast.obj = SP_temp_holt,
+              test = test) %>%
+  layout(title = "SP Temperature Forecast vs. Actual (Holt)")#Interactive Plot
+```
+
+Zooming in on the forecast plot shows a very slight angle in the forecast line, compared to the completely flat line in the SES model, which indicates that the Holt method has detected a trend pattern, but is still unable to forecast anything meaningful. 
+
+The final model to apply here is the Holt-Winters method, which is an improvement on the standard Holt method as it considers the level, trend and the seasonality of a series in the forecasting model. Therefore, in addition to the alpha and beta parameters, there is also a gamma parameter to account for seasonality. To ensure a robust model is produced, hyperparameter tuning via a grid search will also be conducted. First, a shallow grid is developed (for computational efficiency and to narrow down potential values).
+
+```{r message=FALSE, warning=FALSE}
+HW_grid <- ts_grid(train,
+                   model = "HoltWinters",
+                   periods = 6,
+                   window_space = 6,
+                   window_test = 12,
+                   hyper_params = list(alpha = seq(0,1,0.1),
+                                       beta = seq(0,1,0.1),
+                                       gamma = seq(0,1,0.1)),
+                   parallel = TRUE,
+                   n.cores = 8) #shallow grid
+
+
+HW_grid$grid_df[1:10,]
+```
+
+To assess the accuracy of this grid search and use it as a benchmark, the following code chunk is run:
+
+```{r message=FALSE, warning=FALSE}
+HW_sh_grid <- HoltWinters(train,
+                          alpha = HW_grid$alpha,
+                          beta = HW_grid$beta,
+                          gamma = HW_grid$gamma)
+
+HW_sh_fc <- forecast(HW_sh_grid, h = 24)
+accuracy(HW_sh_fc, test)
+```
+
+Already an improvement can be seen from the previously applied models, with a Theil's U of less than one, along with lower RMSE and MAPE scores. To attempt to improve this score, a deeper grid search can be run. The range of values is based on the top 10 rows of the grid dataframe from the shallow search. The plot with the range of optimum parameter values is shown below.
+
+```{r message=FALSE, warning=FALSE, fig.width=9, fig.height=6}
+plot_grid(HW_grid)
+```
+
+```{r message=FALSE, warning=FALSE}
+HW_deep_grid <- ts_grid(train,
+                   model = "HoltWinters",
+                   periods = 6,
+                   window_space = 6,
+                   window_test = 12,
+                   hyper_params = list(alpha = seq(0.1,0.3,0.01),
+                                       beta = seq(0.1,0.2,0.01),
+                                       gamma = seq(0.1,0.4,0.01)),
+                   parallel = TRUE,
+                   n.cores = 8) #deep grid
+
+
+HW_deep_grid$grid_df[1:10,]
+```
+
+To assess the accuracy of the deeper grid search, the metrics are calculated again:
+
+```{r message=FALSE, warning=FALSE}
+HW_dp_grid <- HoltWinters(train,
+                          alpha = HW_deep_grid$alpha,
+                          beta = HW_deep_grid$beta,
+                          gamma = HW_deep_grid$gamma)
+
+HW_dp_fc <- forecast(HW_dp_grid, h = 24)
+accuracy(HW_dp_fc, test)
+```
+
+```{r message=FALSE, warning=FALSE, fig.width=9, fig.height=6}
+plot_grid(HW_deep_grid)
+```
+
+As it can be seen from the new plot and the metrics calculated, there is an even further (although small) improvement in the performance and accuracy of the deeper HW model. To finalise this, the forecast plots are shown below. As it can be seen, the deep HW model fits much better than any other model tested, and is reasonably within the confidence levels. 
+
+```{r message=FALSE, warning=FALSE, fig.width=9, fig.height=6}
+test_forecast(actual = SP_temp_ts,
+              forecast.obj = HW_dp_fc,
+              test = test) %>%
+  layout(title = "SP Temperature Forecast vs. Actual (H-W (deep))")
+plot_forecast(HW_dp_fc) %>%
+  add_lines(x = time(test) + deltat(test),
+            y = as.numeric(test),
+            name = "Testing Partition") %>%
+  layout(title = " SP Temperature Forecast vs. Actual (H-W (deep))")
+```
+
+
+
+### Conclusion
+
+The above case study has utilised the family of exponential smoothing models. The results indicated that the Holt-Winters model performed the best, as it was able to incorporate the trend and seasonality aspects of the series. With additional hyperparameter tuning (assuming there is sufficient time and computing power available), the above models can be refined even further to produce more accurate forecasting. An interesting point to note can be the that exponential smoothing methods can potentially be used with similar time series data (average temperatures) as it can be observed that temperatures in different regions follow a similar pattern of seasonality and trend, the only difference being how hot or cold it might be. 
+

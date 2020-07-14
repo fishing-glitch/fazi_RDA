@@ -1,0 +1,310 @@
+---
+title: "Brent Oil Prices - Time Series with ML Models"
+output: html_notebook
+---
+
+### Introduction
+
+While traditional time series models such as the Exponential Smoothing and ARIMA families are perfectly capable of making sound forecasts, there are some instances where such models are unable to fully capture what the data is portraying. In such cases, especially where the highest predictive power is required and favoured over model interpretability, advanced machine learning methods can be useful. In this analysis, the daily prices of Brent Oil(20th May 1987 - 21st April 2020) are going to be examined. The models used are the Generalized Linear Model (GLM), Random Forests (RF), Gradient Boosting Machines (GBM) and Deep Neural Networks (DNN). The goal is to test each of these models to determine which of these produces the lowest error metric, and is therefore the most accurate. The "h2o" package in R will be used in this case. The data was freely obtained from https://www.kaggle.com/mabusalah/brent-oil-prices
+
+Loading the libraries and data:
+
+```{r message=FALSE, warning=FALSE}
+#Libraries
+library(tidyverse)
+library(forecast)
+library(lubridate)
+library(dplyr)
+library(plotly)
+library(timeDate)
+#Data
+Oil_Price <- read.csv("BrentOilPrices.csv")
+```
+
+The h2o package will be initialized later. 
+
+
+### Data Preprocessing
+
+Before moving onwards to exploration and modelling, some simple data processing needs to be done. Specifically in this case, only the dates need to be converted into a consistent format. The following chunk of code accomplishes this. 
+
+```{r message=FALSE, warning=FALSE}
+Oil_Price_1 <- Oil_Price[1:8322,]
+Oil_Price_1$Date <- as.Date(Oil_Price_1$Date, format = "%d-%b-%y")
+
+Oil_Price_2 <- Oil_Price[8323:8360, ]
+Oil_Price_2$Date <- as.Date(Oil_Price_2$Date, format = "%b %d, %Y")
+
+Oil_Price_df <- rbind(Oil_Price_1, Oil_Price_2) #final clean dataframe
+
+rm(Oil_Price_1)#remove uneccessary data
+rm(Oil_Price_2)#remove uneccessary data
+rm(Oil_Price)#remove uneccessary data
+```
+
+
+
+### Visualizing and Exploring
+
+To begin exploring, a standard line chart is often a good place to start to get a general overview of the progression of prices with time.
+
+```{r message=FALSE, warning=FALSE, fig.width=9, fig.height=6}
+#standard line chart (interactive)
+ggplotly(ggplot(Oil_Price_df, aes(Date, Price)) +
+  geom_line() +
+  scale_x_date(date_breaks = "1 year", date_labels = "%Y") +
+  theme_minimal() +
+  theme(axis.text.x = element_text(angle = 50, hjust = 1))) 
+```
+
+Due to the daily nature of the time series, along with the fact that these are after all oil prices, there is a lot of volatility observed. Perhaps a more smoothed effect might help clarify the chart, and show a general trend of the series. 
+
+```{r message=FALSE, warning=FALSE, fig.width=9, fig.height=6}
+ggplotly(ggplot(Oil_Price_df, aes(Date, Price)) +
+  geom_line() +
+  scale_x_date(date_breaks = "1 year", date_labels = "%Y") +
+  theme_minimal() +
+  theme(axis.text.x = element_text(angle = 50, hjust = 1)) +
+  geom_smooth()) #standard line chart with smoothed effect to show "trend" (interactive)
+```
+
+A density plot for each month will show if there are any obvious seasonal effects present. From the plot below, there does not seem to be any seasonality present in the data, with the distributions for each month appearing almost exactly the same year by year. 
+
+```{r message=FALSE, warning=FALSE, fig.width=9, fig.height=11}
+OP_df <- Oil_Price_df
+OP_df$Month <- factor(month.abb[month(OP_df$Date)], levels = month.abb)
+OP_df$Year <- year(OP_df$Date) #creating new temporary df for additional plots
+
+ggplot(OP_df, aes(Price)) +
+  geom_density(aes(fill = Month)) +
+  facet_grid(rows = vars(as.factor(Month)))
+```
+
+A box plot can be used to visualize the yearly distribution of oil prices:
+
+```{r message=FALSE, warning=FALSE, fig.width=9, fig.height=6}
+ggplot(OP_df, aes(Price, fill = Year)) +
+  geom_boxplot(xlab = "") +
+  coord_flip() +
+  facet_grid(cols = vars(as.factor(Year))) + 
+  theme_minimal() +
+  theme(strip.text = element_blank(),
+        axis.text.x = element_blank(),
+        axis.ticks.x = element_blank())
+rm(OP_df) #remove temporary data
+```
+
+The progression of the box plot above is naturally similar to the line charts plotted earlier. However, an intersting insight is how it shows a greater increase in price variance during periods of economic crises, notably in 2008 and early 2020. Apart from this, there are no other cyclical, seasonal or trend patterns observed. Finally, the autocorrelation between prices can be seen from the Partial ACF plot. The PACF is used as it is slightly better than a standard ACF plot since the PACF provides an estimate of a direct correlation with a series lag after removing any correlation with previous lags.
+
+```{r message=FALSE, warning=FALSE, fig.width=9, fig.height=6}
+pacf <- pacf(Oil_Price_df$Price, plot = FALSE)
+plot(pacf, main = "")
+```
+
+The PACF above shows a very significant correlation of the series with only its first lag. Given the insights generated from the exploration above, it can be concluded that the oil price series does not follow any typical pattern or trends that one might find in a time series data, thus making the forecasting problem slightly more complex. In such cases, maybe employing ML models to do the heavy lifting may be the logical way to go, which will be shown in the next phase. 
+
+
+### Modelling
+
+To generate forecasts for oil prices, the relationship of the series with its own lagged values is going to be analysed. This is implying (for the sake of this analysis) that there are no other factors impacting prices other than its own lagged value at different stages. Therefore, lagged values of the oil prices are generated and added to the data frame at lag1, lag5, lag22, lag130 and lag260. This corresponds to the daily, weekly, monthly, half-yearly and yearly lags. Observe that the number of days is slightly different than what may normally be seen as there are no price values on the weekend, so the weekend days are not present. Also it is assumed for simplicity that there are no leap years. The cost of inserting these lags is losing values for 1 year, which is alright in this case as there are several years of data available. 
+
+```{r message=FALSE, warning=FALSE}
+Oil_Price_df <- Oil_Price_df %>%
+  mutate(lag1 = lag(Price, n = 1),#daily
+         lag5 = lag(Price, n = 5),#weekly
+         lag22 = lag(Price, n = 22),#monthly
+         lag130 = lag(Price, n = 130),#half yearly
+         lag260 = lag(Price, n = 260))#yearly
+
+Oil_Price_df <- na.omit(Oil_Price_df) #left with 8100 rows (so minus 1 year)
+```
+
+The data is split into training and testing partitions, with the last one year accounting for the testing period. It should be noted that unlike normal data splitting, time series needs to be split in order as the the series progression must remain intact. 
+
+```{r message=FALSE, warning=FALSE}
+h <- 260
+train_OP <- Oil_Price_df[1:(nrow(Oil_Price_df) - h), ]
+test_OP <- Oil_Price_df[(nrow(Oil_Price_df) - h + 1):nrow(Oil_Price_df), ]
+```
+
+To begin modelling, h2o needs to be initialized. 
+
+```{r message=FALSE, warning=FALSE, results='hide'}
+library(h2o)
+
+h2o.init(max_mem_size = "16G")
+
+train_OPh <- as.h2o(train_OP)
+test_OPh <- as.h2o(test_OP)
+
+x <- c("lag1", "lag5", "lag22", "lag130", "lag260")
+y <- "Price" #x and y defined only to make it easier to type 
+```
+
+The first model, and also the benchmark model, is the GLM. The GLM is suitable as a benchmark in this case because even though it is the simplest out of all the choices, it is still flexible enough to allow for data that doesnt strictly follow normal distributions.
+
+```{r message=FALSE, warning=FALSE, results='hide'}
+glm_OP <- h2o.glm(family = "gaussian",
+                  x = x,
+                  y = y, 
+                  training_frame = train_OPh)
+test_OPh$pred_glmOP <- h2o.predict(glm_OP, test_OPh)
+```
+
+Once the above model is run, the error metrics can be calculated based on how the model performs on the test data. The Mean Absolute Percentage Error (MAPE) is being used as the metric in this case. The MAPE is often used as it provides a percentage value which is fairly easy to interpret. 
+
+```{r message=FALSE, warning=FALSE}
+test_OP_df <- as.data.frame(test_OPh)
+test_OP_df$Date <- test_OP$Date
+
+mape_glmOP <- mean(abs(test_OP_df$Price - test_OP_df$pred_glmOP) / 
+                     test_OP_df$Price)
+mape_glmOP * 100
+```
+
+The MAPE value is observed for the GLM method. While on its own not much can be said about this value, it is now going to be set as a benchmark for future models. A plot is also drawn to visualize the fitting capabilities of the GLMs predicted values against the actual test series. It can be seen that the GLM does manage to capture the general direction the series is in.
+
+```{r message=FALSE, warning=FALSE, fig.width=9, fig.height=6}
+plot_ly(data = test_OP_df) %>%
+  add_lines(x = ~ Date, y = ~Price, name = "Actual") %>%
+  add_lines(x = ~ Date, y = ~ pred_glmOP, 
+            name = "GLM", 
+            line = list(dash = "dot"))  %>%
+  layout(title = "GLM fit (Actual vs Predicted)") #Interactive
+```
+
+The next model to be tested is the Random Forest model. The parameters are set to be fairly reasonable, with 5000 trees being created at a maximum depth of 10, with a 10-fold cross-validation process to maximize accuracy. The depth and number of trees can be set higher, but this comes at the cost of potential overfitting and high computing power requirements. 
+
+```{r message=FALSE, warning=FALSE, results='hide'}
+rf_OP <- h2o.randomForest(x = x,
+                          y = y, 
+                          ntrees = 5000,
+                          nfolds = 10,
+                          stopping_rounds = 10,
+                          max_depth = 10,
+                          stopping_metric = "RMSE",
+                          seed = 1234,
+                          training_frame = train_OPh)
+test_OPh$pred_rfOP <- h2o.predict(rf_OP, test_OPh)
+```
+
+The MAPE score for the RF model is calculated below.
+
+```{r message=FALSE, warning=FALSE}
+test_OP_df <- as.data.frame(test_OPh)
+test_OP_df$Date <- test_OP$Date
+
+mape_rfOP <- mean(abs(test_OP_df$Price - test_OP_df$pred_rfOP) / 
+                    test_OP_df$Price)
+mape_rfOP * 100
+```
+
+The RF model has actually performed worse than the GLM method. Perhaps the RF model is not properly capturing the relationship of the data with its lagged values. The decline in fit compared to the GLM method can be visualized. 
+
+```{r message=FALSE, warning=FALSE, fig.width=9, fig.height=6}
+plot_ly(data = test_OP_df) %>%
+  add_lines(x = ~ Date, y = ~ Price, name = "Actual") %>%
+  add_lines(x = ~ Date, y = ~ pred_glmOP,
+            name = "GLM", line =
+              list(dash = "dot")) %>%
+  add_lines(x = ~ Date, y = ~ pred_rfOP, name = "RF", line =
+              list(dash = "dash")) %>%
+  layout(title = "GLM fit vs RF (Actual vs Predicted)")#Interactive
+```
+
+An interesting observation from the above visual is that the RF model seems to be performing simarly to the GLM until the major dips in price from Jan 2020, meaning the RF model is probably not capturing the extreme deviance from the average price level very well. Maybe more advanced models can be successful. 
+
+The GBM is the next model that is used. It can be considered as an improved version of Random Forests, as it aims to learn from its mistakes and build better trees (the boosting aspect). Again, 10-fold cross-validation is used as the parameter.
+
+```{r message=FALSE, warning=FALSE, results='hide'}
+GBM_OP <- h2o.gbm(x = x,
+                  y = y,
+                  training_frame = train_OPh,
+                  nfolds = 10,
+                  seed = 1234)
+test_OPh$pred_GBMOP <- h2o.predict(GBM_OP, test_OPh)
+```
+```{r message=FALSE, warning=FALSE}
+test_OP_df <- as.data.frame(test_OPh)
+test_OP_df$Date <- test_OP$Date
+
+mape_GBMOP <- mean(abs(test_OP_df$Price - test_OP_df$pred_GBMOP) / 
+                     test_OP_df$Price)
+mape_GBMOP * 100
+```
+
+The MAPE value from the GBM shows a major improvement over both the GLM and RF. This means the GBM (without any hyperparameter tuning) is quite capable of forecasting the prices reasonably well. From the visualization it is apparent that the improvement can be attributed to the GBMs ability to fit the extreme dip quite well. 
+
+```{r message=FALSE, warning=FALSE, fig.width=9, fig.height=6}
+plot_ly(data = test_OP_df) %>%
+  add_lines(x = ~ Date, y = ~ Price, name = "Actual") %>%
+  add_lines(x = ~ Date, y = ~ pred_glmOP,
+            name = "GLM", line =
+              list(dash = "dot")) %>%
+  add_lines(x = ~ Date, y = ~ pred_rfOP, name = "RF", line =
+              list(dash = "dash"))%>%
+  add_lines(x = ~ Date, y = ~ pred_GBMOP, 
+            name = "GBM", line =
+              list(dash = "dash")) %>%
+  layout(title = "GLM fit vs RF vs GBM (Actual vs Predicted)")#Interactive
+```
+
+The final model to be tested is the Deep Neural Network. This utilises a neural network with multiple hidden layers between the input and output layers. The higher number of layers increases complexity and along with it the accuracy as well. A small sized 3 hidden layer network is used with 16, 8 and 4 nodes in the first, second and third layers respectively, with 50 epochs (50 repititions).  
+
+```{r message=FALSE, warning=FALSE, results='hide'}
+DNN_OP <- h2o.deeplearning(x = x,
+                           y = y, 
+                           distribution = "AUTO",
+                           hidden = c(16,8,4),
+                           epochs = 50,
+                           reproducible = TRUE,
+                           stopping_rounds = 10,
+                           stopping_metric = "RMSE",
+                           training_frame = train_OPh)
+test_OPh$pred_DNNOP <- h2o.predict(DNN_OP, test_OPh)
+```
+
+```{r message=FALSE, warning=FALSE}
+test_OP_df <- as.data.frame(test_OPh)
+test_OP_df$Date <- test_OP$Date
+
+mape_DNNOP <- mean(abs(test_OP_df$Price - test_OP_df$pred_DNNOP) / 
+                     test_OP_df$Price)
+mape_DNNOP * 100
+```
+
+The MAPE value for the DNN is not as good as the GBM metric, so in this particular case, the GBM produces the most accurate results. However, the difference between the two is not too significant. The fitted plot shows that the GBM and DNN are performing fairly equally, with both successfully capturing the extreme dip. 
+
+```{r message=FALSE, warning=FALSE, fig.width=9, fig.height=6}
+plot_ly(data = test_OP_df) %>%
+  add_lines(x = ~ Date, y = ~ Price, name = "Actual") %>%
+  add_lines(x = ~ Date, y = ~ pred_glmOP,
+            name = "GLM", line =
+              list(dash = "dot")) %>%
+  add_lines(x = ~ Date, y = ~ pred_rfOP, name = "RF", line =
+              list(dash = "dash"))%>%
+  add_lines(x = ~ Date, y = ~ pred_GBMOP, 
+            name = "GBM", line =
+              list(dash = "dash")) %>%
+  add_lines(x = ~ Date, y = ~ pred_DNNOP, 
+            name = "DNN", line =
+              list(dash = "dash")) %>%
+  layout(title = "GLM fit vs RF vs GBM vs DNN (Actual vs Predicted)")#Interactive
+```
+
+
+### Conclusion
+
+The results on the face of it do imply that the GBM is producing the best results. However, these are very basic implementations of the models, and with hyperparameter tuning via grid searches, the results can improve and perhaps the DNN may perform better in that case. It can also be worthwhile to utilise feature importance to improve results. An example can be what features does the GBM believe are important for forecasting.
+
+```{r message=FALSE, warning=FALSE, fig.width=9, fig.height=6}
+h2o.varimp_plot(GBM_OP)
+```
+
+The above plot shows that the GBM only considers the daily lagged value to be of any relevance for predictions. This can be contrasted with the feature importance plot of the DNN.
+
+```{r message=FALSE, warning=FALSE, fig.width=9, fig.height=6}
+h2o.varimp_plot(DNN_OP)
+```
+
+In this case, the DNN considers all the lags to be of reasonable importance, with the highest importance still being granted to the daily lag. The point being made here is that by using feature importance as a tool, multiple iterations of the modelling process can be run, combining feature selection and hyperparameter tuning to arrive at the most accurate predictive model. 
