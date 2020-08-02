@@ -58,6 +58,15 @@ The dataset contains some information about computers, with the dependant variab
     </item>
     
     <item>
+      <title>Epileptic Seizure Recognition with Deep Learning</title>
+      <link>/blog/seizure_final/</link>
+      <pubDate>Mon, 01 Jan 0001 00:00:00 +0000</pubDate>
+      
+      <guid>/blog/seizure_final/</guid>
+      <description>IntroductionThis project attempts to classify whether a patient is suffering from an epileptic seizure or not based on certain known features. The dataset was freely obtained from the following link: https://www.kaggle.com/harunshimanto/epileptic-seizure-recognition. To summarise the data, the features comprise of individual data points of an EEG recording, monitoring a subject’s brain activity at different points in time. Further details about the specifications of these variables can be found via the given link.</description>
+    </item>
+    
+    <item>
       <title>Mining Religious and Sacred Texts</title>
       <link>/blog/religious-and-sacred-texts/</link>
       <pubDate>Mon, 01 Jan 0001 00:00:00 +0000</pubDate>

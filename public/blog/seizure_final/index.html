@@ -1,0 +1,369 @@
+<!DOCTYPE html>
+<html lang="en-us">
+
+<head>
+  <title>Epileptic Seizure Recognition with Deep Learning | Fazi_RDA</title>
+
+  <meta charset="UTF-8">
+  <meta name="language" content="en">
+  <meta name="description" content="">
+  <meta name="keywords" content="">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta http-equiv="content-type" content="text/html; charset=utf-8">
+  <meta http-equiv="X-UA-Compatible" content="IE=edge">
+
+  
+  
+
+  <link rel="shortcut icon" type="image/png" href="/favicon.ico" />
+
+  
+  
+    
+ 
+  
+  
+  
+  
+  
+  
+    
+    <link rel="stylesheet" href="/css/post.min.3b28d14676e4769849164baf362f2b0aa069ab25702fef98f0c4227cb68d74cd.css" integrity="sha256-OyjRRnbkdphJFkuvNi8rCqBpqyVwL&#43;&#43;Y8MQifLaNdM0="/>
+  
+    
+    <link rel="stylesheet" href="/css/custom.min.e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855.css" integrity="sha256-47DEQpj8HBSa&#43;/TImW&#43;5JCeuQeRkm5NMpJWZG3hSuFU="/>
+  
+  
+   
+   
+    
+
+<script type="application/ld+json">
+  
+    {
+      "@context" : "http://schema.org",
+      "@type" : "BlogPosting",
+      "mainEntityOfPage": {
+            "@type": "WebPage",
+            "@id": "\/"
+      },
+      "articleSection" : "blog",
+      "name" : "Epileptic Seizure Recognition with Deep Learning",
+      "headline" : "Epileptic Seizure Recognition with Deep Learning",
+      "description" : "",
+      "inLanguage" : "en-US",
+      "author" : "",
+      "creator" : "",
+      "publisher": "",
+      "accountablePerson" : "",
+      "copyrightHolder" : "",
+      "copyrightYear" : "0001",
+      "datePublished": "0001-01-01 00:00:00 \u002b0000 UTC",
+      "dateModified" : "0001-01-01 00:00:00 \u002b0000 UTC",
+      "url" : "\/blog\/seizure_final\/",
+      "wordCount" : "1699",
+      "keywords" : ["Blog"]
+    }
+  
+  </script>
+</head>
+
+<body>
+  <div class="burger__container">
+  <div class="burger" aria-controls="navigation" aria-label="Menu">
+    <div class="burger__meat burger__meat--1"></div>
+    <div class="burger__meat burger__meat--2"></div>
+    <div class="burger__meat burger__meat--3"></div>
+  </div>
+</div>
+ 
+
+  <nav class="nav" role="navigation">
+  <ul class="nav__list">
+    
+    
+      <li>
+        <a  href="/">about</a>
+      </li>
+    
+      <li>
+        <a  class="active"
+         href="/blog">projects</a>
+      </li>
+    
+  </ul>
+</nav>
+
+
+  <main>
+    
+    
+
+    <div class="flex-wrapper">
+      <div class="post__container">
+        <div class="post">
+          <header class="post__header">
+            <h1 id="post__title">Epileptic Seizure Recognition with Deep Learning</h1>
+            <time datetime="0001-01-01 00:00:00 &#43;0000 UTC" class="post__date"
+            > </time>
+          </header>
+          <article class="post__content">
+              
+
+
+
+<div id="introduction" class="section level3">
+<h3>Introduction</h3>
+<p>This project attempts to classify whether a patient is suffering from an epileptic seizure or not based on certain known features. The dataset was freely obtained from the following link: <a href="https://www.kaggle.com/harunshimanto/epileptic-seizure-recognition" class="uri">https://www.kaggle.com/harunshimanto/epileptic-seizure-recognition</a>. To summarise the data, the features comprise of individual data points of an EEG recording, monitoring a subject’s brain activity at different points in time. Further details about the specifications of these variables can be found via the given link. The data consists of 178 explanatory variables, labeled X1, X2,……,X178, and the target variable is simply called y. The target variable comprises of 5 classes, highlighting the following information:</p>
+<p>5 - eyes open, meaning when they were recording the EEG signal of the brain the patient had their eyes open</p>
+<p>4 - eyes closed, meaning when they were recording the EEG signal the patient had their eyes closed</p>
+<p>3 - they identified where the region of the tumor was in the brain and recorded the EEG activity from the healthy brain area</p>
+<p>2 - they recorded the EEG from the area where the tumor was located</p>
+<p>1 - recording of seizure activity</p>
+<p>To summarise, only class 1 indicates any presence of seizures, while the other 4 classes can be considered as the absence of seizures. With 178 features, there are 11500 rows of information, making this a reasonable sized dataset for applying deep learning techniques. The Tensorflow library is utilised here to construct a simple deep neural network for classification (multi-layer perceptron). In order to compare the performance of the neural network with other models, a series of ensemble methods and a logistic regression is also applied to examine any change in performance. This analysis is carried out in Python.</p>
+<p>Before beginning, first the required libraries are loaded.</p>
+<pre class="python"><code>#importing libraries
+
+import matplotlib
+import pandas as pd
+import numpy as np
+from matplotlib import pyplot as plt
+import seaborn as sns
+from imblearn.under_sampling import RandomUnderSampler
+from collections import Counter
+import sklearn
+from sklearn.preprocessing import StandardScaler
+from sklearn.model_selection import train_test_split
+from sklearn.metrics import confusion_matrix
+from sklearn.metrics import roc_curve
+from tensorflow.keras.utils import to_categorical
+from tensorflow.keras import Sequential
+from tensorflow.keras.layers import Dense
+from pycaret.classification import *
+import warnings
+warnings.filterwarnings(&quot;ignore&quot;)</code></pre>
+</div>
+<div id="exploring-and-processing" class="section level3">
+<h3>Exploring and Processing</h3>
+<p>Before moving forward to building the neural network, first some preprocessing and exploring of the data is carried out. Classes 2,3,4 and 5 are replaced with 0, indicating a singular class representing no seizure activity. This simplifies the data a bit as it is now a simple binary classification problem. However, with this conversion, there is now a severe class imbalance, which is shown below.</p>
+<pre class="python"><code>#Initial preprocessing and exploring
+
+#for reproducibility
+np.random.seed(1234)
+
+#Load Data
+seizure = pd.read_csv(&#39;Epileptic-Seizure-Recognition.csv&#39;)
+
+#remove first column
+seizure = seizure.loc[:, ~seizure.columns.str.contains(&#39;^Unnamed&#39;)]
+
+#replace all other classes with 0 to indicate no seizure
+seizure.y = seizure.y.replace({2:0, 3:0, 4:0, 5:0})</code></pre>
+<div class="figure">
+<img src="Class_Imbalance.png" alt="Class_Imbalance" />
+<p class="caption">Class_Imbalance</p>
+</div>
+<p>In such a case of imbalanced classes, it is important that there should be some attempt to balance the data, otherwise any performance metrics generated by the models will be highly misleading as the model will be heavily biased towards to the majority class. As there is ample data available, undersampling is a useful technique that can be used here to randomly select observations from the majority class (0) equal to the number of minority class (1) observations. From 11500 original observations, there are now 4600 observations left to build the model on, which is still reasonable, as the number of features is still well below the number of observations.</p>
+<pre class="python"><code>#create input and output categories for tensorflow
+X = seizure.loc[:, seizure.columns != &#39;y&#39;]
+y = seizure.loc[:, &#39;y&#39;]
+
+#scale the independent variables and convert output to categorical
+X = sklearn.preprocessing.scale(X)
+y = to_categorical(y)
+
+#balance classes by random undersampling
+undersample = RandomUnderSampler(sampling_strategy = &#39;majority&#39;)
+X_under, y_under = undersample.fit_resample(X, y)</code></pre>
+</div>
+<div id="building-the-nn-model-via-tensorflow" class="section level3">
+<h3>Building the NN model via Tensorflow</h3>
+<p>Having processed the data, it is now time to build the neural network model. Initially, the data is split into training and testing partitions (80/20 split). To reach a reasonable level of depth, 3 hidden layers are used, each with an approximately proportional decrease in the number of neurons available to allow smooth convergence from 178 input nodes to 2 output nodes (representing the 2 classes). Since this is a classification task, the sigmoid activation function is generally preferred for the output layer, and accuracy is used as the performance metric. The number of epochs is set to let the model undergo 100 iterations over the entire dataset.</p>
+<pre class="python"><code>#train_test split
+X_train, X_test, Y_train, Y_test = train_test_split(X_under, y_under, 
+                                                    test_size = 0.2)
+
+#A deep NN model
+model_d = Sequential()
+model_d.add(Dense(120, activation = &#39;relu&#39;, input_dim = 178))
+model_d.add(Dense(90, activation = &#39;relu&#39;))
+model_d.add(Dense(40, activation = &#39;relu&#39;))
+model_d.add(Dense(1, activation = &#39;sigmoid&#39;))
+model_d.compile(optimizer = &#39;adam&#39;, loss = &#39;binary_crossentropy&#39;,
+                metrics = [&#39;accuracy&#39;])
+model_d.fit(X_train, Y_train, epochs = 100, verbose = 0)</code></pre>
+<pre><code>## &lt;tensorflow.python.keras.callbacks.History object at 0x0000000061AB8988&gt;</code></pre>
+<p>Once the model is run, the performance over both the training and testing set is noted.</p>
+<pre class="python"><code>#Training set accuracy
+scores_d = model_d.evaluate(X_train, Y_train, verbose=False)
+print(&quot;Training Accuracy: %.2f%%\n&quot; % (scores_d[1]*100))</code></pre>
+<pre><code>## Training Accuracy: 100.00%</code></pre>
+<pre class="python"><code>#Testing set accuracy
+scores_d = model_d.evaluate(X_test, Y_test, verbose=False)
+print(&quot;Testing Accuracy: %.2f%%\n&quot; % (scores_d[1]*100))</code></pre>
+<pre><code>## Testing Accuracy: 96.41%</code></pre>
+<p>The training set achieves a spectacular 100% accuracy. However, this may be too good to be true, as overfitting is a possibility. The testing set accuracy confirms this, reaching a lower value of about 95%. This is still a very good result from just a simple model put together. The performance is further emphasised by the ROC curve, which closely resembles that of a perfect model. Perhaps with further hyperparameter tuning, a more detailed and potentially even deeper model can be created to improve accuracy even further.</p>
+<div class="figure">
+<img src="ROC_DNN.png" alt="ROC_DNN" />
+<p class="caption">ROC_DNN</p>
+</div>
+</div>
+<div id="other-methods" class="section level3">
+<h3>Other Methods</h3>
+<p>Before prematurely deciding that deep neural networks are the greatest thing ever and should be used everywhere all the time, it is worth investigating whether similar results can be achieved with other models. This is because neural networks are generally one of the least interpretable methods used, and while obtaining the highest possible accuracy is a worthy goal, understanding what the model is actually even doing is also important. Good model understanding will enable the right method being used in the right situation, as opposed to blindly plugging in the most complex method.</p>
+<p>In order to make this comparison, the PyCaret package is used, as it implements several popular machine learning methods quickly and easily. First, the data is combined to form a single dataframe once again for the package to process.</p>
+<pre class="python"><code>#combine X_under and y_under into a single array
+seizure_arr = np.concatenate([X_under,y_under], axis = 1)
+
+#convert the array back into a data frame
+seizure_df = pd.DataFrame(seizure_arr)
+
+#setting original column names
+seizure_df.columns = seizure.columns
+
+#had to apparently convert to categorical again for the models to run
+seizure_df.y = to_categorical(seizure_df.y)</code></pre>
+<p>After some brief preprocessing, the PyCaret package is initialized. Do note that the code from this point is shown with a ’ # ’ symbol preceding each command. This is only done as there are some rendering issues between this package and R Markdown (on which these reports are made). The ’ # ’ symbol is not necessary if the actual code is being run.</p>
+<p>The environment is setup, with a default train-test split of 70/30 (refer to the PyCaret documentation for further details). The two methods being used here are the simple Logistic Regression as a benchmark, and a series of ensemble techniques including Extreme Gradient Boosting and Random Forests. The accuracy results for each method are shown below.</p>
+<pre class="python"><code>#setup for pycaret
+seizure_pc = setup(seizure_df, target = &#39;y&#39;, html = False, silent = True, verbose=False)</code></pre>
+<pre><code>## [2K
+[2K
+[2K
+[2K</code></pre>
+<pre class="python"><code>#run simple logistic regression as benchmark
+seizure_logistic = create_model(&#39;lr&#39;)</code></pre>
+<pre><code>## [2K
+[2K
+      Accuracy     AUC  Recall   Prec.      F1   Kappa     MCC
+## 0       0.5807  0.4912  0.7578  0.5596  0.6438  0.1615  0.1727
+## 1       0.6087  0.5454  0.8199  0.5764  0.6769  0.2174  0.2398
+## 2       0.6180  0.4710  0.8509  0.5805  0.6902  0.2360  0.2667
+## 3       0.6211  0.5875  0.7578  0.5951  0.6667  0.2422  0.2518
+## 4       0.6056  0.5302  0.7578  0.5810  0.6577  0.2112  0.2217
+## 5       0.6056  0.5243  0.8075  0.5752  0.6718  0.2112  0.2308
+## 6       0.6025  0.4888  0.8385  0.5696  0.6784  0.2050  0.2325
+## 7       0.6211  0.5632  0.7640  0.5942  0.6685  0.2422  0.2528
+## 8       0.5994  0.5124  0.7702  0.5741  0.6578  0.1988  0.2115
+## 9       0.5607  0.5037  0.7188  0.5450  0.6199  0.1224  0.1290
+## Mean    0.6023  0.5218  0.7843  0.5751  0.6632  0.2048  0.2209
+## SD      0.0179  0.0342  0.0403  0.0142  0.0189  0.0357  0.0394</code></pre>
+<pre class="python"><code>#run ensemble models
+seizure_ensemble = compare_models(whitelist = models(type=&#39;ensemble&#39;).index.tolist(), fold = 3)</code></pre>
+<pre><code>## [2K
+[2K
+                             Model  Accuracy     AUC  Recall   Prec.      F1  \
+## 0           Extra Trees Classifier    0.9633  0.9931  0.9640  0.9629  0.9634   
+## 1  Light Gradient Boosting Machine    0.9621  0.9929  0.9640  0.9607  0.9622   
+## 2              CatBoost Classifier    0.9574  0.9928  0.9646  0.9515  0.9578   
+## 3        Extreme Gradient Boosting    0.9528  0.9913  0.9615  0.9456  0.9532   
+## 4     Gradient Boosting Classifier    0.9469  0.9905  0.9627  0.9337  0.9478   
+## 5         Random Forest Classifier    0.9450  0.9843  0.9198  0.9688  0.9436   
+## 6             Ada Boost Classifier    0.9270  0.9740  0.9441  0.9133  0.9283   
+## 
+##     Kappa     MCC  TT (Sec)  
+## 0  0.9267  0.9269    0.2627  
+## 1  0.9242  0.9244    2.0959  
+## 2  0.9149  0.9154   30.0128  
+## 3  0.9056  0.9061    1.1236  
+## 4  0.8938  0.8946   11.3471  
+## 5  0.8900  0.8913    0.1197  
+## 6  0.8540  0.8548    2.2050</code></pre>
+<p>The Logistic Regression performed the worst, reaching a mean accuracy value of only approximately 60%. This is also illustrated by its ROC curve shown below.</p>
+<div class="figure">
+<img src="ROC_Log.png" alt="ROC_log" />
+<p class="caption">ROC_log</p>
+</div>
+<p>On the other hand, the Extra Tree Classifier from the ensemble methods has performed quite well, with an accuracy level almost equivalent to that of the Neural Network. This is illustrated by the equally similar ROC curve generated below.</p>
+<div class="figure">
+<img src="ROC_Ensemble.png" alt="ROC_Ensemble" />
+<p class="caption">ROC_Ensemble</p>
+</div>
+</div>
+<div id="conclusion" class="section level3">
+<h3>Conclusion</h3>
+<p>The above analysis has two important highlights. Firstly, deep learning techniques are incredibly powerful for use on complex data due to their inherent flexibility. With time as packages such as Tensorflow are being continously developed, implementing neural networks is gradually becoming easier and more efficient. Secondly, it should be noted that just because they are complex, neural networks may not always be the answer, as just like any other model, they have their shortcomings (adversarial machine learning comes to mind). Also, it is highly likely that given a particular use-case, there may be a number of models that provide equally promising results. The decision regarding which model to use therefore depends on the particular situation and goal of the analysis itself.</p>
+</div>
+
+
+              
+          </article>
+          
+
+ <div class="pagination">
+  
+    <a class="pagination__item" href="/blog/religious-and-sacred-texts/">
+        <span class="pagination__label">Previous Post</span>
+        <span class="pagination__title">Mining Religious and Sacred Texts</span>
+    </a>
+  
+
+  
+    <a class="pagination__item" href="/blog/drugs-and-memories/">
+      <span class="pagination__label">Next Post</span>
+      <span class="pagination__title" >Drugs and Memories - The impact of Interaction in Regressions</a>
+    </a>
+  
+</div>
+
+          
+          <footer class="post__footer">
+            
+
+
+<div class="social-icons">
+  
+     
+    
+  
+     
+    
+  
+     
+    
+  
+     
+    
+  
+     
+    
+  
+     
+    
+  
+     
+    
+  
+     
+    
+     
+</div>
+
+            <p>© 2020 fazi_rda</p>
+          </footer>
+          </div>
+      </div>
+      
+    </div>
+    
+
+  </main>
+
+   
+
+  
+  <script src="/js/index.min.49e4d8a384357d9b445b87371863419937ede9fa77737522ffb633073aebfa44.js" integrity="sha256-SeTYo4Q1fZtEW4c3GGNBmTft6fp3c3Ui/7YzBzrr&#43;kQ=" crossorigin="anonymous"></script>
+  
+  
+  <script src="https://unpkg.com/prismjs@1.20.0/components/prism-core.min.js"></script>
+
+  
+  <script src="https://unpkg.com/prismjs@1.20.0/plugins/autoloader/prism-autoloader.min.js"
+    data-autoloader-path="https://unpkg.com/prismjs@1.20.0/components/"></script>
+
+  
+
+
+</body>
+
+</html>
