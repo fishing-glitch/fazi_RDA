@@ -7,9 +7,28 @@
     <generator>Hugo -- gohugo.io</generator>
     <language>en-us</language>
     <copyright>© {year} fazi_rda</copyright>
+    <lastBuildDate>Tue, 04 Aug 2020 00:00:00 +0000</lastBuildDate>
     
 	<atom:link href="/index.xml" rel="self" type="application/rss+xml" />
     
+    
+    <item>
+      <title>CV</title>
+      <link>/blog/cv/</link>
+      <pubDate>Tue, 04 Aug 2020 00:00:00 +0000</pubDate>
+      
+      <guid>/blog/cv/</guid>
+      <description>This is my cv link</description>
+    </item>
+    
+    <item>
+      <title>CV</title>
+      <link>/post/cv/</link>
+      <pubDate>Tue, 04 Aug 2020 00:00:00 +0000</pubDate>
+      
+      <guid>/post/cv/</guid>
+      <description></description>
+    </item>
     
     <item>
       <title>Brent Oil Prices - Time Series with ML Models</title>
