@@ -1,0 +1,616 @@
+---
+title: "Vehicle Accidents in Canada - Exploring and Classifying Severity"
+output: html_notebook
+---
+
+### Introduction
+
+The following analysis is performed on data describing various vehicle accidents in Canada during the years 1999-2014. The focus is on how severe the accidents were in terms of fatalities and injuries. The link between the degree of severity and majority of the other given variables (features) is explored through visualizations. A couple of simple machine learning models are also fit to the dataset to explore whether there is any useful potential for being able to predict fatalities based on the provided features. The data was freely obtained from https://www.kaggle.com/tbsteal/canadian-car-accidents-19942014 , where more information and additional relevant files can be viewed as well.
+
+To begin, the relevant libraries and the data is loaded. 
+```{r warning=FALSE, message=FALSE}
+#Libraries
+library(tidyverse)
+library(lsr)
+library(plotly)
+library(ROSE)
+library(rsample)
+library(caret)
+library(ROCR)
+
+#Import Data 
+acc <- read.csv("NCDB-1999-to-2014.csv")
+```
+
+### Defining the Variables
+
+The initial dataset comprises of 5,860,405 total observations for 22 different variables. The data is therefore substantial in size. Before moving on to the actual analysis, it may be useful to briefly describe the different variables present (and also to avoid constantly referring to the pdf guide in the link given above). 
+
+1.  C_YEAR = Year => ranging from 1999-2014
+
+2.  C_MNTH = Month => numerically coded 01-12, in line with January-December
+
+3.  C_WDAY = Day of Week => numerically coded 1-7, in line with Monday-Sunday
+
+4.  C_HOUR = Collision Hour => numerically coded 00-23, where 00 is midnight to 0:59, 01 is 1:00 to 1:59, and so on until 23 is 23:00 to 23:59
+
+5.  C_SEV = Collision severity => numerically coded 1(at least one fatality) and 2(non-fatal injury or no injury)
+
+6.  C_VEHS = Number of vehicles involved => 1, 2, 3....., 98 vehicles involved, or 99+ vehicles involved
+
+7.  C_CONF = Collision configuration => divided into four different sub categories:
+  * a) Single vehicle in motion:
+    * 01 => Hit a moving object
+    * 02 => Hit a stationary object
+    * 03 => Ran off left shoulder 
+    * 04 => Ran off right shoulder 
+    * 05 => Rollover on roadway
+    * 06 => Any other single vehicle collision configuration
+  * b) Two vehicles in motion - same direction of travel:
+    * 21 => Rear-end collision
+    * 22 => Side swipe
+    * 23 => One vehicle passing to the left of the other, or left turn conflict
+    * 24 => One vehicle passing to the right of the other, or right turn conflict
+    * 25 => Any other two vehicle - same direction of travel configuration
+  * c) Two vehicles in motion - different direction of travel:
+    * 31 => Head-on collision
+    * 32 => Approaching side-swipe
+    * 33 => Left turn across opposing traffic
+    * 34 => Right turn, including turning conflicts
+    * 35 => Right angle collision
+    * 36 => Any other two-vehicle - different direction of travel configuration
+  * d) Two vehicles - hit a parked vehicle
+    * 41 => Hit a parked motor vehicle
+
+8.  C_RCFG = Roadway configuration => 12 categories as follows:
+    * 01 => Non-intersection 
+    * 02 => At an intersection of at least two public roadways
+    * 03 => Intersection with parking lot entrance/exit, private driveway/laneway
+    * 04 => Railroad level crossing
+    * 05 => Bridge, overpass, viaduct
+    * 06 => Tunnel or underpass
+    * 07 => Passing or climbing lane
+    * 08 => Ramp
+    * 09 => Traffic circle
+    * 10 => Express lane of a freeway system
+    * 11 => Collector lane of a freeway system
+    * 12 => Transfer lane of a freeway system
+
+9.  C_WTHR = Weather condition => 7 categories as follows:
+    * 1 => Clear and sunny
+    * 2 => Overcast, cloudy but no precipitation
+    * 3 => Raining
+    * 4 => Snowing, not including drifting snow
+    * 5 => Freezing rain, sleet, hail
+    * 6 => Visibility limitation e.g. drifting snow, fog, smog, dust, smoke, mist
+    * 7 => Strong wind
+    
+10. C_RSUR = Road surface => 9 categories as follows:
+    * 1 => Dry, normal
+    * 2 => Wet
+    * 3 => Snow (fresh, loose snow)
+    * 4 => Slush ,wet snow
+    * 5 => Icy Includes packed snow
+    * 6 => Sand/gravel/dirt
+    * 7 => Muddy
+    * 8 => Oil 
+    * 9 => Flooded
+    
+11. C_RALN = Road alignment => 6 categories as follows:
+    * 1 => Straight and level
+    * 2 => Straight with gradient
+    * 3 => Curved and level
+    * 4 => Curved with gradient
+    * 5 => Top of hill or gradient
+    * 6 => Bottom of hill or gradient
+
+12. C_TRAF = Traffic control => 18 categories as follows:
+    * 01 => Traffic signals fully operational
+    * 02 => Traffic signals in flashing mode
+    * 03 => Stop sign
+    * 04 => Yield sign
+    * 05 => Warning sign 
+    * 06 => Pedestrian crosswalk
+    * 07 => Police officer
+    * 08 => School guard, flagman
+    * 09 => School crossing
+    * 10 => Reduced speed zone
+    * 11 => No passing zone sign
+    * 12 => Markings on the road e.g. no passing
+    * 13 => School bus stopped with school bus signal lights flashing
+    * 14 => School bus stopped with school bus signal lights not flashing
+    * 15 => Railway crossing with signals, or signals and gates
+    * 16 => Railway crossing with signs only
+    * 17 => Control device not specified
+    * 18 => No control present
+
+13. V_ID = Vehicle sequence number => unique ID number 1-98 (99 for pedestrians)
+
+14. V_TYPE = Vehicle type => 17 categories as follows:
+    * 01 => Light Duty Vehicle 
+    * 05 => Panel/cargo van <= 4536 KG GVWR
+    * 06 => Other trucks and vans <= 4536 KG GVWR
+    * 07 => Unit trucks > 4536 KG GVWR
+    * 08 => Road tractor With or without a semi-trailer
+    * 09 => School bus Standard large type
+    * 10 => Smaller school bus Smaller type, seats < 25 passengers
+    * 11 => Urban and Intercity Bus
+    * 14 => Motorcycle and moped Motorcycle and limited-speed motorcycle
+    * 16 => Off road vehicles Off road motorcycles 
+    * 17 => Bicycle
+    * 18 => Purpose-built motorhome Exclude pickup campers
+    * 19 => Farm equipment
+    * 20 => Construction equipment
+    * 21 => Fire engine
+    * 22 => Snowmobile
+    * 23 => Street car
+    
+15. V_YEAR = Vehicle model year => ranging from early 90s to 20xx.
+    
+16. P_ID = Person Sequence Number => unique ID number 01-99
+
+17. P_SEX = Person sex => M (male), F (female)
+
+18. P_AGE = Person age => age range from 00 (less than a year old) to 99 (or older)
+
+19. P_PSN = Person position => 13 categories as follows:
+    * 11 => Driver
+    * 12 => Front row, center
+    * 13 => Front row, right outboard, including motorcycle passenger in sidecar
+    * 21 => Second row, left outboard, including motorcycle passenger
+    * 22 => Second row, center
+    * 23 => Second row, right outboard
+    * 31 => Third row, left outboard
+    * 32 => Third row, center
+    * 33 => Third row, right outboard
+    * 96 => Position unknown, but the person was definitely an occupant
+    * 97 => Sitting on someone’s lap
+    * 98 => Outside passenger compartment
+    * 99 => Pedestrian
+    
+20. P_ISEV = Medical treatment required => three categories, 1 (no injury), 2 (injury) and 3 (fatality)
+
+21. P_SAFE = Safety device used => 7 categories as follows:
+    * 01 => No safety device used or No child restraint used
+    * 02 => Safety device used or child restraint used
+    * 09 => Helmet worn
+    * 10 => Reflective clothing worn
+    * 11 => Both helmet and reflective clothing used
+    * 12 => Other safety device used
+    * 13 => No safety device equipped
+    
+22. P_USER = Road user class => 5 categories as follows:
+    * 1 => Motor Vehicle Driver
+    * 2 => Motor Vehicle Passenger
+    * 3 => Pedestrian
+    * 4 => Bicyclist
+    * 5 => Motorcyclist
+
+Along these variables, other categories have also been defined to describe data that is missing or was not provided. These are labeled as "UU", "XX", "U", "X", "QQ", "Q", "NN", "NNNN", "UUUU", "XXXX", "N". It should also be noted that all the features are completely categorical in nature (no numerical properties), therefore making this data suitable for classification analysis and modeling. 
+
+### Data Cleaning/Processing
+
+Before moving on to the analysis, the data needs to be slightly processed. Firstly, all rows including the labeled missing values are removed as there is no reliable information that can be used for other options such as imputing. However, since the number of rows is already exceeding 5 million, there should not be a significant loss in information from this removal. In fact, once the removal took place  the only noticeable loss of information was from there being no data present for pedestrian related accidents. After discounting the missing values, there are a little over 3 million observations left, which is still substantial enough. The unique vehicle and person ID variables are then removed as they serve no real importance for the purpose of this analysis, leaving 20 variables. Finally, all variables are converted to factor type to account for their categorical nature. This is all carried out in the code chunk below.
+
+```{r warning=FALSE, message=FALSE}
+#removing unknown observations
+
+acc_clean <- acc
+
+unknown_vals <- c("UU", "XX", "U", "X", "QQ", "Q", "NN", "NNNN", "UUUU", "XXXX", "N")
+
+for (i in 1:22){
+  acc_clean <- subset(acc_clean, !  acc_clean[,i] %in% unknown_vals)
+} #left with 3,295,339 obs from 22 variables
+
+
+#removing vehicle and person sequence number variables
+
+acc_clean <- acc_clean[, c(-13, -16)]
+
+#converting to factor
+
+acc_clean$C_YEAR <- as.factor(acc_clean$C_YEAR)
+acc_clean$C_SEV <- as.factor(acc_clean$C_SEV)
+
+acc_clean <- acc_clean %>%
+  mutate_if(is.character, as.factor)
+```
+
+
+### Exploratory Analysis
+
+Now that the data is processed, it can be explored. As mentioned previously, the main focus is going to be how most of these variables interact with the total number and severity of the accidents. The charts are maintained to be as simple as possible, without any unnecessary complexity, to convey the insights clearly. Almost all the charts are interactive as well, to help with readability (it may be better to view these on a computer screen than on a phone). 
+
+Starting simply, the progression of the number of accidents through the years is shown in tables below. The top table refers to the data from the cleaned dataset, which shows a gradual declining trend in the number of accidents as the years go by. This isn't really surprising, as with time it is plausible that safety measures in both vehicles and roads would improve, thus leading to lower accident numbers. To confirm this declining trend (and to validate the clean data), the original raw dataset is also used, which too shows a declining trend, albeit with a slightly steeper drop.
+
+```{r warning=FALSE, message=FALSE}
+# Number of accidents progression per year (table)
+table(acc_clean$C_YEAR) # clean data
+table(acc$C_YEAR) # original data
+```
+
+The number of accidents varies slightly with each month, but not to a significant degree. The highest number of accidents take place in June, July and August, while the lowest numbers are in February, March and April. This may be due to weather changes during these months, with better weather in the middle of the year. 
+
+```{r warning=FALSE, message=FALSE, fig.width=7.5, fig.height=4.5}
+#Distribution of accidents per month
+
+ggplotly(ggplot(acc_clean, aes(C_MNTH)) +
+  geom_histogram(stat = "count", fill = "deepskyblue3", color = "black") +
+  scale_y_continuous(labels = scales::comma) +
+  ggtitle("Distribution of accidents per month") +
+  theme_minimal())
+```
+
+There is not significant variation in the number of accidents during the week as well, with the highest number being on Friday and lowest number being on Sunday. Hovering the cursor (or tapping) on the charts will show the exact numbers. 
+
+```{r warning=FALSE, message=FALSE, fig.width=7.5, fig.height=4.5}
+#Distribution of accidents per weekday
+
+ggplotly(ggplot(acc_clean, aes(C_WDAY)) +
+  geom_histogram(stat = "count", fill = "deepskyblue3", color = "black") +
+  scale_y_continuous(labels = scales::comma) +
+  ggtitle("Distribution of accidents per weekday") +
+  theme_minimal())
+```
+There is a lot more variation of the number of accidents per hour, with majority of the accidents taking place between 11:00 and 20:00. This is probably due to higher traffic levels during these hours. There is also a minor spike between 08:00 and 09:00, which can be because of the morning commute to work. The level of severity or injury however appears to be consistent with the number of accidents in total, showing little variation. 
+
+```{r warning=FALSE, message=FALSE, fig.width=7.5, fig.height=4.5}
+#Distribution of accidents and severity per hour
+
+ggplotly(ggplot(acc_clean, aes(C_HOUR)) +
+  geom_histogram(aes(fill = C_SEV), stat = "count", color = "black") +
+  scale_y_continuous(labels = scales::comma) +
+  scale_fill_manual(values = c("red", "slategray1")) +
+  ggtitle("Distribution of accidents and severity per hour") +
+  theme_minimal())
+```
+Examining the relationship between the collision configuration and the severity of the accidents provides some unique insights. The charts show that majority of the severe (fatal) accidents resulted when there was a head-on collision between two vehicles, whereas majority of the non-severe (little to no injury) accidents resulted when there was a rear-end collision between two vehicles. 
+
+```{r warning=FALSE, message=FALSE, fig.width=7.5, fig.height=4.5}
+#Collision configuration with accident severity
+
+ggplotly(ggplot(subset(acc_clean, C_SEV == "1"), aes(C_SEV)) +
+  geom_bar(aes(fill = C_CONF), stat = "count", color = "black", 
+           position = "dodge") +
+  scale_y_continuous(labels = scales::comma) +
+  ggtitle("Collision configuration for severe accidents") +
+  theme_minimal())
+
+ggplotly(ggplot(subset(acc_clean, C_SEV == "2"), aes(C_SEV)) +
+  geom_bar(aes(fill = C_CONF), stat = "count", color = "black", 
+           position = "dodge") +
+  scale_y_continuous(labels = scales::comma) +
+  ggtitle("Collision configuration for non-severe accidents") +
+  theme_minimal())
+```
+Over 90% of all accidents during the 16 year period took place at either a non-intersection or an intersection of at least two public roadways. 
+
+```{r warning=FALSE, message=FALSE, fig.width=7.5, fig.height=4.5}
+#roadway configuration with accident number
+
+ggplotly(ggplot(acc_clean, aes(C_RCFG)) +
+  geom_bar(stat = "count", color = "black", fill = "gray66",
+           position = "dodge") +
+  scale_y_continuous(labels = scales::comma) +
+  ggtitle("Number of accidents by roadway configuration") +
+  theme_minimal())
+```
+Before jumping to hasty conclusions that accidents are caused due to clear and sunny days, it should be noted that a large number of accidents taking place during clear and sunny weather is probably because such weather is the most common throughout the year, thus naturally showing a higher number of accidents as well. The table showing the number of accidents by road surface condition shows a similar distribution to the weather condition chart, implying that there may be a correlation or association between these two variables. This will be explored further on. 
+
+```{r warning=FALSE, message=FALSE, fig.width=7.5, fig.height=4.5}
+#weather and accident severity
+
+ggplotly(ggplot(acc_clean, aes(C_WTHR)) +
+  geom_bar(aes(fill = C_SEV), stat = "count", color = "black") +
+  scale_y_continuous(labels = scales::comma) +
+  ggtitle("Weather and accident severity") +
+  scale_fill_manual(values = c("red", "slategray1")) +
+  theme_minimal())
+```
+```{r warning=FALSE, message=FALSE, fig.width=7.5, fig.height=4.5}
+#road surface and accident severity
+
+table(C_SEV = acc_clean$C_SEV, C_RSUR = acc_clean$C_RSUR)
+```
+An interesting observation from the below chart shows that most of the accidents either took place where there was no control present at all, or where there were fully operational traffic signals, or a stop sign. These categories can be considered as two extreme opposites to each other, yet both combined have the highest number of accidents attributed to them.
+
+```{r warning=FALSE, message=FALSE, fig.width=7.5, fig.height=4.5}
+#traffic control and accident severity
+
+ggplotly(ggplot(acc_clean, aes(C_TRAF)) +
+  geom_bar(stat = "count", color = "black", fill = "gray66",
+           position = "dodge") +
+  scale_y_continuous(labels = scales::comma) +
+  ggtitle("Number of accidents by traffic control") +
+  theme_minimal())
+```
+To clearly show how severity of accidents vary by vehicle type, percentages instead of absolute numbers are used in the below chart. Here it can be seen that the highest percentage of severe accidents took place when the vehicle type was either a road tractor, a purpose built motorhome, a heavy unit truck or motorcycles and mopeds. 
+
+```{r warning=FALSE, message=FALSE, fig.width=7.5, fig.height=4.5}
+#vehicle type and accident severity
+
+ggplotly(ggplot(acc_clean, aes(V_TYPE)) +
+  geom_bar(aes(fill = C_SEV), stat = "count", color = "black",
+           position = "fill") +
+  scale_y_continuous(labels = scales::comma) +
+  ggtitle("Percentage severity by vehicle type") +
+  scale_fill_manual(values = c("red", "slategray1")) +
+  theme_minimal())
+```
+Men tend to have more accidents (and a higher percentage of severe accidents) than women, according to the data. This does not automatically imply that men are worse drivers. It could also simply be because there may be more men drivers than women in general, or that more men tend to operate dangerous vehicles than women. 
+
+```{r warning=FALSE, message=FALSE, fig.width=7.5, fig.height=4.5}
+#sex and accident severity
+
+ggplotly(ggplot(acc_clean, aes(P_SEX)) +
+  geom_bar(aes(fill = C_SEV), stat = "count", color = "black") +
+  scale_y_continuous(labels = scales::comma) +
+  ggtitle("Number of accidents distributed between men and women") +
+  scale_fill_manual(values = c("red", "slategray1")) +
+  theme_minimal())
+```
+Naturally, the largest spike in the number of accidents is around the age of 17 and 18, which is when people tend to get their new driving license. As age increases, the number of accidents decreases, which can be because of more experience gained while driving, and towards later ages when people tend to drive less and less the older they get. The percentage of severity (class 3 - red) however tends to remain constant throughout all ages, only rising when the age is 80 and above. 
+
+```{r warning=FALSE, message=FALSE, fig.width=7.5, fig.height=4.5}
+#age and medical treatment required
+
+ggplotly(ggplot(acc_clean, aes(P_AGE)) +
+  geom_bar(aes(fill = P_ISEV), stat = "count") +
+  scale_y_continuous(labels = scales::comma) +
+  ggtitle("Medical treatment by age (absolute numbers)") +
+  scale_fill_manual(values = c("limegreen", "paleturquoise2","red")) +
+  theme_minimal() +
+  theme(axis.text.x = element_blank(),
+        axis.ticks.x = element_blank()))
+
+ggplotly(ggplot(acc_clean, aes(P_AGE)) +
+  geom_bar(aes(fill = P_ISEV), stat = "count",
+           position = "fill") +
+  scale_y_continuous(labels = scales::comma) +
+  ggtitle("Medical treatment by age (percentage)") +
+  scale_fill_manual(values = c("limegreen", "paleturquoise2","red")) +
+  theme_minimal() +
+  theme(axis.text.x = element_blank(),
+        axis.ticks.x = element_blank()))
+```
+The charts below firstly show that most of the people accounted for in this data were in fact the drivers themselves, since the highest number of accidents are shown in the driver seat. However, examining the percentages shows that the highest percentage of fatalities is where either the occupant's position is unknown, or where the occupant was sitting on someone's lap. The highest percentage of injuries (class 2- blue) is when the occupant was in an outside compartment, such as the back of a pick-up truck.
+
+```{r warning=FALSE, message=FALSE, fig.width=7.5, fig.height=4.5}
+#position and severity
+
+ggplotly(ggplot(acc_clean, aes(P_PSN)) +
+  geom_bar(aes(fill = P_ISEV), stat = "count") +
+  scale_y_continuous(labels = scales::comma) +
+  ggtitle("Medical treatment by person position (absolute numbers)") +
+  scale_fill_manual(values = c("limegreen", "paleturquoise2","red")) +
+  theme_minimal())
+
+ggplotly(ggplot(acc_clean, aes(P_PSN)) +
+  geom_bar(aes(fill = P_ISEV), stat = "count", position = "fill") +
+  scale_y_continuous(labels = scales::comma) +
+  ggtitle("Medical treatment by person position (percentage)") +
+  scale_fill_manual(values = c("limegreen", "paleturquoise2","red")) +
+  theme_minimal())
+```
+While the largest number of accidents coincide with a safety device being used, it is more likely that this is because most people actually use a safety device while traveling. This is why a percentage bar chart is important to show a better picture. It is probably not surprising that the highest percentage of fatalities is where there is no safety being used. The highest number of injuries is for people wearing helmets, but this is because this is directly linked to motorcycle and moped riders, where the risk of injury and fatality is naturally much higher. Also interesting is category 13, which although shows no safety device equipped, is almost equivalent in percentage terms to category 02 (safety device equipped). This is because category 13 includes vehicles such as buses, where it is quite rare to experience any injury or accident at all due to how large it is and the way it operates. 
+
+```{r warning=FALSE, message=FALSE, fig.width=7.5, fig.height=4.5}
+#safety device used and severity
+
+ggplotly(ggplot(acc_clean, aes(P_SAFE)) +
+  geom_bar(aes(fill = P_ISEV), stat = "count") +
+  scale_y_continuous(labels = scales::comma) +
+  ggtitle("Medical treatment by safety device used (absolute)") +
+  scale_fill_manual(values = c("limegreen", "paleturquoise2","red")) +
+  theme_minimal())
+
+ggplotly(ggplot(acc_clean, aes(P_SAFE)) +
+  geom_bar(aes(fill = P_ISEV), stat = "count", position = "fill") +
+  scale_y_continuous(labels = scales::comma) +
+  ggtitle("Medical treatment by safety device used (percentage)") +
+  scale_fill_manual(values = c("limegreen", "paleturquoise2","red")) +
+  theme_minimal())
+```
+As stated earlier, majority of the people classified in this data set are either motor vehicle drivers or passengers. The highest percentage of injury however is attributed to bicycle riders, and the highest fatality percentage is for motorcyclists. 
+
+```{r warning=FALSE, message=FALSE, fig.width=7.5, fig.height=4.5}
+#road user class and medical treatment
+
+ggplotly(ggplot(acc_clean, aes(P_USER)) +
+  geom_bar(aes(fill = P_ISEV), stat = "count") +
+  scale_y_continuous(labels = scales::comma) +
+  ggtitle("Medical treatment by road user class (absolute)") +
+  scale_fill_manual(values = c("limegreen", "paleturquoise2","red")) +
+  theme_minimal())
+
+ggplotly(ggplot(acc_clean, aes(P_USER)) +
+  geom_bar(aes(fill = P_ISEV), stat = "count", position = "fill") +
+  scale_y_continuous(labels = scales::comma) +
+  ggtitle("Medical treatment by road user class (percentage)") +
+  scale_fill_manual(values = c("limegreen", "paleturquoise2","red")) +
+  theme_minimal())
+```
+Finally, in an attempt to paint an overall picture of the interaction between the variables, a correlation plot is shown. The year variable is removed to remove any evolutionary impact of time series (and it is not needed for any further analysis from this point). As the variables are not ordinal at all and are all categorical, the Cramer's V is calculated and plotted to show the strength of association between the variables. The function below was copied from Stackoverflow (the link is provided in the code comments), with some minor changes to fit this specific purpose. Also to be noted is that all chi-square p-values were zero for every combination, implying statistical significance for each value of Cramer's V. This chart is not interactive.  
+
+```{r warning=FALSE, message=FALSE, fig.width=9, fig.height=7}
+#Correlation with Cramers V
+
+#removing collision year to ignore time series impact
+acc_corr <- acc_clean[,-1]
+
+#from https://stackoverflow.com/a/52557631
+f = function(x,y) {
+  tbl = acc_corr %>% select(x,y) %>% table()
+  chisq_pval = round(chisq.test(tbl)$p.value, 4) #calculate chi-sqr value
+  cramV = round(cramersV(tbl), 3) #calculate cramer V 
+  data.frame(x, y, chisq_pval, cramV) }
+
+# create unique combinations of column names
+# sorting will help getting a better plot (upper triangular)
+df_comb = data.frame(t(combn(sort(names(acc_corr)), 2)), stringsAsFactors = F)
+
+# apply function to each variable combination
+df_res = map2_df(df_comb$X1, df_comb$X2, f)
+
+#filter out chi-square as all are equal to zero, implying statistical significance
+df_res <- df_res[, -3]
+
+# plot results
+corr_plot <- df_res %>%
+  ggplot(aes(x,y,fill=cramV))+
+  geom_tile()+
+  geom_text(aes(x,y,label=cramV))+
+  scale_color_gradient()+
+  theme_minimal() +
+  theme(axis.text.x = element_text(angle = 25, hjust = 1),
+        axis.title.x = element_blank(),
+        axis.title.y = element_blank())
+
+corr_plot
+```
+
+While majority of the variables have very weak association, there are some strong combinations shown:
+ (V_TYPE - P_USER, P_USER - P_PSN/SAFE, P_ISEV - C_SEV, C_WTHR - C_RSUR, V_TYPE - P_SAFE)
+
+Many of these are quite obvious, such as the similarity between vehicle type and the road class user. Also, as mentioned earlier, there is a somewhat stronger association between the weather and the road surface condition. A strong association is also between the severity and the medical treatment required, which both more or less provide the same information. 
+
+
+### Classification of Severity
+
+Having explored how severity of accidents is related to majority of the variables, it is now time to briefly investigate whether it is possible to predict accident severity using a classification model. Two simple classification models will be used, the logistic regression, and the generalized linear model with regularization. No manual parameter tuning or highly complex methods are being used here, as the purpose is to only see whether initial results are promising enough to warrant further attempts. 
+
+Two things to note before progressing: Firstly, the data is such that there are two potential candidates for the target variable (C_SEV and P_ISEV). C_SEV is chosen as it leads to binary classification, making things relatively simpler to understand. Therefore, P_ISEV is removed (justified by the previous correlation plot as well). Secondly, due to memory constraints, the entire 3 million plus observations could not be used, so only a very minor portion of the data is utilized. While this may not lead to the most true representation of accuracy, it should be sufficient for this specific purpose. 
+
+Before jumping into the models, first the target variable itself is examined. 
+
+```{r warning=FALSE, message=FALSE, fig.width=9, fig.height=7}
+#class imbalance for target variable
+
+table(Severity = acc_corr$C_SEV)
+```
+
+As it may have been evident by now, there is a severe class imbalance. Undersampling may be the easiest way to fix this, but the cost of information loss may be too great in this case given the difference between the two classes. Oversampling will also not work for this reason, as it will very likely lead to overfitting (Due to repeated observations). A third option is to use synthetic data generating techniques. The function used here 'creates a sample of synthetic data by enlarging the features space of minority and majority class examples using a smoothed bootstrap approach' (paraphrased from the documentation). To simplify, it generates data within the original data using algorithms such that the number of classes is equal, while avoiding the pitfalls of under and overfitting. However, synthetic data generation is a bit of an ethical dilemma, as it revolves around the territory of falsifying data, so it should be used with care and not to make any outrageous or influential claims about the data.  
+
+```{r warning=FALSE, message=FALSE, fig.width=9, fig.height=7}
+#ROSE function - (as seen in documentation) creates a sample of synthetic data by
+  #enlarging the features space of minority and majority class examples using a
+  # smoothed bootstrap approach. 
+
+acc_corr <- acc_corr[,-17]
+
+acc_synth <- ROSE(C_SEV ~ ., data = acc_corr, seed = 1234, N = 3295339)$data
+
+#need to select smaller data size due to memory constraints (0.5% of 3 million)
+
+acc_synth_sm <- acc_synth[sample(nrow(acc_synth), (nrow(acc_synth) * 0.005)), ]
+
+table(acc_synth_sm$C_SEV)
+
+```
+
+The table above shows that the classes are now much more balanced than before, with approximately 16000 total observations being used. The next steps split the data into a 70/30 train-test split, apply a 5-fold standard cross-validation technique to improve accuracy and apply the models. This is carried out in the code chunk below.
+
+```{r warning=FALSE, message=FALSE, fig.width=9, fig.height=7}
+##splitting the data into train-test samples
+
+set.seed(1234)
+acc_split <- initial_split(acc_synth_sm, prop = 0.7, strata = "C_SEV")
+acc_train <- training(acc_split)
+acc_test <- testing(acc_split)
+
+##define cross-validation method
+
+cv <- trainControl(method = "cv", number = 5)
+
+##Logistic and Regularized model training
+
+set.seed(1234)
+acc_logistic <- train(C_SEV ~ .,
+                      data = acc_train,
+                      method = 'glm',
+                      family = 'binomial',
+                      trControl = cv)
+
+set.seed(1234)
+acc_glmregular <- train(C_SEV ~ .,
+                        data = acc_train,
+                        method = 'glmnet',
+                        trControl = cv)
+```
+
+To assess the accuracy of the models on the training data, the accuracy and Kappa metrics are used to provide a fair picture, as the Kappa value will take into account the random chance of correct classification. 
+
+```{r warning=FALSE, message=FALSE, fig.width=9, fig.height=7}
+#Accuracy Metric
+summary(resamples(list(
+  Logistic  = acc_logistic,
+  Regularized = acc_glmregular
+)))$statistics$Accuracy
+#Kappa Metric
+summary(resamples(list(
+  Logistic  = acc_logistic,
+  Regularized = acc_glmregular
+)))$statistics$Kappa
+```
+
+Both models seem to be performing very similarly, with the regularized model performing only marginally better. While the accuracy metric shows some promise, the Kappa value of an average of 0.5 for each model shows that the element of chance is quite evident in this case. It may be useful to see how these models perform on the test data using confusion matrices. 
+
+```{r warning=FALSE, message=FALSE, fig.width=9, fig.height=7}
+#logistic model
+logistic_pred <- predict(acc_logistic, acc_test) 
+confusionMatrix(data = relevel(logistic_pred, ref = 2),
+                reference = relevel(acc_test$C_SEV, ref = 2))
+#regularized model
+glmregular_pred <- predict(acc_glmregular, acc_test) 
+confusionMatrix(data = relevel(glmregular_pred, ref = 2),
+                reference = relevel(acc_test$C_SEV, ref = 2))
+```
+
+The results from the confusion matrices are much more interesting. Here the regularized model appears to be performing much better than the logistic model when applied to the testing data. The accuracy and Kappa values are both higher for the regularized model. While the the logistic model has a higher sensitivity, the specificity is quite low, whereas the regularized model has a much more balanced sensitivity and specificity. Observing the actual values in the matrices themselves shows even more variation. While the logistic model correctly classifies Class 1 more, the regularized model correctly classifies Class 2 more. To provide a more overall point of view on these two models, an ROC curve (along with the AUC value) is useful. 
+
+```{r warning=FALSE, message=FALSE, fig.width=9, fig.height=7}
+#Calculate AUC
+
+pred_ROCR_logistic <- prediction(as.numeric(logistic_pred), 
+                             as.numeric(acc_test$C_SEV))
+
+perf_ROCR_logistic <- performance(pred_ROCR_logistic, 
+                              measure = "tpr", x.measure = "fpr")
+
+auc_ROCR_logistic <- performance(pred_ROCR_logistic, measure = "auc")
+auc_ROCR_logistic <- auc_ROCR_logistic@y.values[[1]]
+
+
+pred_ROCR_glmregular <- prediction(as.numeric(glmregular_pred), 
+                                 as.numeric(acc_test$C_SEV))
+
+perf_ROCR_glmregular <- performance(pred_ROCR_glmregular, 
+                                  measure = "tpr", x.measure = "fpr")
+
+auc_ROCR_glmregular <- performance(pred_ROCR_glmregular, measure = "auc")
+auc_ROCR_glmregular <- auc_ROCR_glmregular@y.values[[1]]
+
+data.frame("Logistic" = auc_ROCR_logistic, "Regularized" = auc_ROCR_glmregular) 
+#Plot ROC
+
+plot(perf_ROCR_logistic, col = "red", lty = 2)
+plot(perf_ROCR_glmregular, add = TRUE, col = "blue", lty = 3)
+legend(0.8, 0.2, legend = c("Logistic", "Regularized"),
+       col = c("red", "blue"), lty = c(2, 3), cex = 1)
+```
+
+
+### Conclusion
+
+Based on the ROC curve and the AUC value, the regularized model seems to be the better choice. However, this is only a highly simple attempt to classify the severity of accidents based on some features, that to on a very small portion of the data. The variability within the different metrics of the two models could simply be because given the nature of the data (and how there are class imbalances within the independent variables themselves), the chosen sample size is much too small and the models are unable to find any consistent pattern. Perhaps with more computing power and a larger sample, the results may differ. Also, very basic cross-validation is used as opposed to the more robust repeated cross-validation. This may potentially be a problem as simple cross-validation tends to suffer from higher variance in the bias-variance trade-off, whereas repeated cross-validation manages to lower both bias and variance by being more robust. Perhaps simply using a more complex model like Random Forests or Support Vector Machines can be more useful. At the end of the day, it really depends on the use case and what is specifically required. One could even question how useful being able to successfully predict the severity of accidents really is.    
+
+
+
+
+
+
+
+
+
+
