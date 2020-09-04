@@ -7,18 +7,19 @@
     <generator>Hugo -- gohugo.io</generator>
     <language>en-us</language>
     <copyright>© {year} fazi_rda</copyright>
-    <lastBuildDate>Tue, 04 Aug 2020 00:00:00 +0000</lastBuildDate>
     
 	<atom:link href="/blog/index.xml" rel="self" type="application/rss+xml" />
     
     
     <item>
-      <title>CV</title>
-      <link>/blog/cv/</link>
-      <pubDate>Tue, 04 Aug 2020 00:00:00 +0000</pubDate>
+      <title>Antidepressants in the UK: Exploring Prescription Data</title>
+      <link>/blog/antidep/</link>
+      <pubDate>Mon, 01 Jan 0001 00:00:00 +0000</pubDate>
       
-      <guid>/blog/cv/</guid>
-      <description>This is my cv link</description>
+      <guid>/blog/antidep/</guid>
+      <description>IntroductionThis is a simple exploratory analysis about the prescriptions of antidepressants in the UK. The data was freely obtained from the following link: https://www.kaggle.com/lsind18/prescriptions-of-antidepressants, where more information about the specifics can be found.
+Notes about the dataBefore progressing further, there are a couple of points that need to be noted about the data:
+1). As it is not possible to capture all information perfectly, some data can be missing.</description>
     </item>
     
     <item>
@@ -83,6 +84,15 @@ The dataset contains some information about computers, with the dependant variab
       
       <guid>/blog/religious-and-sacred-texts/</guid>
       <description>IntroductionThis is an exercise in simple text mining. Five different religious and sacred texts are analysed, namely the King James Bible, the Koran, the Book of Meditations, the Gospel of Buddha and the Book of Mormon. The analysis is structured in two segments. First, the text data is processed and some visual analysis is performed, simply to gather a better understanding about these texts.</description>
+    </item>
+    
+    <item>
+      <title>Mining Religious and Sacred Texts - Visualizing Clusters with UMAP</title>
+      <link>/blog/umap-clust/</link>
+      <pubDate>Mon, 01 Jan 0001 00:00:00 +0000</pubDate>
+      
+      <guid>/blog/umap-clust/</guid>
+      <description>IntroductionThis analysis is a continuation of the previous post regarding religious and sacred text analysis. In the previous post, a simple exploratory analysis was performed, along with an attempt to use k-means clustering to further understand the data. However, perhaps due to the size and complexity of the data, a suitable value for k could not be found. To take a different approach to clustering, the UMAP algorithim is now going to be used instead to attempt to visualize clusters in the texts (if there are any).</description>
     </item>
     
     <item>

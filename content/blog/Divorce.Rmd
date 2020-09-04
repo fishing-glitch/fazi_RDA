@@ -94,7 +94,7 @@ summary(divorce$Status) #a summary of the dependent variable
 
 From the summary values above, it is clear that the two classes (1 and 0) are almost equal in quantity, therefore there is no class imbalance problem. This luckily makes the analysis simpler to perform.
 
-To further understand the independent variables, a correlation plot is developed to see if any of the questions provide approximately the same information to the data. 
+To further understand the independent variables, a correlation plot is developed to see if any of the questions provide approximately the same information to the data. It should be noted that ordinarily with categorical variables the chi square of Cramer's V methods are used to measure association strength. However, since these categorical variables are ordinal, the Spearman's coefficient may also be used.
 
 ```{r message=FALSE, warning=FALSE, fig.width=12, fig.height=12}
 divorce_num <- divorce[,1:54] #temporary dataframe created

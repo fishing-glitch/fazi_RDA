@@ -88,7 +88,7 @@ summary(divorce$Status) #a summary of the dependent variable</code></pre>
 <pre><code>##  0  1 
 ## 86 84</code></pre>
 <p>From the summary values above, it is clear that the two classes (1 and 0) are almost equal in quantity, therefore there is no class imbalance problem. This luckily makes the analysis simpler to perform.</p>
-<p>To further understand the independent variables, a correlation plot is developed to see if any of the questions provide approximately the same information to the data.</p>
+<p>To further understand the independent variables, a correlation plot is developed to see if any of the questions provide approximately the same information to the data. It should be noted that ordinarily with categorical variables the chi square of Cramer’s V methods are used to measure association strength. However, since these categorical variables are ordinal, the Spearman’s coefficient may also be used.</p>
 <pre class="r"><code>divorce_num &lt;- divorce[,1:54] #temporary dataframe created
 divorce_num[,1:54] &lt;- sapply(divorce_num[,1:54], as.numeric) #reconverting back to numeric 
 #for the correlation function to work
@@ -374,6 +374,7 @@ legend(0.8, 0.2, legend = c(&quot;Naive Bayes&quot;, &quot;Logistic&quot;, &quot
 ##   1.00   0.25174392  0.8833566  0.7654431
 ## 
 ## Accuracy was used to select the optimal model using the largest value.
-## The final values used for the model were alpha = 0.1 and lambda = 0.02517439.</code></pre>
+## The final values used for the model were alpha = 0.1 and lambda
+##  = 0.02517439.</code></pre>
 <p>The model maximized accuracy with an alpha value of 0.1 and lambda value of 0.025. Having found the exact model parameters, an easy to interpret model has been developed for this specific use case which provides exceptionally accurate results.</p>
 </div>

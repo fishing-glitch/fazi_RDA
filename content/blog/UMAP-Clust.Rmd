@@ -1,0 +1,151 @@
+---
+title: "Mining Religious and Sacred Texts - Visualizing Clusters with UMAP"
+output: html_notebook
+---
+
+### Introduction
+
+This analysis is a continuation of the previous post regarding religious and sacred text analysis. In the previous post, a simple exploratory analysis was performed, along with an attempt to use k-means clustering to further understand the data. However, perhaps due to the size and complexity of the data, a suitable value for k could not be found. To take a different approach to clustering, the UMAP algorithim is now going to be used instead to attempt to visualize clusters in the texts (if there are any).
+
+UMAP (Uniform Manifold Approximation and Projection) is essentially not really a clustering algorithim as it is originally a dimension reduction technique, similar in nature to the t-SNE (t-distributed stochastic neighbor embedding) method. The primary strength of this method is that it is able to take high dimension data and drop it down to 2 or 3 dimensions, enabling it to be easily visualized, and thereby seemingly forming clusters of data along the way. This makes understanding very high dimensional data much more convenient, an example being a large sparse matrix created from text data (as is the case here). Essentially the UMAP and t-SNE methods are very similar to each other. However, with regards to clustering there is a key difference. With the t-SNE, the focus is primarily on local structures, implying that the distance between cluster groups themselves cannot be relied upon. UMAP addresses this issue by accounting for both the local and global cluster structures present in the data. However, the use of UMAP for clustering is a bit controversial, which will be discussed later on. 
+
+This analysis will focus on three of the five texts (Meditations, Book of Mormon, Gospel of Buddha). The other two texts are left out due to file size and memory constraints. Python is used for this analysis. 
+
+### Exploring and Processing
+
+First, the required packages and libraries are loaded.
+
+```{python, engine.path = 'C:\\Users\\faiza\\Anaconda3\\python.exe', eval = FALSE}
+#Load Packages
+import nltk
+import re
+import pandas as pd
+%matplotlib inline
+import numpy as np
+import warnings
+warnings.filterwarnings("ignore")
+from sklearn.feature_extraction.text import TfidfVectorizer
+import umap.umap_ as umap
+import umap.plot
+```
+
+The text files themselves are then loaded.
+
+```{python, engine.path = 'C:\\Users\\faiza\\Anaconda3\\python.exe', eval = FALSE}
+#Import Data
+meditations = open('Meditations.txt', 'r', encoding='utf8')
+mormon = open('Book-of-Mormon.txt','r', encoding='utf8')
+buddha = open('Gospel-of-Buddha.txt','r', encoding='utf8')
+
+
+meditations_txt = meditations.read()
+mormon_txt = mormon.read()
+buddha_txt = buddha.read()
+```
+
+In order to clean the text (similar to the previous post), the data is processed so that all characters are in lower case (standardized), any numerical characters are removed, all stop words are removed, and the document is tokenized (split word by word) along with punctuation being removed as well. The tokenization method also removes any special characters present in the text. 
+
+```{python, engine.path = 'C:\\Users\\faiza\\Anaconda3\\python.exe', eval = FALSE}
+#Process text data
+stop_words = set(nltk.corpus.stopwords.words('english'))
+def remove_stopwords(tokens):
+    return [word for word in tokens if word not in stop_words]
+
+def process_text(text):
+    #everything to lower case
+    text = text.lower()
+    #remove numbers
+    text = re.sub(r'\d+','',text)
+    #tokenize and remove punctuation
+    token = nltk.tokenize.RegexpTokenizer(r'\w+')
+    text = token.tokenize(text)
+    #remove stop words
+    text = remove_stopwords(text)
+    #return text
+    return text
+
+meditations_txt = process_text(meditations_txt)
+mormon_txt = process_text(mormon_txt)
+buddha_txt = process_text(buddha_txt)
+```
+
+Just for a quick visual, simple word frequency density plots are shown. More detailed plots can be viewed in the previous post. There is some overlap between the three texts regarding the most frequently used words. This can be an indication that any clustering plots formed for the three texts may be similar to each other. 
+
+```{python, engine.path = 'C:\\Users\\faiza\\Anaconda3\\python.exe', eval = FALSE}
+#Frequency Distributions
+def freq_plot(text, header):
+    med_freq = nltk.FreqDist(text)
+    med_freq.plot(30, cumulative = False, title = header)
+
+freq_plot(meditations_txt, "Meditations")
+freq_plot(mormon_txt, "Book of Mormon")
+freq_plot(buddha_txt, "Gospel of Buddha")
+```
+![](/images/Meditations-Freq.png)
+
+![](/images/Mormon-Freq.png)
+
+![](/images/Buddha-Freq.png)
+
+
+Finally, sparse matrices for each of the three texts are created, upon which UMAP will be applied. 
+
+```{python, engine.path = 'C:\\Users\\faiza\\Anaconda3\\python.exe', eval = FALSE}
+#Create Sparse Matrices
+def create_matrix(text):
+    vect = TfidfVectorizer()
+    vect.fit(text)
+    text = vect.transform(text)
+    return text
+
+meditations_txt = create_matrix(meditations_txt)
+mormon_txt = create_matrix(mormon_txt)
+buddha_txt = create_matrix(buddha_txt)
+```
+
+### Applying UMAP
+
+As UMAP has been optimized to be used with scikit-learn, applying the algorthim to the sparse matrices is quite simple. Two main parameters are considered here:
+
+1) metric: this is used to select the distance measuring method, including the standard Euclidean measure. This metric is important as it will significantly impact the visualized result. Here, the Hellinger metric is used. This is based on the example provided within the UMAP documentation itself (https://umap-learn.readthedocs.io/en/latest/sparse.html#a-text-analysis-example). Also, since the Hellinger method produces an output of between 0 and 1 (with lower values indicating more similarity), any clusters present can potentially be shown more clearly. However, this is simply an assumption, which can only be confirmed after the plots are developed.
+
+2) n_neighbors: this parameter is specific to the UMAP algorithim itself. It allows UMAP to determine whether to focus more on local clusters (lower values) or on the overall global structure of the entire dataset (higher values). For this analysis, a relatively high value of 30 is used for Meditations and the Gospel of Buddha, while a lower value of 15 is used for the Book of Mormon, simply to serve as a comparison. It should be noted that higher n_neighbor values will come at the cost of increased computing time.  
+
+Having defined these parameters, the model is run, with the plotted results shown below. 
+
+```{python, engine.path = 'C:\\Users\\faiza\\Anaconda3\\python.exe', eval = FALSE}
+Meditations = umap.UMAP(metric = 'hellinger',
+                        random_state = 42,
+                        n_neighbors = 30).fit(meditations_txt)
+umap.plot.points(Meditations, theme = 'fire')
+```
+
+!["Meditations"](/images/Meditations.png)
+
+```{python, engine.path = 'C:\\Users\\faiza\\Anaconda3\\python.exe', eval = FALSE}
+
+Buddha = umap.UMAP(metric = 'hellinger', 
+                        random_state = 42,
+                        n_neighbors = 30).fit(buddha_txt)
+umap.plot.points(Buddha, theme = 'fire')
+
+```
+
+![Gospel of Buddha](/images/Buddha.png)
+
+
+```{python, engine.path = 'C:\\Users\\faiza\\Anaconda3\\python.exe', eval = FALSE}
+Mormon = umap.UMAP(metric = 'hellinger', 
+                        random_state = 42).fit(mormon_txt)
+umap.plot.points(Mormon, theme = 'fire')
+```
+
+![Book of Mormon](/images/Mormon.png)
+
+### Conclusion
+
+The above plots create some interesting visuals about how there may be potential clusters in the texts. All three are quite similar to each other, with a large cluster in the center, and several smaller clusters in orbit of the large cluster. This makes sense as previously mentioned, since there is some similarlity to be expected due to the common words shared between the texts. There are some differences between the size of the large cluster among the three, indicating that perhaps there are potentially more clusters present in the data which may be identified by varying the value for n_neighbours, thus allowing UMAP to analyze the data with varying degrees of depth and detail.
+
+However, the use of UMAP as a clustering mechanism is somewhat controversial due to a couple of concerns. Firstly, the clusters that UMAP will portray are heavily dependent upon the hyperparameters involved, as choosing the value for n_neighbours and the distance metric will significantly impact the visualization. Another concern is that it can potentially create "false tears" in the clusters, implying that the clusters are much more refined than they are in reality. Despite these concerns, UMAP is still quite widely used, as it is an improvement over the previously used t-SNE method, and by implementing just a few steps, highly complex data (linear and non-linear) can be easily visualized and understood.
+
+

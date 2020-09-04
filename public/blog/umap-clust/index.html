@@ -1,0 +1,310 @@
+<!DOCTYPE html>
+<html lang="en-us">
+
+<head>
+  <title>Mining Religious and Sacred Texts - Visualizing Clusters with UMAP | Fazi_RDA</title>
+
+  <meta charset="UTF-8">
+  <meta name="language" content="en">
+  <meta name="description" content="">
+  <meta name="keywords" content="">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta http-equiv="content-type" content="text/html; charset=utf-8">
+  <meta http-equiv="X-UA-Compatible" content="IE=edge">
+
+  
+  
+
+  <link rel="shortcut icon" type="image/png" href="/favicon.ico" />
+
+  
+  
+    
+ 
+  
+  
+  
+  
+  
+  
+    
+    <link rel="stylesheet" href="/css/post.min.3b28d14676e4769849164baf362f2b0aa069ab25702fef98f0c4227cb68d74cd.css" integrity="sha256-OyjRRnbkdphJFkuvNi8rCqBpqyVwL&#43;&#43;Y8MQifLaNdM0="/>
+  
+    
+    <link rel="stylesheet" href="/css/custom.min.e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855.css" integrity="sha256-47DEQpj8HBSa&#43;/TImW&#43;5JCeuQeRkm5NMpJWZG3hSuFU="/>
+  
+  
+   
+   
+    
+
+<script type="application/ld+json">
+  
+    {
+      "@context" : "http://schema.org",
+      "@type" : "BlogPosting",
+      "mainEntityOfPage": {
+            "@type": "WebPage",
+            "@id": "\/"
+      },
+      "articleSection" : "blog",
+      "name" : "Mining Religious and Sacred Texts - Visualizing Clusters with UMAP",
+      "headline" : "Mining Religious and Sacred Texts - Visualizing Clusters with UMAP",
+      "description" : "",
+      "inLanguage" : "en-US",
+      "author" : "",
+      "creator" : "",
+      "publisher": "",
+      "accountablePerson" : "",
+      "copyrightHolder" : "",
+      "copyrightYear" : "0001",
+      "datePublished": "0001-01-01 00:00:00 \u002b0000 UTC",
+      "dateModified" : "0001-01-01 00:00:00 \u002b0000 UTC",
+      "url" : "\/blog\/umap-clust\/",
+      "wordCount" : "1118",
+      "keywords" : ["Blog"]
+    }
+  
+  </script>
+</head>
+
+<body>
+  <div class="burger__container">
+  <div class="burger" aria-controls="navigation" aria-label="Menu">
+    <div class="burger__meat burger__meat--1"></div>
+    <div class="burger__meat burger__meat--2"></div>
+    <div class="burger__meat burger__meat--3"></div>
+  </div>
+</div>
+ 
+
+  <nav class="nav" role="navigation">
+  <ul class="nav__list">
+    
+    
+      <li>
+        <a  href="/">about</a>
+      </li>
+    
+      <li>
+        <a  class="active"
+         href="/blog">projects</a>
+      </li>
+    
+  </ul>
+</nav>
+
+
+  <main>
+    
+    
+
+    <div class="flex-wrapper">
+      <div class="post__container">
+        <div class="post">
+          <header class="post__header">
+            <h1 id="post__title">Mining Religious and Sacred Texts - Visualizing Clusters with UMAP</h1>
+            <time datetime="0001-01-01 00:00:00 &#43;0000 UTC" class="post__date"
+            > </time>
+          </header>
+          <article class="post__content">
+              
+
+
+
+<div id="introduction" class="section level3">
+<h3>Introduction</h3>
+<p>This analysis is a continuation of the previous post regarding religious and sacred text analysis. In the previous post, a simple exploratory analysis was performed, along with an attempt to use k-means clustering to further understand the data. However, perhaps due to the size and complexity of the data, a suitable value for k could not be found. To take a different approach to clustering, the UMAP algorithim is now going to be used instead to attempt to visualize clusters in the texts (if there are any).</p>
+<p>UMAP (Uniform Manifold Approximation and Projection) is essentially not really a clustering algorithim as it is originally a dimension reduction technique, similar in nature to the t-SNE (t-distributed stochastic neighbor embedding) method. The primary strength of this method is that it is able to take high dimension data and drop it down to 2 or 3 dimensions, enabling it to be easily visualized, and thereby seemingly forming clusters of data along the way. This makes understanding very high dimensional data much more convenient, an example being a large sparse matrix created from text data (as is the case here). Essentially the UMAP and t-SNE methods are very similar to each other. However, with regards to clustering there is a key difference. With the t-SNE, the focus is primarily on local structures, implying that the distance between cluster groups themselves cannot be relied upon. UMAP addresses this issue by accounting for both the local and global cluster structures present in the data. However, the use of UMAP for clustering is a bit controversial, which will be discussed later on.</p>
+<p>This analysis will focus on three of the five texts (Meditations, Book of Mormon, Gospel of Buddha). The other two texts are left out due to file size and memory constraints. Python is used for this analysis.</p>
+</div>
+<div id="exploring-and-processing" class="section level3">
+<h3>Exploring and Processing</h3>
+<p>First, the required packages and libraries are loaded.</p>
+<pre class="python"><code>#Load Packages
+import nltk
+import re
+import pandas as pd
+%matplotlib inline
+import numpy as np
+import warnings
+warnings.filterwarnings(&quot;ignore&quot;)
+from sklearn.feature_extraction.text import TfidfVectorizer
+import umap.umap_ as umap
+import umap.plot</code></pre>
+<p>The text files themselves are then loaded.</p>
+<pre class="python"><code>#Import Data
+meditations = open(&#39;Meditations.txt&#39;, &#39;r&#39;, encoding=&#39;utf8&#39;)
+mormon = open(&#39;Book-of-Mormon.txt&#39;,&#39;r&#39;, encoding=&#39;utf8&#39;)
+buddha = open(&#39;Gospel-of-Buddha.txt&#39;,&#39;r&#39;, encoding=&#39;utf8&#39;)
+
+
+meditations_txt = meditations.read()
+mormon_txt = mormon.read()
+buddha_txt = buddha.read()</code></pre>
+<p>In order to clean the text (similar to the previous post), the data is processed so that all characters are in lower case (standardized), any numerical characters are removed, all stop words are removed, and the document is tokenized (split word by word) along with punctuation being removed as well. The tokenization method also removes any special characters present in the text.</p>
+<pre class="python"><code>#Process text data
+stop_words = set(nltk.corpus.stopwords.words(&#39;english&#39;))
+def remove_stopwords(tokens):
+    return [word for word in tokens if word not in stop_words]
+
+def process_text(text):
+    #everything to lower case
+    text = text.lower()
+    #remove numbers
+    text = re.sub(r&#39;\d+&#39;,&#39;&#39;,text)
+    #tokenize and remove punctuation
+    token = nltk.tokenize.RegexpTokenizer(r&#39;\w+&#39;)
+    text = token.tokenize(text)
+    #remove stop words
+    text = remove_stopwords(text)
+    #return text
+    return text
+
+meditations_txt = process_text(meditations_txt)
+mormon_txt = process_text(mormon_txt)
+buddha_txt = process_text(buddha_txt)</code></pre>
+<p>Just for a quick visual, simple word frequency density plots are shown. More detailed plots can be viewed in the previous post. There is some overlap between the three texts regarding the most frequently used words. This can be an indication that any clustering plots formed for the three texts may be similar to each other.</p>
+<pre class="python"><code>#Frequency Distributions
+def freq_plot(text, header):
+    med_freq = nltk.FreqDist(text)
+    med_freq.plot(30, cumulative = False, title = header)
+
+freq_plot(meditations_txt, &quot;Meditations&quot;)
+freq_plot(mormon_txt, &quot;Book of Mormon&quot;)
+freq_plot(buddha_txt, &quot;Gospel of Buddha&quot;)</code></pre>
+<p><img src="/images/Meditations-Freq.png" /></p>
+<p><img src="/images/Mormon-Freq.png" /></p>
+<p><img src="/images/Buddha-Freq.png" /></p>
+<p>Finally, sparse matrices for each of the three texts are created, upon which UMAP will be applied.</p>
+<pre class="python"><code>#Create Sparse Matrices
+def create_matrix(text):
+    vect = TfidfVectorizer()
+    vect.fit(text)
+    text = vect.transform(text)
+    return text
+
+meditations_txt = create_matrix(meditations_txt)
+mormon_txt = create_matrix(mormon_txt)
+buddha_txt = create_matrix(buddha_txt)</code></pre>
+</div>
+<div id="applying-umap" class="section level3">
+<h3>Applying UMAP</h3>
+<p>As UMAP has been optimized to be used with scikit-learn, applying the algorthim to the sparse matrices is quite simple. Two main parameters are considered here:</p>
+<ol style="list-style-type: decimal">
+<li><p>metric: this is used to select the distance measuring method, including the standard Euclidean measure. This metric is important as it will significantly impact the visualized result. Here, the Hellinger metric is used. This is based on the example provided within the UMAP documentation itself (<a href="https://umap-learn.readthedocs.io/en/latest/sparse.html#a-text-analysis-example" class="uri">https://umap-learn.readthedocs.io/en/latest/sparse.html#a-text-analysis-example</a>). Also, since the Hellinger method produces an output of between 0 and 1 (with lower values indicating more similarity), any clusters present can potentially be shown more clearly. However, this is simply an assumption, which can only be confirmed after the plots are developed.</p></li>
+<li><p>n_neighbors: this parameter is specific to the UMAP algorithim itself. It allows UMAP to determine whether to focus more on local clusters (lower values) or on the overall global structure of the entire dataset (higher values). For this analysis, a relatively high value of 30 is used for Meditations and the Gospel of Buddha, while a lower value of 15 is used for the Book of Mormon, simply to serve as a comparison. It should be noted that higher n_neighbor values will come at the cost of increased computing time.</p></li>
+</ol>
+<p>Having defined these parameters, the model is run, with the plotted results shown below.</p>
+<pre class="python"><code>Meditations = umap.UMAP(metric = &#39;hellinger&#39;,
+                        random_state = 42,
+                        n_neighbors = 30).fit(meditations_txt)
+umap.plot.points(Meditations, theme = &#39;fire&#39;)</code></pre>
+<div class="figure">
+<img src="/images/Meditations.png" alt="“Meditations”" />
+<p class="caption">“Meditations”</p>
+</div>
+<pre class="python"><code>Buddha = umap.UMAP(metric = &#39;hellinger&#39;, 
+                        random_state = 42,
+                        n_neighbors = 30).fit(buddha_txt)
+umap.plot.points(Buddha, theme = &#39;fire&#39;)</code></pre>
+<div class="figure">
+<img src="/images/Buddha.png" alt="Gospel of Buddha" />
+<p class="caption">Gospel of Buddha</p>
+</div>
+<pre class="python"><code>Mormon = umap.UMAP(metric = &#39;hellinger&#39;, 
+                        random_state = 42).fit(mormon_txt)
+umap.plot.points(Mormon, theme = &#39;fire&#39;)</code></pre>
+<div class="figure">
+<img src="/images/Mormon.png" alt="Book of Mormon" />
+<p class="caption">Book of Mormon</p>
+</div>
+</div>
+<div id="conclusion" class="section level3">
+<h3>Conclusion</h3>
+<p>The above plots create some interesting visuals about how there may be potential clusters in the texts. All three are quite similar to each other, with a large cluster in the center, and several smaller clusters in orbit of the large cluster. This makes sense as previously mentioned, since there is some similarlity to be expected due to the common words shared between the texts. There are some differences between the size of the large cluster among the three, indicating that perhaps there are potentially more clusters present in the data which may be identified by varying the value for n_neighbours, thus allowing UMAP to analyze the data with varying degrees of depth and detail.</p>
+<p>However, the use of UMAP as a clustering mechanism is somewhat controversial due to a couple of concerns. Firstly, the clusters that UMAP will portray are heavily dependent upon the hyperparameters involved, as choosing the value for n_neighbours and the distance metric will significantly impact the visualization. Another concern is that it can potentially create “false tears” in the clusters, implying that the clusters are much more refined than they are in reality. Despite these concerns, UMAP is still quite widely used, as it is an improvement over the previously used t-SNE method, and by implementing just a few steps, highly complex data (linear and non-linear) can be easily visualized and understood.</p>
+</div>
+
+
+              
+          </article>
+          
+
+ <div class="pagination">
+  
+    <a class="pagination__item" href="/blog/forest-fires/">
+        <span class="pagination__label">Previous Post</span>
+        <span class="pagination__title">Predicting Forest Fires with Regressions</span>
+    </a>
+  
+
+  
+    <a class="pagination__item" href="/blog/religious-and-sacred-texts/">
+      <span class="pagination__label">Next Post</span>
+      <span class="pagination__title" >Mining Religious and Sacred Texts</a>
+    </a>
+  
+</div>
+
+          
+          <footer class="post__footer">
+            
+
+
+<div class="social-icons">
+  
+     
+    
+  
+     
+    
+  
+     
+    
+  
+     
+    
+  
+     
+    
+  
+     
+    
+  
+     
+    
+  
+     
+    
+     
+</div>
+
+            <p>© 2020 fazi_rda</p>
+          </footer>
+          </div>
+      </div>
+      
+    </div>
+    
+
+  </main>
+
+   
+
+  
+  <script src="/js/index.min.49e4d8a384357d9b445b87371863419937ede9fa77737522ffb633073aebfa44.js" integrity="sha256-SeTYo4Q1fZtEW4c3GGNBmTft6fp3c3Ui/7YzBzrr&#43;kQ=" crossorigin="anonymous"></script>
+  
+  
+  <script src="https://unpkg.com/prismjs@1.20.0/components/prism-core.min.js"></script>
+
+  
+  <script src="https://unpkg.com/prismjs@1.20.0/plugins/autoloader/prism-autoloader.min.js"
+    data-autoloader-path="https://unpkg.com/prismjs@1.20.0/components/"></script>
+
+  
+
+
+</body>
+
+</html>

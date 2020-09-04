@@ -1,0 +1,472 @@
+<!DOCTYPE html>
+<html lang="en-us">
+
+<head>
+  <title>Antidepressants in the UK: Exploring Prescription Data | Fazi_RDA</title>
+
+  <meta charset="UTF-8">
+  <meta name="language" content="en">
+  <meta name="description" content="">
+  <meta name="keywords" content="">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta http-equiv="content-type" content="text/html; charset=utf-8">
+  <meta http-equiv="X-UA-Compatible" content="IE=edge">
+
+  
+  
+
+  <link rel="shortcut icon" type="image/png" href="/favicon.ico" />
+
+  
+  
+    
+ 
+  
+  
+  
+  
+  
+  
+    
+    <link rel="stylesheet" href="/css/post.min.3b28d14676e4769849164baf362f2b0aa069ab25702fef98f0c4227cb68d74cd.css" integrity="sha256-OyjRRnbkdphJFkuvNi8rCqBpqyVwL&#43;&#43;Y8MQifLaNdM0="/>
+  
+    
+    <link rel="stylesheet" href="/css/custom.min.e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855.css" integrity="sha256-47DEQpj8HBSa&#43;/TImW&#43;5JCeuQeRkm5NMpJWZG3hSuFU="/>
+  
+  
+   
+   
+    
+
+<script type="application/ld+json">
+  
+    {
+      "@context" : "http://schema.org",
+      "@type" : "BlogPosting",
+      "mainEntityOfPage": {
+            "@type": "WebPage",
+            "@id": "\/"
+      },
+      "articleSection" : "blog",
+      "name" : "Antidepressants in the UK: Exploring Prescription Data",
+      "headline" : "Antidepressants in the UK: Exploring Prescription Data",
+      "description" : "",
+      "inLanguage" : "en-US",
+      "author" : "",
+      "creator" : "",
+      "publisher": "",
+      "accountablePerson" : "",
+      "copyrightHolder" : "",
+      "copyrightYear" : "0001",
+      "datePublished": "0001-01-01 00:00:00 \u002b0000 UTC",
+      "dateModified" : "0001-01-01 00:00:00 \u002b0000 UTC",
+      "url" : "\/blog\/antidep\/",
+      "wordCount" : "2200",
+      "keywords" : ["Blog"]
+    }
+  
+  </script>
+</head>
+
+<body>
+  <div class="burger__container">
+  <div class="burger" aria-controls="navigation" aria-label="Menu">
+    <div class="burger__meat burger__meat--1"></div>
+    <div class="burger__meat burger__meat--2"></div>
+    <div class="burger__meat burger__meat--3"></div>
+  </div>
+</div>
+ 
+
+  <nav class="nav" role="navigation">
+  <ul class="nav__list">
+    
+    
+      <li>
+        <a  href="/">about</a>
+      </li>
+    
+      <li>
+        <a  class="active"
+         href="/blog">projects</a>
+      </li>
+    
+  </ul>
+</nav>
+
+
+  <main>
+    
+    
+
+    <div class="flex-wrapper">
+      <div class="post__container">
+        <div class="post">
+          <header class="post__header">
+            <h1 id="post__title">Antidepressants in the UK: Exploring Prescription Data</h1>
+            <time datetime="0001-01-01 00:00:00 &#43;0000 UTC" class="post__date"
+            > </time>
+          </header>
+          <article class="post__content">
+              
+
+
+
+<div id="introduction" class="section level3">
+<h3>Introduction</h3>
+<p>This is a simple exploratory analysis about the prescriptions of antidepressants in the UK. The data was freely obtained from the following link: <a href="https://www.kaggle.com/lsind18/prescriptions-of-antidepressants" class="uri">https://www.kaggle.com/lsind18/prescriptions-of-antidepressants</a>, where more information about the specifics can be found.</p>
+</div>
+<div id="notes-about-the-data" class="section level3">
+<h3>Notes about the data</h3>
+<p>Before progressing further, there are a couple of points that need to be noted about the data:</p>
+<p>1). As it is not possible to capture all information perfectly, some data can be missing. In this case, it is within the Age.Band variable, where the patients age is placed within groups. Where information was presumably lost or mislabeled, the age group “Nov-17” has been created. This is a very minor part of the data, and is filtered out at some charts as it is not going to have any impact on the analysis.</p>
+<p>2). Regarding the practises, some are labelled as “Non-CCG prescriber”, implying that these practises are not part of the Clinical Commissioning Groups (CCG) in the UK. Later in the analysis, in some charts this will be accounted for and in others it will not. This will depend on the specific chart and will be explained.</p>
+</div>
+<div id="initial-loading-and-processing" class="section level3">
+<h3>Initial loading and processing</h3>
+<p>To begin, the required libraries and data is loaded.</p>
+<pre class="r"><code>#Libraries
+library(tidyverse)
+library(reshape2)
+library(treemap)
+library(ggrepel)
+
+#Load the data
+AD &lt;- read.csv(&quot;Antidepressants.csv&quot;)
+
+#A quick glimpse...
+head(AD)</code></pre>
+<pre><code>##   Financial.Year Country       Region                            CCG
+## 1        2015/16 ENGLAND LONDON (Y56) BARKING &amp; DAGENHAM CCG (07L00)
+## 2        2015/16 ENGLAND LONDON (Y56) BARKING &amp; DAGENHAM CCG (07L00)
+## 3        2015/16 ENGLAND LONDON (Y56) BARKING &amp; DAGENHAM CCG (07L00)
+## 4        2015/16 ENGLAND LONDON (Y56) BARKING &amp; DAGENHAM CCG (07L00)
+## 5        2015/16 ENGLAND LONDON (Y56) BARKING &amp; DAGENHAM CCG (07L00)
+## 6        2015/16 ENGLAND LONDON (Y56) BARKING &amp; DAGENHAM CCG (07L00)
+##                    Practice.Name Practice.Code Age.Band      Drug.Group
+## 1           ABBEY MEDICAL CENTRE        F82625   Nov-17 Antidepressants
+## 2           ABBEY MEDICAL CENTRE        F82625    18-24 Antidepressants
+## 3           ABBEY MEDICAL CENTRE        F82625    25-39 Antidepressants
+## 4           ABBEY MEDICAL CENTRE        F82625    40-59 Antidepressants
+## 5           ABBEY MEDICAL CENTRE        F82625  60 plus Antidepressants
+## 6 BARKING MEDICAL GROUP PRACTICE        F82018   Nov-17 Antidepressants
+##   No..of.identifiable.patients No..of.items.prescribed.to.identifiable.patients
+## 1                            2                                                3
+## 2                           24                                              105
+## 3                           78                                              389
+## 4                          150                                             1060
+## 5                           76                                              642
+## 6                            3                                                7</code></pre>
+<p>The data is comprised of 10 variables including the specific year, geographic details, practise information, number of patients and the number of prescriptions belonging to each specific practise.</p>
+<pre class="r"><code>#Factorize variables
+AD$Financial.Year &lt;- as.factor(AD$Financial.Year)
+AD$Country &lt;- as.factor(AD$Country)
+AD$Region &lt;- as.factor(AD$Region)
+AD$CCG &lt;- as.factor(AD$CCG)
+AD$Practice.Name &lt;- as.factor(AD$Practice.Name)
+AD$Practice.Code &lt;- as.factor(AD$Practice.Code)
+AD$Age.Band &lt;- as.factor(AD$Age.Band)
+AD$Drug.Group &lt;- as.factor(AD$Drug.Group)
+
+#Variable information
+str(AD)</code></pre>
+<pre><code>## &#39;data.frame&#39;:    125696 obs. of  10 variables:
+##  $ Financial.Year                                  : Factor w/ 3 levels &quot;2015/16&quot;,&quot;2016/17&quot;,..: 1 1 1 1 1 1 1 1 1 1 ...
+##  $ Country                                         : Factor w/ 1 level &quot;ENGLAND&quot;: 1 1 1 1 1 1 1 1 1 1 ...
+##  $ Region                                          : Factor w/ 5 levels &quot;LONDON (Y56)&quot;,..: 1 1 1 1 1 1 1 1 1 1 ...
+##  $ CCG                                             : Factor w/ 212 levels &quot;AIREDALE, WHARFEDALE AND CRAVEN CCG (02N00)&quot;,..: 4 4 4 4 4 4 4 4 4 4 ...
+##  $ Practice.Name                                   : Factor w/ 8416 levels &quot;(FRACTURE CLINIC) NORTH OOH&quot;,..: 47 47 47 47 47 428 428 428 428 428 ...
+##  $ Practice.Code                                   : Factor w/ 9150 levels &quot;00C998&quot;,&quot;00D998&quot;,..: 3139 3139 3139 3139 3139 3108 3108 3108 3108 3108 ...
+##  $ Age.Band                                        : Factor w/ 6 levels &quot;0-10&quot;,&quot;18-24&quot;,..: 6 2 3 4 5 6 2 3 4 5 ...
+##  $ Drug.Group                                      : Factor w/ 1 level &quot;Antidepressants&quot;: 1 1 1 1 1 1 1 1 1 1 ...
+##  $ No..of.identifiable.patients                    : int  2 24 78 150 76 3 75 241 499 304 ...
+##  $ No..of.items.prescribed.to.identifiable.patients: int  3 105 389 1060 642 7 254 951 2694 2902 ...</code></pre>
+<p>The Country variable only has England as its observation, and the Drug.Group variable is only antidepressants (logically). Therefore, to make the data more neat, these variables can be removed as they don’t contribute anything. There is a difference between Practice.Code and Practice.Name, implying that a practice may have more than one code. The geographic variables of this data are hierarchical in nature, with Region being at the highest level and Practice.Code being the lowest. The first and the last two variables are also renamed to make them more clear. Finally, a check for the existence of any missing values is run as well.</p>
+<pre class="r"><code>#removing columns
+AD &lt;- AD[,c(-2, -8)]
+
+#renaming columns
+colnames(AD)[c(1,7,8)] &lt;- c(&quot;Year&quot;, &quot;Number.of.Patients&quot;, &quot;Number.of.Prescriptions&quot;)
+
+#check for missing values (0 means no NA values)
+sum(is.na(AD))</code></pre>
+<pre><code>## [1] 0</code></pre>
+<p>With these minor preprocessing steps, the data is now quite clean and ready to be visually explored.</p>
+</div>
+<div id="simple-exploring" class="section level3">
+<h3>Simple Exploring</h3>
+<p>The key variables within this data (around which majority of the analysis revolves) are the number of patients and the number of prescriptions. Therefore, a good place to start would be to how these variables change over the years (only 3 years).</p>
+<pre class="r"><code>#create temporary dataframe for only relevant variables
+year_prog &lt;- AD[,c(1, 7, 8)]
+
+#sum number of patients and prescriptions by year (total per year)
+year_prog &lt;- year_prog %&gt;%
+  group_by(Year) %&gt;%
+  summarize_all(list(sum))
+
+#melt data for plotting
+year_prog_melt &lt;- melt(year_prog)
+
+#plot
+ggplot(year_prog_melt, aes(x = Year, y = value, fill = variable)) +
+  geom_bar(position = &quot;dodge&quot;, stat = &quot;identity&quot;, color = &quot;black&quot;) +
+  scale_fill_manual(values = c(&quot;#0099FF&quot;, &quot;#99FF99&quot;)) +
+  geom_text(aes(label = value), 
+            position=position_dodge(width=0.9), vjust=-0.25) +
+  theme_minimal() + 
+  ggtitle(&quot;Number of patients and prescriptions per year 2015-2018&quot;) +
+  theme(axis.text.y=element_blank(),
+        axis.ticks.y=element_blank(),
+        axis.title.x=element_blank())</code></pre>
+<p><img src="/blog/AntiDep_files/figure-html/unnamed-chunk-4-1.png" width="864" /></p>
+<pre class="r"><code>#remove temporary dataframe (just to keep things tidy)
+remove(year_prog_melt)
+remove(year_prog)</code></pre>
+<p>Both the number of patients and the number of prescriptions have been gradually increasing throughout the 3 year period, which can be naturally expected. An interesting point to note is the massive difference between the number of patients and the number of prescriptions, which will be explored later. There isn’t enough data to confidently comment on any trends with time as 3 years is not enough to make any strong forecasts.</p>
+<p>Moving on, the number of patients for each age group is visualized.</p>
+<pre class="r"><code>#temporrary dataframe 
+age_patients &lt;- AD[,c(6,7)]
+
+#total number of patients per age group
+age_patients &lt;- age_patients %&gt;%
+  group_by(Age.Band) %&gt;%
+  summarize_all(list(sum))
+
+#filter &quot;Nov-17&quot; as it is damaged or lost data
+age_patients &lt;- subset(age_patients, Age.Band != &#39;Nov-17&#39;)
+
+#plot
+ggplot(age_patients, aes(x = Age.Band,
+                      y = Number.of.Patients)) +
+  geom_bar(stat = &quot;identity&quot;, fill = &quot;#99CCFF&quot;, color = &quot;black&quot;) +
+  geom_text(aes(label = Number.of.Patients), 
+            position=position_dodge(width=0.9), vjust=-0.25) +
+  ggtitle(&quot;Total number of patients in each age group&quot;) +
+  theme_minimal() +
+  theme(axis.text.y=element_blank(),
+        axis.ticks.y=element_blank(),
+        axis.title.x=element_blank())</code></pre>
+<p><img src="/blog/AntiDep_files/figure-html/unnamed-chunk-5-1.png" width="864" /></p>
+<pre class="r"><code>#remove temporary dataframe
+remove(age_patients)</code></pre>
+<p>The largest number of patients prescribed to anti-depressants are above the age of 40, which is more than half of the total of patients present within the data. The lowest number, at just about 6000 is for children between the age of 0 and 10. It should be noted that these number of patients are derived from capturing the unique NHS number present on the prescriptions, implying that each patient is recieving a prescription for some kind of antidepressant. Similarly, the number of prescriptions per age group is visualized below.</p>
+<pre class="r"><code>#temporrary dataframe 
+age_items &lt;- AD[,c(6,8)]
+
+#total prescriptions per age group
+age_items &lt;- age_items %&gt;%
+  group_by(Age.Band) %&gt;%
+  summarize_all(list(sum))
+
+#remove Nov-17 age group
+age_items &lt;- subset(age_items, Age.Band != &#39;Nov-17&#39;)
+
+#plot
+ggplot(age_items, aes(x = Age.Band,
+               y = Number.of.Prescriptions)) +
+  geom_bar(stat = &quot;identity&quot;, fill = &quot;#0066CC&quot;, color = &quot;black&quot;) +
+  geom_text(aes(label = Number.of.Prescriptions), 
+            position=position_dodge(width=0.9), vjust=-0.25) +
+  ggtitle(&quot;Total number of prescriptions in each age group&quot;) +
+  theme_minimal() +
+  theme(axis.text.y=element_blank(),
+        axis.ticks.y=element_blank(),
+        axis.title.x=element_blank())</code></pre>
+<p><img src="/blog/AntiDep_files/figure-html/unnamed-chunk-6-1.png" width="864" /></p>
+<pre class="r"><code>#remove temporary dataframe
+remove(age_items)</code></pre>
+<p>The overall trend is the same in this chart as compared to the previous one, the only difference being that while the highest number of patients are between 40-59, the highest number of prescriptions are for the group 60 plus.</p>
+<p>As mentioned earlier, there is a quite a large numerical difference between the number of patients and the number of prescriptions for each age group. A ratio of the two variables can be insightful as it can provide an approximate estimate about the number of prescriptions per patients. However, it should not be assumed that this value is consistent, as the prescriptions in reality will depend on each specific patients case.</p>
+<pre class="r"><code>#temporrary dataframe 
+ratio &lt;- AD[,c(6,7,8)]
+
+#total patients and prescriptions per age group
+ratio &lt;- ratio %&gt;%
+  group_by(Age.Band) %&gt;%
+  summarize_all(list(sum))
+
+#remove nov-17
+ratio &lt;- subset(ratio, Age.Band != &#39;Nov-17&#39;)
+
+#add ratio variable
+ratio[&quot;Ratio&quot;] &lt;- ratio[,3]/ratio[,2]
+
+#plot
+ggplot(ratio, aes(x = Age.Band, y = Ratio)) +
+  geom_point(size = 7, color = &quot;black&quot;) +
+  geom_segment(aes(x=Age.Band, xend=Age.Band, y=0, yend=Ratio), 
+               size = 1.5, linetype = &quot;dotted&quot;) +
+  theme_minimal() +
+  ggtitle(&quot;Ratio - Prescriptions/Patients&quot;) +
+  theme(axis.title.x=element_blank())</code></pre>
+<p><img src="/blog/AntiDep_files/figure-html/unnamed-chunk-7-1.png" width="864" /></p>
+<pre class="r"><code>#remove temporary dataframe
+remove(ratio)</code></pre>
+<p>As expected, the number of prescriptions per patient is consistently rising as the age group increases as well, nearing almost 10 prescriptions per patient at the 60 plus age group.</p>
+</div>
+<div id="diving-deeper" class="section level3">
+<h3>Diving deeper</h3>
+<p>To further understand the data, it can be useful to consider how the number of patients and prescriptions vary with the geographic variables. Below is a Cleveland Plot to visualize both these key variables per practise name. As there are over 8000 practise names, this plot will be a bit cluttered, but can still provide some useful insights, while also maintaining an interesting aesthetic.</p>
+<pre class="r"><code>#temporary data frame
+practise &lt;- AD[,c(4,7,8)]
+
+#total patients and prescriptions per practise name
+practise &lt;- practise %&gt;%
+  group_by(Practice.Name) %&gt;%
+  summarize_all(list(sum))
+
+#plot
+ggplot(practise) +
+  geom_segment(aes(x=Practice.Name, xend = Practice.Name, 
+                   y = Number.of.Patients, yend = Number.of.Prescriptions), 
+               linetype = &quot;dotted&quot;, color = &quot;black&quot;) +
+  geom_point(aes(x=Practice.Name, y = Number.of.Patients), size = 4, color = &#39;blue&#39;) +
+  geom_point(aes(x=Practice.Name, y = Number.of.Prescriptions), size = 1) +
+  theme(axis.title.x=element_blank(),
+        axis.text.x=element_blank(),
+        axis.ticks.x=element_blank(),
+        axis.title.y=element_blank(),
+        axis.text.y=element_blank(),
+        axis.ticks.y=element_blank()) +
+  geom_text(data = subset(practise, Number.of.Patients &gt; 300000),
+            aes(Practice.Name, Number.of.Patients, label = Practice.Name),
+            position=position_dodge(width=2), vjust=-0.5, hjust = -1) +
+  coord_flip()</code></pre>
+<p><img src="/blog/AntiDep_files/figure-html/unnamed-chunk-8-1.png" width="864" /></p>
+<p>The above plot provides some key insights. The number of patients (blue dots) appear to be reltively uniformly distributed throughout (however this may be a bit misleading due to scaling). More importantly however, there is a massive outlier created by the Non-CCG prescriber practises. A potential reason for this is that every practise that is not a CCG prescriber is given the exact same label, and therefore all these practises are assumed to one, with their patients and prescriptions being summed together. This is shown in the following table:</p>
+<pre class="r"><code>subset(practise, Practice.Name == &#39;Non-CCG prescriber&#39;)</code></pre>
+<pre><code>## # A tibble: 1 x 3
+##   Practice.Name      Number.of.Patients Number.of.Prescriptions
+##   &lt;fct&gt;                           &lt;int&gt;                   &lt;int&gt;
+## 1 Non-CCG prescriber             309859                  660146</code></pre>
+<p>These are 18 in number from the total observations. In the following plot, the Non-CCG prescriber label is filtered out to provide a more clear image.</p>
+<pre class="r"><code>#remove Non-CCG prescriber label
+practise &lt;- subset(practise, Practice.Name != &#39;Non-CCG prescriber&#39;)
+
+#plot
+ggplot(practise) +
+  geom_segment(aes(x=Practice.Name, xend = Practice.Name, 
+                   y = Number.of.Patients, yend = Number.of.Prescriptions), 
+               linetype = &quot;dotted&quot;, color = &quot;black&quot;) +
+  geom_point(aes(x=Practice.Name, y = Number.of.Patients), size = 4, color = &#39;blue&#39;) +
+  geom_point(aes(x=Practice.Name, y = Number.of.Prescriptions), size = 1) +
+  theme(axis.title.x=element_blank(),
+        axis.text.x=element_blank(),
+        axis.ticks.x=element_blank(),
+        axis.title.y=element_blank(),
+        axis.text.y=element_blank(),
+        axis.ticks.y=element_blank()) +
+  geom_label_repel(data = subset(practise, 
+                          Number.of.Patients &gt; 20000 &amp; Number.of.Prescriptions &gt; 150000),
+            aes(Practice.Name, Number.of.Prescriptions, label = Practice.Name),
+            position=position_dodge(width=2), vjust=-0.5, hjust = -1, size = 2.5,
+            segment.colour = &quot;red&quot;) +
+  coord_flip()</code></pre>
+<p><img src="/blog/AntiDep_files/figure-html/unnamed-chunk-10-1.png" width="864" /></p>
+<pre class="r"><code>#remove temporary dataframe
+remove(practise)</code></pre>
+<p>This plot now provides a slightly clearer image. There is apparently quite a lot of variance in the number of prescriptions per practice (black dots), compared to the number of patients. To highlight some outliers, the practices which have more than 20000 patients and provide over 150000 prescriptions have also been labeled. These plots can go into another level of detail (down the hierarchy) by replacing practise names with the practise codes. However this runs the risk of being even more cluttered, and finding anything related to a specific practise without applying some filters will be difficult. Business intelligence software (Power BI or Tableau for example) can be useful in such cases.</p>
+<p>A final look can be given to how the number of patients and prescriptions vary with both the Region and CCG. A treemap is particularly useful to plot such hierarchical data. Before plotting however, the Non-CCG prescriber labels are removed from the entire dataset, as the way they are labelled is such that if a practise is not a CCG prescriber, then the region, ccg and practise name variables are all given the same label. This is will not process properly through the treemap as it can’t be determined whether this is just one practise or several, and is therefore removed. The number of such observations are relatively small, and should not impact the overall analysis.</p>
+<pre class="r"><code>#filter non-ccg prescriber
+AD &lt;- subset(AD, Practice.Name != &#39;Non-CCG prescriber&#39;)</code></pre>
+<p>The treemaps for both the number of patients and the number of prescriptions are plotted below, and both show overall the same pattern as seen in the previous plots (comparing with age group), with darker regions indicating a higher number for each variable. This makes sense since where there are more patients it is likely there are more prescriptions as well.</p>
+<pre class="r"><code>region_ccg &lt;- AD[,c(2,3,4,7,8)]
+
+region_ccg &lt;- region_ccg %&gt;%
+  group_by(Region, CCG, Practice.Name) %&gt;%
+  summarize_all(list(sum))</code></pre>
+<pre class="r"><code>#for number of patients
+treemap(region_ccg, index = c(&#39;Region&#39;,&#39;CCG&#39;),
+        vSize = &quot;Number.of.Patients&quot;, type = &#39;value&#39;,
+        position.legend = &quot;none&quot;,
+        title = &quot;Number of Patients by Region and CCG&quot;,
+        palette = &quot;RdBu&quot;)</code></pre>
+<p><img src="/blog/AntiDep_files/figure-html/unnamed-chunk-13-1.png" width="864" /></p>
+<pre class="r"><code>#for number of prescriptions
+treemap(region_ccg, index = c(&quot;Region&quot;, &quot;CCG&quot;),
+        vSize = &quot;Number.of.Prescriptions&quot;, type = &quot;value&quot;,
+        position.legend = &quot;none&quot;,
+        title = &quot;Number of Prescriptions by Region and CCG&quot;,
+        palette = &quot;PiYG&quot;)</code></pre>
+<p><img src="/blog/AntiDep_files/figure-html/unnamed-chunk-14-1.png" width="864" /></p>
+<pre class="r"><code>#remove temporary dataframe
+remove(region_ccg)</code></pre>
+</div>
+
+
+              
+          </article>
+          
+
+ <div class="pagination">
+  
+    <a class="pagination__item" href="/blog/brent-oil/">
+        <span class="pagination__label">Previous Post</span>
+        <span class="pagination__title">Brent Oil Prices - Time Series with ML Models</span>
+    </a>
+  
+
+  
+</div>
+
+          
+          <footer class="post__footer">
+            
+
+
+<div class="social-icons">
+  
+     
+    
+  
+     
+    
+  
+     
+    
+  
+     
+    
+  
+     
+    
+  
+     
+    
+  
+     
+    
+  
+     
+    
+     
+</div>
+
+            <p>© 2020 fazi_rda</p>
+          </footer>
+          </div>
+      </div>
+      
+    </div>
+    
+
+  </main>
+
+   
+
+  
+  <script src="/js/index.min.49e4d8a384357d9b445b87371863419937ede9fa77737522ffb633073aebfa44.js" integrity="sha256-SeTYo4Q1fZtEW4c3GGNBmTft6fp3c3Ui/7YzBzrr&#43;kQ=" crossorigin="anonymous"></script>
+  
+  
+  <script src="https://unpkg.com/prismjs@1.20.0/components/prism-core.min.js"></script>
+
+  
+  <script src="https://unpkg.com/prismjs@1.20.0/plugins/autoloader/prism-autoloader.min.js"
+    data-autoloader-path="https://unpkg.com/prismjs@1.20.0/components/"></script>
+
+  
+
+
+</body>
+
+</html>

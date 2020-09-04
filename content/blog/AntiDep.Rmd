@@ -1,0 +1,304 @@
+---
+title: "Antidepressants in the UK: Exploring Prescription Data"
+output: html_notebook
+---
+
+### Introduction
+
+This is a simple exploratory analysis about the prescriptions of antidepressants in the UK. The data was freely obtained from the following link: https://www.kaggle.com/lsind18/prescriptions-of-antidepressants, where more information about the specifics can be found. 
+
+### Notes about the data
+Before progressing further, there are a couple of points that need to be noted about the data:
+
+1). As it is not possible to capture all information perfectly, some data can be missing. In this case, it is within the Age.Band variable, where the patients age is placed within groups. Where information was presumably lost or mislabeled, the age group "Nov-17" has been created. This is a very minor part of the data, and is filtered out at some charts as it is not going to have any impact on the analysis. 
+
+2). Regarding the practises, some are labelled as "Non-CCG prescriber", implying that these practises are not part of the Clinical Commissioning Groups (CCG) in the UK. Later in the analysis, in some charts this will be accounted for and in others it will not. This will depend on the specific chart and will be explained. 
+
+### Initial loading and processing
+
+To begin, the required libraries and data is loaded. 
+
+```{r message=FALSE, warning=FALSE}
+#Libraries
+library(tidyverse)
+library(reshape2)
+library(treemap)
+library(ggrepel)
+
+#Load the data
+AD <- read.csv("Antidepressants.csv")
+
+#A quick glimpse...
+head(AD)
+```
+
+The data is comprised of 10 variables including the specific year, geographic details, practise information, number of patients and the number of prescriptions belonging to each specific practise. 
+
+```{r message=FALSE, warning=FALSE}
+#Factorize variables
+AD$Financial.Year <- as.factor(AD$Financial.Year)
+AD$Country <- as.factor(AD$Country)
+AD$Region <- as.factor(AD$Region)
+AD$CCG <- as.factor(AD$CCG)
+AD$Practice.Name <- as.factor(AD$Practice.Name)
+AD$Practice.Code <- as.factor(AD$Practice.Code)
+AD$Age.Band <- as.factor(AD$Age.Band)
+AD$Drug.Group <- as.factor(AD$Drug.Group)
+
+#Variable information
+str(AD)
+```
+
+The Country variable only has England as its observation, and the Drug.Group variable is only antidepressants (logically). Therefore, to make the data more neat, these variables can be removed as they don't contribute anything. There is a difference between Practice.Code and Practice.Name, implying that a practice may have more than one code. The geographic variables of this data are hierarchical in nature, with Region being at the highest level and Practice.Code being the lowest. The first and the last two variables are also renamed to make them more clear. Finally, a check for the existence of any missing values is run as well. 
+
+```{r message=FALSE, warning=FALSE}
+#removing columns
+AD <- AD[,c(-2, -8)]
+
+#renaming columns
+colnames(AD)[c(1,7,8)] <- c("Year", "Number.of.Patients", "Number.of.Prescriptions")
+
+#check for missing values (0 means no NA values)
+sum(is.na(AD))
+```
+
+With these minor preprocessing steps, the data is now quite clean and ready to be visually explored. 
+
+### Simple Exploring
+
+The key variables within this data (around which majority of the analysis revolves) are the number of patients and the number of prescriptions. Therefore, a good place to start would be to how these variables change over the years (only 3 years). 
+
+```{r message=FALSE, warning=FALSE, fig.width=9, fig.height=7}
+#create temporary dataframe for only relevant variables
+year_prog <- AD[,c(1, 7, 8)]
+
+#sum number of patients and prescriptions by year (total per year)
+year_prog <- year_prog %>%
+  group_by(Year) %>%
+  summarize_all(list(sum))
+
+#melt data for plotting
+year_prog_melt <- melt(year_prog)
+
+#plot
+ggplot(year_prog_melt, aes(x = Year, y = value, fill = variable)) +
+  geom_bar(position = "dodge", stat = "identity", color = "black") +
+  scale_fill_manual(values = c("#0099FF", "#99FF99")) +
+  geom_text(aes(label = value), 
+            position=position_dodge(width=0.9), vjust=-0.25) +
+  theme_minimal() + 
+  ggtitle("Number of patients and prescriptions per year 2015-2018") +
+  theme(axis.text.y=element_blank(),
+        axis.ticks.y=element_blank(),
+        axis.title.x=element_blank())
+
+#remove temporary dataframe (just to keep things tidy)
+remove(year_prog_melt)
+remove(year_prog)
+```
+
+Both the number of patients and the number of prescriptions have been gradually increasing throughout the 3 year period, which can be naturally expected. An interesting point to note is the massive difference between the number of patients and the number of prescriptions, which will be explored later. There isn't enough data to confidently comment on any trends with time as 3 years is not enough to make any strong forecasts. 
+
+Moving on, the number of patients for each age group is visualized. 
+
+```{r message=FALSE, warning=FALSE, fig.width=9, fig.height=7}
+#temporrary dataframe 
+age_patients <- AD[,c(6,7)]
+
+#total number of patients per age group
+age_patients <- age_patients %>%
+  group_by(Age.Band) %>%
+  summarize_all(list(sum))
+
+#filter "Nov-17" as it is damaged or lost data
+age_patients <- subset(age_patients, Age.Band != 'Nov-17')
+
+#plot
+ggplot(age_patients, aes(x = Age.Band,
+                      y = Number.of.Patients)) +
+  geom_bar(stat = "identity", fill = "#99CCFF", color = "black") +
+  geom_text(aes(label = Number.of.Patients), 
+            position=position_dodge(width=0.9), vjust=-0.25) +
+  ggtitle("Total number of patients in each age group") +
+  theme_minimal() +
+  theme(axis.text.y=element_blank(),
+        axis.ticks.y=element_blank(),
+        axis.title.x=element_blank())
+
+#remove temporary dataframe
+remove(age_patients)
+```
+
+The largest number of patients prescribed to anti-depressants are above the age of 40, which is more than half of the total of patients present within the data. The lowest number, at just about 6000 is for children between the age of 0 and 10. It should be noted that these number of patients are derived from capturing the unique NHS number present on the prescriptions, implying that each patient is recieving a prescription for some kind of antidepressant. Similarly, the number of prescriptions per age group is visualized below. 
+
+```{r message=FALSE, warning=FALSE, fig.width=9, fig.height=7}
+#temporrary dataframe 
+age_items <- AD[,c(6,8)]
+
+#total prescriptions per age group
+age_items <- age_items %>%
+  group_by(Age.Band) %>%
+  summarize_all(list(sum))
+
+#remove Nov-17 age group
+age_items <- subset(age_items, Age.Band != 'Nov-17')
+
+#plot
+ggplot(age_items, aes(x = Age.Band,
+               y = Number.of.Prescriptions)) +
+  geom_bar(stat = "identity", fill = "#0066CC", color = "black") +
+  geom_text(aes(label = Number.of.Prescriptions), 
+            position=position_dodge(width=0.9), vjust=-0.25) +
+  ggtitle("Total number of prescriptions in each age group") +
+  theme_minimal() +
+  theme(axis.text.y=element_blank(),
+        axis.ticks.y=element_blank(),
+        axis.title.x=element_blank())
+
+#remove temporary dataframe
+remove(age_items)
+```
+
+The overall trend is the same in this chart as compared to the previous one, the only difference being that while the highest number of patients are between 40-59, the highest number of prescriptions are for the group 60 plus. 
+
+As mentioned earlier, there is a quite a large numerical difference between the number of patients and the number of prescriptions for each age group. A ratio of the two variables can be insightful as it can provide an approximate estimate about the number of prescriptions per patients. However, it should not be assumed that this value is consistent, as the prescriptions in reality will depend on each specific patients case. 
+
+```{r message=FALSE, warning=FALSE, fig.width=9, fig.height=7}
+#temporrary dataframe 
+ratio <- AD[,c(6,7,8)]
+
+#total patients and prescriptions per age group
+ratio <- ratio %>%
+  group_by(Age.Band) %>%
+  summarize_all(list(sum))
+
+#remove nov-17
+ratio <- subset(ratio, Age.Band != 'Nov-17')
+
+#add ratio variable
+ratio["Ratio"] <- ratio[,3]/ratio[,2]
+
+#plot
+ggplot(ratio, aes(x = Age.Band, y = Ratio)) +
+  geom_point(size = 7, color = "black") +
+  geom_segment(aes(x=Age.Band, xend=Age.Band, y=0, yend=Ratio), 
+               size = 1.5, linetype = "dotted") +
+  theme_minimal() +
+  ggtitle("Ratio - Prescriptions/Patients") +
+  theme(axis.title.x=element_blank())
+
+#remove temporary dataframe
+remove(ratio)
+```
+
+As expected, the number of prescriptions per patient is consistently rising as the age group increases as well, nearing almost 10 prescriptions per patient at the 60 plus age group. 
+
+### Diving deeper
+
+To further understand the data, it can be useful to consider how the number of patients and prescriptions vary with the geographic variables. Below is a Cleveland Plot to visualize both these key variables per practise name. As there are over 8000 practise names, this plot will be a bit cluttered, but can still provide some useful insights, while also maintaining an interesting aesthetic. 
+
+```{r message=FALSE, warning=FALSE, fig.width=9, fig.height=12}
+#temporary data frame
+practise <- AD[,c(4,7,8)]
+
+#total patients and prescriptions per practise name
+practise <- practise %>%
+  group_by(Practice.Name) %>%
+  summarize_all(list(sum))
+
+#plot
+ggplot(practise) +
+  geom_segment(aes(x=Practice.Name, xend = Practice.Name, 
+                   y = Number.of.Patients, yend = Number.of.Prescriptions), 
+               linetype = "dotted", color = "black") +
+  geom_point(aes(x=Practice.Name, y = Number.of.Patients), size = 4, color = 'blue') +
+  geom_point(aes(x=Practice.Name, y = Number.of.Prescriptions), size = 1) +
+  theme(axis.title.x=element_blank(),
+        axis.text.x=element_blank(),
+        axis.ticks.x=element_blank(),
+        axis.title.y=element_blank(),
+        axis.text.y=element_blank(),
+        axis.ticks.y=element_blank()) +
+  geom_text(data = subset(practise, Number.of.Patients > 300000),
+            aes(Practice.Name, Number.of.Patients, label = Practice.Name),
+            position=position_dodge(width=2), vjust=-0.5, hjust = -1) +
+  coord_flip()
+```
+
+The above plot provides some key insights. The number of patients (blue dots) appear to be reltively uniformly distributed throughout (however this may be a bit misleading due to scaling). More importantly however, there is a massive outlier created by the Non-CCG prescriber practises. A potential reason for this is that every practise that is not a CCG prescriber is given the exact same label, and therefore all these practises are assumed to one, with their patients and prescriptions being summed together. This is shown in the following table:
+
+```{r message=FALSE, warning=FALSE, fig.width=9, fig.height=12}
+subset(practise, Practice.Name == 'Non-CCG prescriber')
+```
+
+These are 18 in number from the total observations. In the following plot, the Non-CCG prescriber label is filtered out to provide a more clear image. 
+
+```{r message=FALSE, warning=FALSE, fig.width=9, fig.height=12}
+#remove Non-CCG prescriber label
+practise <- subset(practise, Practice.Name != 'Non-CCG prescriber')
+
+#plot
+ggplot(practise) +
+  geom_segment(aes(x=Practice.Name, xend = Practice.Name, 
+                   y = Number.of.Patients, yend = Number.of.Prescriptions), 
+               linetype = "dotted", color = "black") +
+  geom_point(aes(x=Practice.Name, y = Number.of.Patients), size = 4, color = 'blue') +
+  geom_point(aes(x=Practice.Name, y = Number.of.Prescriptions), size = 1) +
+  theme(axis.title.x=element_blank(),
+        axis.text.x=element_blank(),
+        axis.ticks.x=element_blank(),
+        axis.title.y=element_blank(),
+        axis.text.y=element_blank(),
+        axis.ticks.y=element_blank()) +
+  geom_label_repel(data = subset(practise, 
+                          Number.of.Patients > 20000 & Number.of.Prescriptions > 150000),
+            aes(Practice.Name, Number.of.Prescriptions, label = Practice.Name),
+            position=position_dodge(width=2), vjust=-0.5, hjust = -1, size = 2.5,
+            segment.colour = "red") +
+  coord_flip()
+
+#remove temporary dataframe
+remove(practise)
+```
+
+This plot now provides a slightly clearer image. There is apparently quite a lot of variance in the number of prescriptions per practice (black dots), compared to the number of patients. To highlight some outliers, the practices which have more than 20000 patients and provide over 150000 prescriptions have also been labeled. These plots can go into another level of detail (down the hierarchy) by replacing practise names with the practise codes. However this runs the risk of being even more cluttered, and finding anything related to a specific practise without applying some filters will be difficult. Business intelligence software (Power BI or Tableau for example) can be useful in such cases. 
+
+A final look can be given to how the number of patients and prescriptions vary with both the Region and CCG. A treemap is particularly useful to plot such hierarchical data. Before plotting however, the Non-CCG prescriber labels are removed from the entire dataset, as the way they are labelled is such that if a practise is not a CCG prescriber, then the region, ccg and practise name variables are all given the same label. This is will not process properly through the treemap as it can't be determined whether this is just one practise or several, and is therefore removed. The number of such observations are relatively small, and should not impact the overall analysis. 
+
+```{r message=FALSE, warning=FALSE, fig.width=9, fig.height=12}
+#filter non-ccg prescriber
+AD <- subset(AD, Practice.Name != 'Non-CCG prescriber')
+```
+
+The treemaps for both the number of patients and the number of prescriptions are plotted below, and both show overall the same pattern as seen in the previous plots (comparing with age group), with darker regions indicating a higher number for each variable. This makes sense since where there are more patients it is likely there are more prescriptions as well.
+
+```{r message=FALSE, warning=FALSE, fig.width=9, fig.height=7}
+region_ccg <- AD[,c(2,3,4,7,8)]
+
+region_ccg <- region_ccg %>%
+  group_by(Region, CCG, Practice.Name) %>%
+  summarize_all(list(sum))
+
+```
+
+```{r message=FALSE, warning=FALSE, fig.width=9, fig.height=7}
+#for number of patients
+treemap(region_ccg, index = c('Region','CCG'),
+        vSize = "Number.of.Patients", type = 'value',
+        position.legend = "none",
+        title = "Number of Patients by Region and CCG",
+        palette = "RdBu")
+```
+
+```{r message=FALSE, warning=FALSE, fig.width=9, fig.height=7}
+#for number of prescriptions
+treemap(region_ccg, index = c("Region", "CCG"),
+        vSize = "Number.of.Prescriptions", type = "value",
+        position.legend = "none",
+        title = "Number of Prescriptions by Region and CCG",
+        palette = "PiYG")
+```
+```{r message=FALSE, warning=FALSE, fig.width=9, fig.height=7}
+#remove temporary dataframe
+remove(region_ccg)
+```
