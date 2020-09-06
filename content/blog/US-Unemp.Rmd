@@ -1,0 +1,179 @@
+---
+title: "US Unemployment - Time Series and Neural Networks"
+output: html_notebook
+---
+
+### Introduction
+
+This report differs slightly from the rest of the projects on this website. Over here, the main focus will be more on gaining an understanding of the process, as opposed to solving a specific problem. The focus here will be to simply try and understand and discuss how neural network architectures (RNN specifically) can be applied to time series data. The ultimate objective here is to appreciate the process as simply and succinctly as possible.
+
+### Notes
+
+The data was obtained from the following website: https://fred.stlouisfed.org/series/UNRATE The reason the up-to-date monthly US Unemployment rate is chosen is to highlight a very specific aspect of univariate time series analysis, which will be discussed later on. 
+
+Various online sources have been used as a reference for this brief report, to validate both the written text and code used. All sources used are linked as follows:
+
+https://machinelearningmastery.com/how-to-develop-lstm-models-for-time-series-forecasting/
+
+https://medium.com/@marianne.benkamoun/stock-price-prediction-using-recurrent-neural-networks-369c21817da8
+
+https://keras.io/api/layers/recurrent_layers/lstm/
+
+https://www.tensorflow.org/guide/keras/rnn
+
+https://towardsdatascience.com/understanding-neural-networks-from-neuron-to-rnn-cnn-and-deep-learning-cd88e90e0a90
+
+http://colah.github.io/posts/2015-08-Understanding-LSTMs/
+
+https://stats.stackexchange.com/q/222584
+
+https://towardsdatascience.com/how-not-to-use-machine-learning-for-time-series-forecasting-avoiding-the-pitfalls-19f9d7adf424
+
+The analysis is carried out in Python.
+
+### Loading the Data
+
+```{python, engine.path = 'C:\\Users\\faiza\\Anaconda3\\python.exe', eval = FALSE}
+#libraries
+import numpy as np
+import pandas as pd
+import matplotlib.pyplot as plt
+from tensorflow.keras import Sequential
+from tensorflow.keras.layers import Dense, LSTM
+
+#load data
+unemp = pd.read_csv("UNRATE.csv")
+```
+
+The data comprises of the monthly US Unemployment rate for 866 months (observations) in total. This ranges from January 1948 to August 2020. There is a good amount of historical data present to conduct analysis. The following chart visualizes the progression of this rate through time.
+
+![](/images/Rate-with-time.png)
+
+As it usually is with economic indicators, the data here shows periods of high and low unemployment one after the other. However, there isn't any strong seasonal or strictly cyclical pattern present. The intensity of how high or low the rates can go also has no apparent pattern or trend.
+
+### Data Processing
+
+Before applying the model, the data needs to be processed. Firstly, a 2 dimensional numpy array of the monthly rates is created.
+
+```{python, engine.path = 'C:\\Users\\faiza\\Anaconda3\\python.exe', eval = FALSE}
+rate = unemp.iloc[:,1] #select rate column
+rate = np.array(rate) #convert to array
+rate = rate.reshape(-1,1) #convert to 2-dimensional array
+```
+
+Next, the data is split into different sequences such that the previous 6 time steps (or lagged values) are used as inputs to output the immediate next time step. The inputs are denoted by X and the output by Y. 
+
+```{python, engine.path = 'C:\\Users\\faiza\\Anaconda3\\python.exe', eval = FALSE}
+x1 = rate[0:len(rate)-6]
+x2 = rate[1:len(rate)-5]
+x3 = rate[2:len(rate)-4]
+x4 = rate[3:len(rate)-3]
+x5 = rate[4:len(rate)-2]
+x6 = rate[5:len(rate)-1]
+X = np.concatenate([x1,x2,x3,x4,x5,x6], axis = 1) #inputs
+
+Y = rate[6:len(rate)] #output
+```
+
+Usually the data is subjected to scaling or normalizing procedures as this is recommended before applying a predictive model. However, in this case it is not really necessary as all the independent values (X) are mostly within a similar range, so this will not severely impact the model.
+
+X then needs to be converted into a 3-dimensional object as this is required by LSTM. 
+
+```{python, engine.path = 'C:\\Users\\faiza\\Anaconda3\\python.exe', eval = FALSE}
+X = np.reshape(X, (X.shape[0],1,X.shape[1]))
+```
+
+Finally, the inputs and outputs are split into training and testing partitions. The last 12 months (1 year) is being used as the testing partition, to test how well the model will fit on unseen data. 
+
+```{python, engine.path = 'C:\\Users\\faiza\\Anaconda3\\python.exe', eval = FALSE}
+X_train = X[:854,:,:]
+X_test = X[854:,:,:]
+Y_train = Y[:854,:]
+Y_test = Y[854:,:]
+```
+
+### Single Layer LSTM
+
+From the different neural network models present, the Recurrent Neural Network (RNN) architecture tends to be preferred when it comes to forecasting time series data. This is because of the structure of a RNN itself. A RNN layer essentially loops over the time steps previously defined. In doing so, it is able to "remember" or "memorize" information with time, which is particularly useful for time series forecasting, as it is able to remember and learn from the past values of the variable to form future predictions. While theoretically this sounds optimal, in practice RNNs aren't able to memorize information too far back in time due to its loss function exponentially approaching zero (vanishing gradient problem). In the vanishing gradient problem, the model is unable to effectively update its weights, or sometimes even stop training the model altogether.
+
+As an improvement upon the traditional RNN and to counter the vanishing gradient problem, the Long Short-Term Memory (LSTM) model exists. To describe it as simply as possible, the LSTM is a variant of the RNN, where the recurrent layer has a slightly different structure than the standard RNN. This different structure enables the LSTM to "remember" much longer term data, making LSTM models more suitable for time series analysis, as it is able to account for information much further back in time. 
+
+To forecast US Unemployment rates, two LSTM models are going to be run:  A single layer LSTM and a stacked LSTM. A single layer LSTM, as the name suggests, consists of only a single hidden LSTM layer and an output layer. A simple single layer LSTM model is run below, with 20 units being run for 100 epochs. The model is run 4 times, with 4 graphs being plotted to show the difference between actual and predicted values. 
+
+```{python, engine.path = 'C:\\Users\\faiza\\Anaconda3\\python.exe', eval = FALSE}
+#Single Layer
+
+model_single = Sequential()
+model_single.add(LSTM(20, activation = 'relu', input_shape = (1,6)))
+model_single.add(Dense(1))
+model_single.compile(optimizer = 'adam', loss = 'mse') #model
+
+model_single.fit(X_train, Y_train,epochs = 100, verbose = 2) #fit on training data
+
+predicted_single = model_single.predict(X_test) #predict on test data
+
+plt.figure(figsize=(10,8))
+plt.plot(Y_test, label = 'Test Data')
+plt.plot(predicted_single, label = 'Single Model')
+plt.legend(loc = 'best')
+plt.show() #plot
+```
+![](/images/Single-Model-1.png)
+![](/images/Single-Model-2.png)
+![](/images/Single-Model-3.png)
+![](/images/Single-Model-4.png)
+
+### Stacked LSTM
+
+Having run the single layer LSTM model above, now a more robust approach via a stacked LSTM is applied. This is the same as a single layer LSTM, except two or more layers can be used to improve performance. Generally 2 layers in an LSTM is sufficient to improve performance significantly, so only 2 will be used here. Similar to the single layer, 4 different charts are shown here as well. 
+
+```{python, engine.path = 'C:\\Users\\faiza\\Anaconda3\\python.exe', eval = FALSE}
+#Stacked LSTM model
+
+model_stacked = Sequential()
+model_stacked.add(LSTM(20, activation = 'relu', 
+               return_sequences = True, input_shape = (1,6)))
+model_stacked.add(LSTM(20, activation= 'relu'))
+model_stacked.add(Dense(1))
+model_stacked.compile(optimizer = 'adam', loss = 'mse') #model
+
+model_stacked.fit(X_train, Y_train,epochs = 100, verbose = 2) #fit on training data
+
+predicted_stack = model_stacked.predict(X_test) #predict on test data
+
+plt.figure(figsize=(10,8))
+plt.plot(Y_test, label = 'Test Data')
+plt.plot(predicted_stack, label = 'Stacked Model')
+plt.legend(loc = 'best')
+plt.show() #plot
+```
+
+![](/images/Stack-Model-1.png)
+
+![](/images/Stack-Model-2.png)
+
+![](/images/Stack-Model-3.png)
+
+![](/images/Stack-Model-4.png)
+
+### Results
+
+Having run the models and plotting the predicted values, the results show an interesting trend. Up until month 6 from the 12 month total, the model appears to be going hand in hand with the actual values, indicating a small error range and a good accuracy. However, it is at the moment when the extreme change takes place that the models start to fail at being accurate. This is the reason that this specific data was chosen, as due to Covid-19 the US Unemployment rate spiked significantly. This spike, although shown in the predicted values, is not accurately in line with the actual values. 
+
+Also, upon careful inspection, it can be clearly seen that the only reason this spike is actually visualized is because the independent variables are all just the lagged values of the target variable, thereby subjecting this entire process to autocorrelation. This may work in certain situations, such as for believers in the efficient market hypothesis who are trying to forecast stock or other asset prices based solely on previous data. However, the US Unemployment rate, being an economic indicator, has nothing to do with the efficient market hypothesis, making forecasting based on lagged values and relying on autocorrelation unsuitable for this specific dataset. 
+
+The conclusion here is that although LSTM models are quite powerful and useful, care should be taken as to where they are being applied. In this particular case, had there been additional variables explaining the unemployment rate apart from its own lagged values, the results may have been different and the model could possibly predict such drastic spikes better. But as in this case there are only lagged values, this analysis should not be taken for granted as being accurate or reliable. However, as far as the model itself goes, it seems to have done its job well of understanding the general trend of how the data goes, and perhaps with further hyperparameter tuning and better independent variables, the results may improve further.  
+
+
+
+
+
+
+
+
+
+
+
+
+
+

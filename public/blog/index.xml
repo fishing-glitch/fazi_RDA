@@ -114,6 +114,15 @@ The dataset contains some information about computers, with the dependant variab
     </item>
     
     <item>
+      <title>US Unemployment - Time Series and Neural Networks</title>
+      <link>/blog/us-unemp/</link>
+      <pubDate>Mon, 01 Jan 0001 00:00:00 +0000</pubDate>
+      
+      <guid>/blog/us-unemp/</guid>
+      <description>IntroductionThis report differs slightly from the rest of the projects on this website. Over here, the main focus will be more on gaining an understanding of the process, as opposed to solving a specific problem. The focus here will be to simply try and understand and discuss how neural network architectures (RNN specifically) can be applied to time series data. The ultimate objective here is to appreciate the process as simply and succinctly as possible.</description>
+    </item>
+    
+    <item>
       <title>Vehicle Accidents in Canada - Exploring and Classifying Severity</title>
       <link>/blog/accidents-canada/</link>
       <pubDate>Mon, 01 Jan 0001 00:00:00 +0000</pubDate>
