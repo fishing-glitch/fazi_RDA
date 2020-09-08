@@ -78,6 +78,15 @@ The dataset contains some information about computers, with the dependant variab
     </item>
     
     <item>
+      <title>House Price Predictions with Clusters and Regressions</title>
+      <link>/blog/house-price/</link>
+      <pubDate>Mon, 01 Jan 0001 00:00:00 +0000</pubDate>
+      
+      <guid>/blog/house-price/</guid>
+      <description>IntroductionThis analysis involves combining two modelling techniques to predict house prices: clustering and regressions. The data describes real estate valuations in the Xindian Dsitrict, New Tapei City, Taiwan, and was obtained from the following link: http://archive.ics.uci.edu/ml/datasets/Real+estate+valuation+data+set. While the original data file is in the xlsx format, some quick preprocessing was done in Excel (shorten variable names and convert to csv), just to make things more convenient. There are 7 variables, namely:</description>
+    </item>
+    
+    <item>
       <title>Mining Religious and Sacred Texts</title>
       <link>/blog/religious-and-sacred-texts/</link>
       <pubDate>Mon, 01 Jan 0001 00:00:00 +0000</pubDate>

@@ -1,0 +1,147 @@
+---
+title: "House Price Predictions with Clusters and Regressions"
+output: html_notebook
+---
+
+
+
+<div id="introduction" class="section level3">
+<h3>Introduction</h3>
+<p>This analysis involves combining two modelling techniques to predict house prices: clustering and regressions. The data describes real estate valuations in the Xindian Dsitrict, New Tapei City, Taiwan, and was obtained from the following link: <a href="http://archive.ics.uci.edu/ml/datasets/Real+estate+valuation+data+set" class="uri">http://archive.ics.uci.edu/ml/datasets/Real+estate+valuation+data+set</a>. While the original data file is in the xlsx format, some quick preprocessing was done in Excel (shorten variable names and convert to csv), just to make things more convenient. There are 7 variables, namely:</p>
+<p>X1 = transaction date
+X2 = house age
+X3 = distance to MRT station (meter)
+X4 = number of convenience stores in the living circle on foot
+X5 = latitude (degrees)
+X6 = longitude (degrees)</p>
+<p>Y = house price (10000 New Taiwan Dollar/Ping) (target variable)</p>
+<p>The clustering algorithm (DBSCAN) is first used to process the geographical variables (latitude and longitude), followed by simple Linear Regression and the MARS model (Multiple Adaptive Regression Splines) being used to predict the variable Y (price). The analysis is carried out in Python.</p>
+<p>To begin, the required libraries and the data is loaded.</p>
+<pre class="python"><code>import pandas as pd
+import numpy as np
+import matplotlib.pyplot as plt
+import seaborn as sns
+from sklearn.cluster import DBSCAN
+from sklearn.model_selection import train_test_split
+from sklearn.linear_model import LinearRegression
+from sklearn import metrics
+from pyearth import Earth
+import warnings
+warnings.filterwarnings(&quot;ignore&quot;)
+
+house_price = pd.read_csv(&quot;Real-estate-valuation.csv&quot;)</code></pre>
+</div>
+<div id="exploring-and-visualizing" class="section level3">
+<h3>Exploring and Visualizing</h3>
+<p>The type for each variable can first be seen below. There are 414 total observations, and all the variables are numeric type.</p>
+<pre class="python"><code>#variable info
+house_price.info()</code></pre>
+<p><img src="/images/house-price-info.png" /></p>
+<p>To remove the impact of time and to make the process more simple, the date variable (X1) is removed from the dataset. A quick glimpse at the data and summary statistics is shown below.</p>
+<pre class="python"><code>house_price = house_price.drop(&quot;X1&quot;, axis = 1) #dropped date variable
+
+#data glimpse
+house_price.head()</code></pre>
+<p><img src="/images/house-price-head.png" /></p>
+<pre class="python"><code>#summary statistics
+house_price.describe()</code></pre>
+<p><img src="/images/house-price-summary.png" /></p>
+<p>The summary statistics for X5 and X6 are practically irrelevant, as these are geographical coordinates. The average house price appears to be approximately 380000 New Taiwan Dollar. This is very close to the median value as well, indicating that there is negligible skewness present. The maximum value of 117.5 indicates that there are potentially some outliers present. This can be visualized with the following density plot. The plot shows that there is indeed a very small number of outlier values slightly skewing the data, but this is too minor to have any significant impact on further analysis.</p>
+<pre class="python"><code>#visualize house prices
+plt.figure(figsize=(10,7))
+sns.kdeplot(house_price[&quot;Y &quot;], shade=True)
+plt.show()</code></pre>
+<p><img src="/images/price.png" /></p>
+<p>To visualize the house age variable, the following boxplot is shown. There aren’t any apparent outliers present in this variable, with all values falling within the quartile ranges of the plot.</p>
+<pre class="python"><code>#visualize house age
+plt.figure(figsize=(10,7))
+sns.boxplot(x = house_price[&quot;X2 &quot;], linewidth=3, notch=True, width = 0.5)
+plt.show()</code></pre>
+<p><img src="/images/age.png" /></p>
+<p>In contrast to the above boxplot, the plot for the X3 variable (distance to MRT station) shows significant outliers and a very skewed distribution. But this makes sense, since it is unreasonable to expect MRT stations to be uniformly distributed through the district leading to relatively equal distances. So while the distribution is skewed, this is perfectly reasonable and realistic.</p>
+<pre class="python"><code>#visualize distance to MRT station
+plt.figure(figsize=(10,7))
+sns.boxplot(x = house_price[&quot;X3 &quot;], linewidth=3, notch=True, width = 0.5)
+plt.show()</code></pre>
+<p><img src="/images/MRT.png" /></p>
+<p>To understand the number of convenience stores, a histogram is plotted to show the frequency of the number of convenience stores present in the household radius across the district. There does not appear to be any normal distribution in this case, with either 0 stores or 5 stores being most frequently present.</p>
+<pre class="python"><code>#visualize distribution of number of convenience stores 
+plt.figure(figsize=(10,7))
+sns.distplot(house_price[&quot;X4 &quot;], bins = 10, kde = False)
+plt.show()</code></pre>
+<p><img src="/images/stores.png" /></p>
+</div>
+<div id="clustering-coordinates-with-dbscan" class="section level3">
+<h3>Clustering Coordinates with DBSCAN</h3>
+<p>Having explored majority of the variables, only the geographical coordinates are left. If the coordinates are plotted on a scatter plot, the image will vaguely resemble the actual map area of the district. This plot is shown below.</p>
+<pre class="python"><code>#scatter plot of latitude and longitude
+plt.figure(figsize=(10,10))
+sns.regplot(x = house_price[&quot;X5 &quot;], y = house_price[&quot;X6 &quot;], fit_reg=False)
+plt.show()</code></pre>
+<p><img src="/images/scatter.png" /></p>
+<p>The problem here however is that these coordinates cannot be used in their raw form within a regression or any other model as they will be incorrectly assumed to be ordinary numerical values. In order to resolve this problem, clustering is used to identify groups within the data, which can then be used to categorize the coordinates into different sub-regions. This essentially converts the two latitude and longitude variables into a single categorical variable, which the model can then correctly utilize.</p>
+<p>The clustering algorithm used here is the DBSCAN model. While the k-means clustering algorithm is perhaps the most common, it doesn’t work well with geographical coordinates as the Euclidean distance measure used by it is unsuitable for such data. However, in this case the very popular DBSCAN model can be used here, while setting its algorithm to ball-tree and its metric to Haversine, which makes it suitable for clustering geographical coordinates. Another advantage of DBSCAN over the k-means is that it does not require an initial k-value, and it can find arbitrarily shaped clusters well. However, the model is very sensitive to the parameters it uses, which must be chosen carefully.</p>
+<p>For the coordinates in this data, the model is run on the values to determine the number of clusters it is able to detect. A separate dataframe is created to keep things neat. The epsilon value, which is perhaps the most important parameter, is the maximum distance between two samples for one to be considered the neighbour of the other (<a href="https://scikit-learn.org/stable/modules/generated/sklearn.cluster.DBSCAN.html" class="uri">https://scikit-learn.org/stable/modules/generated/sklearn.cluster.DBSCAN.html</a>). This varies depending on the specific situation. Here 30/6371 is chosen. The value needs to be divided by 6371 as the latitude and longitude values need to be converted into radians for the model to work.</p>
+<pre class="python"><code>lat_long = house_price.iloc[:,3:5]
+db_clust = DBSCAN(eps = 30/6371, min_samples=5, 
+                  algorithm = &quot;ball_tree&quot;, metric = &quot;haversine&quot;).fit(lat_long)
+labels = db_clust.labels_
+
+set(labels) #which clusters</code></pre>
+<p>{0, 1, 2, 3, 4, 5, 6, 7, -1}</p>
+<p>The model has grouped the coordinates into 8 different clusters (0-7). -1 is produced to represent all the outliers. Therefore there are a total of 9 different groups. The next step is to fit these clusters to the original coordinates in order to categorize them. A frequency plot of the clusters indicate that majority of the houses fall within cluster zero, which is probably a central and most populated area of the district.</p>
+<pre class="python"><code>lat_long_clust = db_clust.fit_predict(lat_long) #fit to lat-long data
+
+plt.figure(figsize=(10,7))
+sns.distplot(lat_long_clust, bins = 9, kde = False)#frequency count of clusters
+plt.show()</code></pre>
+<p><img src="/images/cluster.png" /></p>
+<p>These clusters can now be visualized on the original scatter plot shown earlier to clearly see the groups present.</p>
+<pre class="python"><code>plt.figure(figsize=(10,10))
+plt.scatter(lat_long[&quot;X5 &quot;], lat_long[&quot;X6 &quot;], 
+            c = lat_long_clust, cmap=&#39;Paired&#39;) #clusters on scatter plot
+plt.show()</code></pre>
+<p><img src="/images/scatter-cluster.png" /></p>
+<p>Now that the coordinates have been categorized, a new dataframe can be created where the original coordinate variables are replaced by their respective categorical labels. This is carried out in the code chunk below:</p>
+<pre class="python"><code>labels = pd.Categorical(labels, ordered=True) #convert to type categorical
+
+house_price_new = house_price.drop([&#39;X5 &#39;, &#39;X6 &#39;], axis = 1) #new dataframe
+house_price_new[&quot;Cluster&quot;] = labels
+
+house_price_new.head()#a glimpse of the new data</code></pre>
+<p><img src="/images/house-price-new-head.png" /></p>
+</div>
+<div id="regression-modelling" class="section level3">
+<h3>Regression Modelling</h3>
+<p>Now that the data is completely processed and clean, it is ready to be analysed using the regression models mentioned earlier. This will just be a simple application of the standard Linear Regression model, followed by the MARS model to measure if there is any dramatic improvement in performance. The mean absolute error (MAE) and the root mean squared error (RMSE) are the two metrics used here to assess the accuracy and performance of the model.</p>
+<p>First, the data is split into training and testing partitions. A 75/25 split is used here.</p>
+<pre class="python"><code>Y = house_price_new[&quot;Y &quot;] #output variable
+Y = Y.values.reshape(-1,1) #2 dimensional array 
+
+X = house_price_new.drop(&quot;Y &quot;, axis = 1) #input variables
+
+X_train, X_test, Y_train, Y_test = train_test_split(X, Y, test_size = 0.25,
+                                                    random_state = 1234) #split</code></pre>
+<p>Next, the Linear Regression model is run, followed by the error metrics being noted.</p>
+<pre class="python"><code>LR_Model = LinearRegression()
+LR_Model.fit(X_train, Y_train) #fit model to training data
+
+Y_pred = LR_Model.predict(X_test) #derive predicted values</code></pre>
+<p>MAE value (Linear Regression): 6.51223</p>
+<pre class="python"><code>metrics.mean_absolute_error(Y_test,Y_pred) #MAE</code></pre>
+<p>RMSE value (Linear Regression): 10.52067</p>
+<pre class="python"><code>np.sqrt(metrics.mean_squared_error(Y_test, Y_pred)) #RMSE</code></pre>
+<p>Finally, the MARS model is similarly run to determine if there is any change in performance.</p>
+<pre class="python"><code>MARS_model = Earth()
+MARS_model.fit(X_train, Y_train) #fit model to training data
+
+Y_pred_MARS = MARS_model.predict(X_test) #derive predicted values</code></pre>
+<p>MAE value (MARS): 6.49561</p>
+<pre class="python"><code>metrics.mean_absolute_error(Y_test,Y_pred_MARS) #MAE</code></pre>
+<p>RMSE value (MARS): 10.38611</p>
+<pre class="python"><code>np.sqrt(metrics.mean_squared_error(Y_test, Y_pred_MARS)) #RMSE</code></pre>
+</div>
+<div id="conclusion" class="section level3">
+<h3>Conclusion</h3>
+<p>There appears to be a very marginal drop in the error metric values, and thereby an increase in the performance. Depending on the specific purpose, these value may or may not be acceptable. Personally, the error metrics seem to be a bit too high for this specific case of house prices. This can either be improved by using a more complex model (but it may lead to high variance in the bias-variance trade-off). Other than that, better features can be included which may be more relevant in influencing house prices in that region, and more data can also be helpful.</p>
+</div>
