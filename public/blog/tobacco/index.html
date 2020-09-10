@@ -1,0 +1,692 @@
+<!DOCTYPE html>
+<html lang="en-us">
+
+<head>
+  <title>Smoking and Visualizing - Exploring Tobacco Use and Mortality Data | Fazi_RDA</title>
+
+  <meta charset="UTF-8">
+  <meta name="language" content="en">
+  <meta name="description" content="">
+  <meta name="keywords" content="">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta http-equiv="content-type" content="text/html; charset=utf-8">
+  <meta http-equiv="X-UA-Compatible" content="IE=edge">
+
+  
+  
+
+  <link rel="shortcut icon" type="image/png" href="/favicon.ico" />
+
+  
+  
+    
+ 
+  
+  
+  
+  
+  
+  
+    
+    <link rel="stylesheet" href="/css/post.min.3b28d14676e4769849164baf362f2b0aa069ab25702fef98f0c4227cb68d74cd.css" integrity="sha256-OyjRRnbkdphJFkuvNi8rCqBpqyVwL&#43;&#43;Y8MQifLaNdM0="/>
+  
+    
+    <link rel="stylesheet" href="/css/custom.min.e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855.css" integrity="sha256-47DEQpj8HBSa&#43;/TImW&#43;5JCeuQeRkm5NMpJWZG3hSuFU="/>
+  
+  
+   
+   
+    
+
+<script type="application/ld+json">
+  
+    {
+      "@context" : "http://schema.org",
+      "@type" : "BlogPosting",
+      "mainEntityOfPage": {
+            "@type": "WebPage",
+            "@id": "\/"
+      },
+      "articleSection" : "blog",
+      "name" : "Smoking and Visualizing - Exploring Tobacco Use and Mortality Data",
+      "headline" : "Smoking and Visualizing - Exploring Tobacco Use and Mortality Data",
+      "description" : "",
+      "inLanguage" : "en-US",
+      "author" : "",
+      "creator" : "",
+      "publisher": "",
+      "accountablePerson" : "",
+      "copyrightHolder" : "",
+      "copyrightYear" : "0001",
+      "datePublished": "0001-01-01 00:00:00 \u002b0000 UTC",
+      "dateModified" : "0001-01-01 00:00:00 \u002b0000 UTC",
+      "url" : "\/blog\/tobacco\/",
+      "wordCount" : "3124",
+      "keywords" : ["Blog"]
+    }
+  
+  </script>
+</head>
+
+<body>
+  <div class="burger__container">
+  <div class="burger" aria-controls="navigation" aria-label="Menu">
+    <div class="burger__meat burger__meat--1"></div>
+    <div class="burger__meat burger__meat--2"></div>
+    <div class="burger__meat burger__meat--3"></div>
+  </div>
+</div>
+ 
+
+  <nav class="nav" role="navigation">
+  <ul class="nav__list">
+    
+    
+      <li>
+        <a  href="/">about</a>
+      </li>
+    
+      <li>
+        <a  class="active"
+         href="/blog">projects</a>
+      </li>
+    
+  </ul>
+</nav>
+
+
+  <main>
+    
+    
+
+    <div class="flex-wrapper">
+      <div class="post__container">
+        <div class="post">
+          <header class="post__header">
+            <h1 id="post__title">Smoking and Visualizing - Exploring Tobacco Use and Mortality Data</h1>
+            <time datetime="0001-01-01 00:00:00 &#43;0000 UTC" class="post__date"
+            > </time>
+          </header>
+          <article class="post__content">
+              
+
+
+
+<div id="introduction" class="section level3">
+<h3>Introduction</h3>
+<p>The data used in this visual exploratory analysis describes information related to tobacco use in England, from 2004-2015. The data was obtained from <a href="https://www.kaggle.com/nhs/tobacco-use" class="uri">https://www.kaggle.com/nhs/tobacco-use</a>, and contains five different data files, each describing a specific aspect. These are as follows:</p>
+<ol style="list-style-type: decimal">
+<li>Admissions =&gt; Hospital admissions attributed to tobacco use</li>
+<li>Fatalities =&gt; Fatalities attributed to tobacco use</li>
+<li>Metrics =&gt; Household expenditures on tobacco (index values)</li>
+<li>Prescriptions =&gt; Prescription information attributed to tobacco use</li>
+<li>Smokers =&gt; Smokers by age as percentage of population</li>
+</ol>
+<p>The aim here is to simply create clear and aesthetically appealing visualizations, which can provide sufficient insight about each of the five data files. While there is the possibility of creating several charts and tables to explore each and every single variable, that does tend to become a bit tedious and inefficient. Therefore, an additional challenge here is to create no more than 2 visualizations for each data file, that would paint an almost complete picture of how the variables are interacting with each other and what is the overall story being told by the data. The main focus here is visualizing, so the charts and graphs will be doing most of the talking. There are also minor aspects of data processing, which will be mentioned and described in the code comments along the way.</p>
+<p>Loading the required libraries and data:</p>
+<pre class="r"><code>#Libraries
+
+library(tidyverse)
+library(reshape2)
+
+#Load data
+
+admissions &lt;- read.csv(&#39;admissions.csv&#39;)
+fatalities &lt;- read.csv(&#39;fatalities.csv&#39;)
+metrics &lt;- read.csv(&#39;metrics.csv&#39;)
+prescriptions &lt;- read.csv(&#39;prescriptions.csv&#39;)
+smokers &lt;- read.csv(&#39;smokers.csv&#39;)</code></pre>
+</div>
+<div id="prescriptions" class="section level3">
+<h3>Prescriptions</h3>
+<pre class="r"><code>#A quick glimpse
+
+head(prescriptions)</code></pre>
+<pre><code>##      Year All.Pharmacotherapy.Prescriptions
+## 1 2014/15                              1348
+## 2 2013/14                              1778
+## 3 2012/13                              2203
+## 4 2011/12                              2532
+## 5 2010/11                              2564
+## 6 2009/10                              2483
+##   Nicotine.Replacement.Therapy..NRT..Prescriptions
+## 1                                              766
+## 2                                             1059
+## 3                                             1318
+## 4                                             1545
+## 5                                             1541
+## 6                                             1559
+##   Bupropion..Zyban..Prescriptions Varenicline..Champix..Prescriptions
+## 1                              21                                 561
+## 2                              22                                 697
+## 3                              26                                 859
+## 4                              30                                 957
+## 5                              36                                 987
+## 6                              47                                 877
+##   Net.Ingredient.Cost.of.All.Pharmacotherapies
+## 1                                        38145
+## 2                                        48767
+## 3                                        58121
+## 4                                        64552
+## 5                                        65883
+## 6                                        63425
+##   Net.Ingredient.Cost.of.Nicotine.Replacement.Therapies..NRT.
+## 1                                                       18208
+## 2                                                       24257
+## 3                                                       28069
+## 4                                                       30951
+## 5                                                       30808
+## 6                                                       31429
+##   Net.Ingredient.Cost.of.Bupropion..Zyban.
+## 1                                      807
+## 2                                      865
+## 3                                      994
+## 4                                     1216
+## 5                                     1581
+## 6                                     2060
+##   Net.Ingredient.Cost.of.Varenicline..Champix.
+## 1                                        19129
+## 2                                        23646
+## 3                                        29058
+## 4                                        32385
+## 5                                        33494
+## 6                                        29936</code></pre>
+<pre class="r"><code>str(prescriptions)</code></pre>
+<pre><code>## &#39;data.frame&#39;:    11 obs. of  9 variables:
+##  $ Year                                                       : chr  &quot;2014/15&quot; &quot;2013/14&quot; &quot;2012/13&quot; &quot;2011/12&quot; ...
+##  $ All.Pharmacotherapy.Prescriptions                          : int  1348 1778 2203 2532 2564 2483 2263 2475 2079 2205 ...
+##  $ Nicotine.Replacement.Therapy..NRT..Prescriptions           : int  766 1059 1318 1545 1541 1559 1492 1756 1938 2076 ...
+##  $ Bupropion..Zyban..Prescriptions                            : int  21 22 26 30 36 47 58 107 119 129 ...
+##  $ Varenicline..Champix..Prescriptions                        : int  561 697 859 957 987 877 714 612 22 NA ...
+##  $ Net.Ingredient.Cost.of.All.Pharmacotherapies               : int  38145 48767 58121 64552 65883 63425 57520 61479 44817 48092 ...
+##  $ Net.Ingredient.Cost.of.Nicotine.Replacement.Therapies..NRT.: int  18208 24257 28069 30951 30808 31429 30683 35883 39743 43465 ...
+##  $ Net.Ingredient.Cost.of.Bupropion..Zyban.                   : int  807 865 994 1216 1581 2060 2143 3882 4315 4627 ...
+##  $ Net.Ingredient.Cost.of.Varenicline..Champix.               : int  19129 23646 29058 32385 33494 29936 24694 21714 760 NA ...</code></pre>
+<p>The prescriptions data provides two sets of data related to the overall prescriptions and three specific prescriptions. The first half (or set) describes the total number of prescriptions, while the second half describes the net ingredient cost for the prescriptions. The data is processed, and two visualizations are created showing how each half progresses with time.</p>
+<pre class="r"><code>#Preprocessing
+
+prescriptions$Year &lt;- strtrim(prescriptions$Year, 4) #trim the year values to show only one year (removing the /)
+
+prescriptions$Year &lt;- as.numeric(prescriptions$Year) #convert year to numeric type
+
+prescriptions &lt;- prescriptions %&gt;% #arrange years in ascending order
+  arrange(Year)
+
+prescriptions[is.na(prescriptions)] &lt;- 0 #convert NA values to 0 
+
+pres_nums &lt;- prescriptions[,1:5] #select first half of data
+
+pres_nums &lt;- melt(pres_nums, id.vars = &#39;Year&#39;) #melt for visualizations
+
+pres_cost &lt;- prescriptions[,c(1,6:9)] #select second half of data
+
+pres_cost &lt;- melt(pres_cost, id.vars = &#39;Year&#39;) #melt for visualizations </code></pre>
+<p>Now that the data is processed, the visualizations can be shown.</p>
+<pre class="r"><code>#Number of Prescriptions
+
+ggplot(pres_nums, aes(x = Year, y = value)) +
+  geom_area(aes(fill = variable), alpha = 0.7, color = &#39;black&#39;) +
+  theme_minimal() +
+  ylab(&quot;Number of Prescriptions&quot;) +
+  theme(legend.position = &#39;none&#39;) +
+  scale_fill_manual(values = c(&#39;steelblue4&#39;, &#39;steelblue2&#39;, 
+                               &#39;steelblue2&#39;, &#39;steelblue2&#39;)) +
+  facet_wrap(~variable, scales = &quot;free&quot;) </code></pre>
+<p><img src="/blog/Tobacco_files/figure-html/unnamed-chunk-4-1.png" width="864" /></p>
+<pre class="r"><code>#Net Ingredient Cost of Prescriptions
+
+ggplot(pres_cost, aes(x = Year, y = value)) +
+  geom_area(aes(fill = variable), alpha = 0.7, color = &#39;black&#39;) +
+  theme_minimal() +
+  ylab(&quot;Net Ingredient Cost&quot;) +
+  theme(legend.position = &#39;none&#39;) +
+  scale_fill_manual(values = c(&#39;slategray4&#39;, &#39;slategray2&#39;, 
+                               &#39;slategray2&#39;, &#39;slategray2&#39;)) +
+  facet_wrap(~variable, scales = &quot;free&quot;) </code></pre>
+<p><img src="/blog/Tobacco_files/figure-html/unnamed-chunk-5-1.png" width="864" /></p>
+<p>The charts are almost exactly the same in terms of shape, indicating that the number of prescriptions and their respective net ingredient cost are very highly correlated with one another, moving in almost the same direction with time.</p>
+<pre class="r"><code>#Removing used data, just to keep things clean
+
+remove(pres_nums)
+remove(pres_cost)
+remove(prescriptions)</code></pre>
+</div>
+<div id="admissions" class="section level3">
+<h3>Admissions</h3>
+<pre class="r"><code>#A quick glimpse
+
+head(admissions) </code></pre>
+<pre><code>##      Year
+## 1 2014/15
+## 2 2014/15
+## 3 2014/15
+## 4 2014/15
+## 5 2014/15
+## 6 2014/15
+##                                                                                                                                                                                                                  ICD10.Code
+## 1                                                                                                                                                                                                                 All codes
+## 2 C33-C34 &amp; C00-C14 &amp; C15 &amp; C32 &amp; C53 &amp; C67 &amp; C64-C66 &amp; C68 &amp; C16 &amp; C25 &amp; C80 &amp; C92 &amp; J40-J43 &amp; J44 &amp; J10-J18 &amp; I00-I09 &amp; I26-I51 &amp; I20-I25 &amp; I72-I78 &amp; I60-I69 &amp; I71 &amp; I70 &amp; K25-K27 &amp; K50 &amp; K05 &amp; H25 &amp; S72.0-S72.2 &amp; O03
+## 3                                                                                                                                                                                                                   C00-D48
+## 4                                                                                                                                                                                                                   J00-J99
+## 5                                                                                                                                                                                                                   I00-I99
+## 6                                                                                                                                                                                                                   K00-K93
+##                               ICD10.Diagnosis
+## 1                              All admissions
+## 2 All diseases which can be caused by smoking
+## 3                                 All cancers
+## 4                    All respiratory diseases
+## 5                    All circulatory diseases
+## 6        All diseases of the digestive system
+##                                Diagnosis.Type               Metric Sex
+## 1                              All admissions Number of admissions    
+## 2 All diseases which can be caused by smoking Number of admissions    
+## 3                                 All cancers Number of admissions    
+## 4                    All respiratory diseases Number of admissions    
+## 5                    All circulatory diseases Number of admissions    
+## 6        All diseases of the digestive system Number of admissions    
+##      Value
+## 1 11011882
+## 2  1713330
+## 3  1691035
+## 4   611002
+## 5   907157
+## 6  1460719</code></pre>
+<pre class="r"><code>str(admissions)</code></pre>
+<pre><code>## &#39;data.frame&#39;:    2079 obs. of  7 variables:
+##  $ Year           : chr  &quot;2014/15&quot; &quot;2014/15&quot; &quot;2014/15&quot; &quot;2014/15&quot; ...
+##  $ ICD10.Code     : chr  &quot;All codes&quot; &quot;C33-C34 &amp; C00-C14 &amp; C15 &amp; C32 &amp; C53 &amp; C67 &amp; C64-C66 &amp; C68 &amp; C16 &amp; C25 &amp; C80 &amp; C92 &amp; J40-J43 &amp; J44 &amp; J10-J18 &amp; I&quot;| __truncated__ &quot;C00-D48&quot; &quot;J00-J99&quot; ...
+##  $ ICD10.Diagnosis: chr  &quot;All admissions&quot; &quot;All diseases which can be caused by smoking&quot; &quot;All cancers&quot; &quot;All respiratory diseases&quot; ...
+##  $ Diagnosis.Type : chr  &quot;All admissions&quot; &quot;All diseases which can be caused by smoking&quot; &quot;All cancers&quot; &quot;All respiratory diseases&quot; ...
+##  $ Metric         : chr  &quot;Number of admissions&quot; &quot;Number of admissions&quot; &quot;Number of admissions&quot; &quot;Number of admissions&quot; ...
+##  $ Sex            : chr  &quot;&quot; &quot;&quot; &quot;&quot; &quot;&quot; ...
+##  $ Value          : chr  &quot;11011882&quot; &quot;1713330&quot; &quot;1691035&quot; &quot;611002&quot; ...</code></pre>
+<p>The admissions data includes 7 variables describing hospital admissions potentially related to smoking. The two visualizations created here show two aspects. First, how the number of hospital admissions progresses through the years between men and women. Second, the number of hospital admissions based on the ICD10 Diagnosis and the Diagnosis Type. The data is first processed and cleaned.</p>
+<pre class="r"><code>#Preprocessing
+
+admissions$Year &lt;- strtrim(admissions$Year, 4) #trim years to show only single year value (removing /)
+
+admissions$Year &lt;- as.numeric(admissions$Year) #convert year to numeric type
+
+admissions &lt;- admissions %&gt;% #arrange by year (ascending)
+  arrange(Year)
+
+admissions &lt;- admissions %&gt;% #keeping only relevant and required observations
+  filter(!str_detect(Diagnosis.Type, &quot;All &quot;)) %&gt;%
+  filter(!str_detect(Metric, &quot;Attributable number&quot;)) %&gt;%
+  filter(str_detect(Sex, &quot;Male|Female&quot;))
+
+admissions[admissions==&quot;.&quot;] &lt;- 0 #cleaning..
+
+admissions$Value &lt;- as.numeric(admissions$Value) #convert value to numeric
+
+admissions$Year &lt;- as.character(admissions$Year) #convert year back to character
+
+admit_diag_type &lt;- admissions[,-1:-2] #grouping separate dataframe with diagnosis information
+admit_diag_type &lt;- admit_diag_type %&gt;% #total number of admissions per diagnosis type 
+  group_by(ICD10.Diagnosis, Diagnosis.Type) %&gt;%
+  summarize_at(vars(Value), list(sum)) %&gt;%
+  arrange(desc(Value))</code></pre>
+<p>While the number of men being admitted into hospital has been gradually decreasing, the number of women being admitted has been increasing. There are however still more men being admitted to hospital than women.</p>
+<pre class="r"><code>#Number of Hospital Admissions (Men-Women)
+
+ggplot(admissions, aes(x = Year, y = Value, fill = Sex)) +
+  geom_bar(position = &quot;dodge&quot;, stat = &quot;identity&quot;) +
+  theme_minimal() +
+  ylab(&quot;Number of Hospital Admissions&quot;) +
+  scale_fill_manual(values = c(&#39;red3&#39;,&#39;royalblue3&#39;))</code></pre>
+<p><img src="/blog/Tobacco_files/figure-html/unnamed-chunk-9-1.png" width="864" /></p>
+<p>The highest number of admissions are attributed to circulatory problems by a large margin, followed by respiratory problems. However, it should be noted that this shows diagnosis which CAN be caused by smoking, not those which definitely were, so hasty conclusions should not be made.</p>
+<pre class="r"><code>#Number of Hospital Admissions by Diagnosis
+
+ggplot(admit_diag_type,
+       aes(x = reorder(ICD10.Diagnosis, Value), y = Value, fill = Diagnosis.Type)) +
+  geom_bar(stat = &quot;identity&quot;) +
+  xlab(&quot;ICD10.Diagnosis&quot;) +
+  ylab(&quot;Number of Hospital Admissions&quot;) +
+  scale_y_continuous(labels = scales::comma) +
+  scale_fill_brewer(palette = &quot;Set1&quot;) +
+  theme_minimal() +
+  coord_flip() +
+  theme(legend.position = c(0.6,0.5), legend.direction = &quot;vertical&quot;)</code></pre>
+<p><img src="/blog/Tobacco_files/figure-html/unnamed-chunk-10-1.png" width="864" /></p>
+<pre class="r"><code>#Removing used data, just to keep things clean
+
+remove(admit_diag_type)
+remove(admissions)</code></pre>
+</div>
+<div id="fatalities" class="section level3">
+<h3>Fatalities</h3>
+<pre class="r"><code>#A quick glimpse
+
+head(fatalities) </code></pre>
+<pre><code>##   Year
+## 1 2014
+## 2 2014
+## 3 2014
+## 4 2014
+## 5 2014
+## 6 2014
+##                                                                                                                                                                                                                  ICD10.Code
+## 1                                                                                                                                                                                                                 All codes
+## 2 C33-C34 &amp; C00-C14 &amp; C15 &amp; C32 &amp; C53 &amp; C67 &amp; C64-C66 &amp; C68 &amp; C16 &amp; C25 &amp; C80 &amp; C92 &amp; J40-J43 &amp; J44 &amp; J10-J18 &amp; I00-I09 &amp; I26-I51 &amp; I20-I25 &amp; I72-I78 &amp; I60-I69 &amp; I71 &amp; I70 &amp; K25-K27 &amp; K50 &amp; K05 &amp; H25 &amp; S72.0-S72.2 &amp; O03
+## 3                                                                                                                                                                                                                   C00-D48
+## 4                                                                                                                                                                                                                   J00-J99
+## 5                                                                                                                                                                                                                   I00-I99
+## 6                                                                                                                                                                                                                   K00-K93
+##                             ICD10.Diagnosis
+## 1                                All deaths
+## 2 All deaths which can be caused by smoking
+## 3                               All cancers
+## 4                  All respiratory diseases
+## 5                  All circulatory diseases
+## 6      All diseases of the digestive system
+##                              Diagnosis.Type                    Metric Sex
+## 1                                All deaths Number of observed deaths    
+## 2 All deaths which can be caused by smoking Number of observed deaths    
+## 3                               All cancers Number of observed deaths    
+## 4                  All respiratory diseases Number of observed deaths    
+## 5                  All circulatory diseases Number of observed deaths    
+## 6      All diseases of the digestive system Number of observed deaths    
+##    Value
+## 1 459087
+## 2 235820
+## 3 136312
+## 4  61744
+## 5 126101
+## 6  22335</code></pre>
+<pre class="r"><code>str(fatalities)</code></pre>
+<pre><code>## &#39;data.frame&#39;:    1749 obs. of  7 variables:
+##  $ Year           : int  2014 2014 2014 2014 2014 2014 2014 2014 2014 2014 ...
+##  $ ICD10.Code     : chr  &quot;All codes&quot; &quot;C33-C34 &amp; C00-C14 &amp; C15 &amp; C32 &amp; C53 &amp; C67 &amp; C64-C66 &amp; C68 &amp; C16 &amp; C25 &amp; C80 &amp; C92 &amp; J40-J43 &amp; J44 &amp; J10-J18 &amp; I&quot;| __truncated__ &quot;C00-D48&quot; &quot;J00-J99&quot; ...
+##  $ ICD10.Diagnosis: chr  &quot;All deaths&quot; &quot;All deaths which can be caused by smoking&quot; &quot;All cancers&quot; &quot;All respiratory diseases&quot; ...
+##  $ Diagnosis.Type : chr  &quot;All deaths&quot; &quot;All deaths which can be caused by smoking&quot; &quot;All cancers&quot; &quot;All respiratory diseases&quot; ...
+##  $ Metric         : chr  &quot;Number of observed deaths&quot; &quot;Number of observed deaths&quot; &quot;Number of observed deaths&quot; &quot;Number of observed deaths&quot; ...
+##  $ Sex            : chr  &quot;&quot; &quot;&quot; &quot;&quot; &quot;&quot; ...
+##  $ Value          : chr  &quot;459087&quot; &quot;235820&quot; &quot;136312&quot; &quot;61744&quot; ...</code></pre>
+<p>The fatalities data is almost identical to the previous admissions data, in terms of shape and variables. The only difference is that instead of hospital admissions, it is now describing the number of fatalities. Due to these similarities, the same two charts will be plotted as previously shown, but this time in the context of fatalities.</p>
+<pre class="r"><code>#Preprocessing
+
+fatalities$Year &lt;- strtrim(fatalities$Year, 4) #trim years to show only single year value (removing /)
+
+fatalities$Year &lt;- as.numeric(fatalities$Year) #convert year to numeric type
+
+fatalities &lt;- fatalities %&gt;% #arrange by year (ascending)
+  arrange(Year)
+
+fatalities &lt;- fatalities %&gt;% #keeping only relevant and required observations
+  filter(!str_detect(Diagnosis.Type, &quot;All &quot;)) %&gt;%
+  filter(!str_detect(Metric, &quot;Attributable number&quot;)) %&gt;%
+  filter(str_detect(Sex, &quot;Male|Female&quot;))
+
+fatalities[fatalities==&quot;.&quot;] &lt;- 0 #cleaning..
+
+fatalities$Value &lt;- as.numeric(fatalities$Value) #convert value to numeric
+
+fatalities$Year &lt;- as.character(fatalities$Year) #convert year back to character
+
+fatal_diag_type &lt;- fatalities[,-1:-2] #grouping separate dataframe with diagnosis information
+fatal_diag_type &lt;- fatal_diag_type %&gt;% #total number of fatalities per diagnosis type 
+  group_by(ICD10.Diagnosis, Diagnosis.Type) %&gt;%
+  summarize_at(vars(Value), funs(sum)) %&gt;%
+  arrange(desc(Value))</code></pre>
+<p>Here the number of fatalities potentially caused by smoking has been decreasing over the years for both men and women, with the number of men dying still being higher than women.</p>
+<pre class="r"><code>#Number of Fatalities (Men-Women)
+
+ggplot(fatalities, aes(x = Year, y = Value, fill = Sex)) +
+  geom_bar(position = &quot;dodge&quot;, stat = &quot;identity&quot;) +
+  theme_minimal() +
+  ylab(&quot;Number of Observed Deaths&quot;) +
+  scale_fill_manual(values = c(&#39;red3&#39;,&#39;royalblue3&#39;))</code></pre>
+<p><img src="/blog/Tobacco_files/figure-html/unnamed-chunk-14-1.png" width="864" /></p>
+<p>The number of fatalities is the highest for circulatory problems too, similar to what was seen earlier.</p>
+<pre class="r"><code>#Number of Fatalities by diagnosis type
+
+ggplot(fatal_diag_type,
+       aes(x = reorder(ICD10.Diagnosis, Value), y = Value, fill = Diagnosis.Type)) +
+  geom_bar(stat = &quot;identity&quot;) +
+  xlab(&quot;ICD10.Diagnosis&quot;) +
+  ylab(&quot;Number of Observed Deaths&quot;) +
+  scale_y_continuous(labels = scales::comma) +
+  scale_fill_brewer(palette = &quot;Set1&quot;) +
+  theme_minimal() +
+  coord_flip() +
+  theme(legend.position = c(0.6,0.5), legend.direction = &quot;vertical&quot;)</code></pre>
+<p><img src="/blog/Tobacco_files/figure-html/unnamed-chunk-15-1.png" width="864" /></p>
+<pre class="r"><code>#Removing used data, just to keep things clean
+
+remove(fatal_diag_type)
+remove(fatalities)</code></pre>
+</div>
+<div id="smokers" class="section level3">
+<h3>Smokers</h3>
+<pre class="r"><code>#A quick glimpse
+
+head(smokers)</code></pre>
+<pre><code>##   Year     Method Sex X16.and.Over X16.24 X25.34 X35.49 X50.59
+## 1 1974 Unweighted               46     44     51     52     50
+## 2 1976 Unweighted               42     42     45     48     48
+## 3 1978 Unweighted               40     39     45     45     45
+## 4 1980 Unweighted               39     37     46     44     45
+## 5 1982 Unweighted               35     35     38     39     41
+## 6 1984 Unweighted               34     35     38     37     39
+##   X60.and.Over
+## 1           33
+## 2           30
+## 3           30
+## 4           29
+## 5           27
+## 6           26</code></pre>
+<pre class="r"><code>str(smokers)</code></pre>
+<pre><code>## &#39;data.frame&#39;:    84 obs. of  9 variables:
+##  $ Year        : int  1974 1976 1978 1980 1982 1984 1986 1988 1990 1992 ...
+##  $ Method      : chr  &quot;Unweighted&quot; &quot;Unweighted&quot; &quot;Unweighted&quot; &quot;Unweighted&quot; ...
+##  $ Sex         : chr  &quot;&quot; &quot;&quot; &quot;&quot; &quot;&quot; ...
+##  $ X16.and.Over: int  46 42 40 39 35 34 33 32 30 28 ...
+##  $ X16.24      : int  44 42 39 37 35 35 35 33 35 33 ...
+##  $ X25.34      : int  51 45 45 46 38 38 36 36 35 34 ...
+##  $ X35.49      : int  52 48 45 44 39 37 36 36 33 31 ...
+##  $ X50.59      : int  50 48 45 45 41 39 35 33 29 29 ...
+##  $ X60.and.Over: int  33 30 30 29 27 26 25 23 21 20 ...</code></pre>
+<p>This dataset is fairly simple, as it just describes what proportion of each age group of the population are smokers, divided between men and women. A single chart will be enough to show the general progression of these proportions with time. But first, some preprocessing.</p>
+<pre class="r"><code>#Preprocessing
+
+smokers &lt;- smokers[,c(-2,-4)] #remove unwanted columns (16 and over removed as not clear if this is a mislabel)
+
+smokers &lt;- smokers %&gt;%
+  filter(str_detect(Sex, &quot;Male|Female&quot;)) #filtering complete information
+
+colnames(smokers)[c(3:7)] &lt;- c(&quot;16-24&quot;,&quot;25-34&quot;,&quot;35-49&quot;,&quot;50-59&quot;,&quot;60+&quot;) #renaming columns for convenience
+
+smokers_melt &lt;- melt(smokers, id.vars = c(&quot;Year&quot;,&quot;Sex&quot;)) #melt for visualizing</code></pre>
+<p>The general trend here is that with time, the proportion of people smoking from each age group has been decreasing.</p>
+<pre class="r"><code>#Percentage of population of each age group trend
+
+ggplot(smokers_melt, aes(x = Year, y = value, fill = variable)) +
+  geom_area(color = &quot;white&quot;) +
+  ylab(&quot;Percentage of Population&quot;) +
+  theme_minimal() +
+  labs(fill = &quot;Age Group&quot;) +
+  scale_fill_brewer(palette = &quot;PuBu&quot;) +
+  theme(axis.text.y = element_blank(),
+        legend.position = &quot;bottom&quot;) +
+  facet_wrap(~Sex)</code></pre>
+<p><img src="/blog/Tobacco_files/figure-html/unnamed-chunk-19-1.png" width="864" /></p>
+<pre class="r"><code>#Removing used data, just to keep things clean
+
+remove(smokers_melt)
+remove(smokers)</code></pre>
+</div>
+<div id="metrics" class="section level3">
+<h3>Metrics</h3>
+<pre class="r"><code>#A quick glimpse
+
+head(metrics)</code></pre>
+<pre><code>##   Year Tobacco.Price.Index Retail.Prices.Index
+## 1 2015              1294.3               386.7
+## 2 2014              1226.0               383.0
+## 3 2013              1139.3               374.2
+## 4 2012              1057.8               363.1
+## 5 2011               974.9               351.9
+## 6 2010               878.3               334.5
+##   Tobacco.Price.Index.Relative.to.Retail.Price.Index
+## 1                                              334.7
+## 2                                              320.1
+## 3                                              304.5
+## 4                                              291.3
+## 5                                              277.1
+## 6                                              262.6
+##   Real.Households..Disposable.Income Affordability.of.Tobacco.Index
+## 1                              196.4                           58.7
+## 2                              190.0                           59.4
+## 3                              190.3                           62.5
+## 4                              192.9                           66.2
+## 5                              189.3                           68.3
+## 6                              195.0                           74.3
+##   Household.Expenditure.on.Tobacco Household.Expenditure.Total
+## 1                            19252                     1152387
+## 2                            19411                     1118992
+## 3                            18683                     1073106
+## 4                            18702                     1029378
+## 5                            18217                      990828
+## 6                            17176                      954781
+##   Expenditure.on.Tobacco.as.a.Percentage.of.Expenditure
+## 1                                                   1.7
+## 2                                                   1.7
+## 3                                                   1.7
+## 4                                                   1.8
+## 5                                                   1.8
+## 6                                                   1.8</code></pre>
+<pre class="r"><code>str(metrics)</code></pre>
+<pre><code>## &#39;data.frame&#39;:    36 obs. of  9 variables:
+##  $ Year                                                 : int  2015 2014 2013 2012 2011 2010 2009 2008 2007 2006 ...
+##  $ Tobacco.Price.Index                                  : num  1294 1226 1139 1058 975 ...
+##  $ Retail.Prices.Index                                  : num  387 383 374 363 352 ...
+##  $ Tobacco.Price.Index.Relative.to.Retail.Price.Index   : num  335 320 304 291 277 ...
+##  $ Real.Households..Disposable.Income                   : num  196 190 190 193 189 ...
+##  $ Affordability.of.Tobacco.Index                       : num  58.7 59.4 62.5 66.2 68.3 74.3 76.7 78.8 80.6 79.9 ...
+##  $ Household.Expenditure.on.Tobacco                     : int  19252 19411 18683 18702 18217 17176 16209 15879 15766 15542 ...
+##  $ Household.Expenditure.Total                          : int  1152387 1118992 1073106 1029378 990828 954781 911665 928265 898478 851456 ...
+##  $ Expenditure.on.Tobacco.as.a.Percentage.of.Expenditure: num  1.7 1.7 1.7 1.8 1.8 1.8 1.8 1.7 1.8 1.8 ...</code></pre>
+<p>This final dataset comprises of index values indicating the expenditure and purchasing habits of households in relation to tobacco. There are a number of variables that can potentially be studied here. However, the most important ones (personal judgement here) are related to the relationship between household expenditure on tobacco and overall household expenditure. Two charts will be plotted, one focusing only on expenditure on tobacco as a percentage, and the other focusing on how the expenditure on tobacco and overall household expenditure progress with time. Conveniently, not a lot of preprocessing is required.</p>
+<pre class="r"><code>#Preprocessing
+
+metrics &lt;- na.omit(metrics) #remove NA values
+
+metrics &lt;- metrics %&gt;% #arrange by year (ascending)
+  arrange(Year)
+
+metrics_house_tobac &lt;- metrics[,c(1,7,8)] # dataframe for expenditure on tobacco and overall expenditure
+
+metrics_house_tobac &lt;- melt(metrics_house_tobac, id.vars = &quot;Year&quot;) #melt for visualizing</code></pre>
+<p>The percentage of the total household expenditure on tobacco has been decreasing with time. However, is this because actual tobacco expenditure has decreased, or is it because overall household expenditure has increased?</p>
+<pre class="r"><code>#Percentage of expenditure of tobacco with time
+
+ggplot(metrics, aes(x = Year, y = Expenditure.on.Tobacco.as.a.Percentage.of.Expenditure)) +
+  geom_line(size = 2, color = &quot;steelblue4&quot;) +
+  geom_point() +
+  ylab(&quot;Expenditure on Tobacco as % of Total Household Expenditure&quot;) +
+  geom_segment(aes(x = Year, xend = Year, 
+                   y = 0, 
+                   yend = Expenditure.on.Tobacco.as.a.Percentage.of.Expenditure), 
+               size = 0.7, linetype = &quot;dotted&quot;) +
+  theme_minimal()</code></pre>
+<p><img src="/blog/Tobacco_files/figure-html/unnamed-chunk-23-1.png" width="864" /></p>
+<p>The chart below answers the previous questions. Although both are increasing, it seems that household expenditure has increased by a larger margin than tobacco expenditure. The tobacco expenditure increase can also be due to the higher prices being implemented on tobacco products.</p>
+<pre class="r"><code>#Expenditure of tobacco and household expenditure with time
+
+ggplot(metrics_house_tobac, aes(x = Year, y = value, fill = variable)) +
+  geom_area() +
+  theme_minimal() +
+  ylab(&quot;Index.Value&quot;) +
+  scale_fill_manual(values = c(&quot;midnightblue&quot;,&quot;skyblue1&quot;)) +
+  theme(legend.position = c(0.3,0.8),
+        legend.title = element_blank())</code></pre>
+<p><img src="/blog/Tobacco_files/figure-html/unnamed-chunk-24-1.png" width="864" /></p>
+<pre class="r"><code>#Removing used data, just to keep things clean
+
+remove(metrics_house_tobac)
+remove(metrics)</code></pre>
+</div>
+
+
+              
+          </article>
+          
+
+ <div class="pagination">
+  
+    <a class="pagination__item" href="/blog/us-unemp/">
+        <span class="pagination__label">Previous Post</span>
+        <span class="pagination__title">US Unemployment - Time Series and Neural Networks</span>
+    </a>
+  
+
+  
+    <a class="pagination__item" href="/blog/sao-paulo-temperature/">
+      <span class="pagination__label">Next Post</span>
+      <span class="pagination__title" >Sao Paulo Temperature - Time Series with Exponential Smoothing Models</a>
+    </a>
+  
+</div>
+
+          
+          <footer class="post__footer">
+            
+
+
+<div class="social-icons">
+  
+     
+    
+  
+     
+    
+  
+     
+    
+  
+     
+    
+  
+     
+    
+  
+     
+    
+  
+     
+    
+  
+     
+    
+     
+</div>
+
+            <p>© 2020 fazi_rda</p>
+          </footer>
+          </div>
+      </div>
+      
+    </div>
+    
+
+  </main>
+
+   
+
+  
+  <script src="/js/index.min.49e4d8a384357d9b445b87371863419937ede9fa77737522ffb633073aebfa44.js" integrity="sha256-SeTYo4Q1fZtEW4c3GGNBmTft6fp3c3Ui/7YzBzrr&#43;kQ=" crossorigin="anonymous"></script>
+  
+  
+  <script src="https://unpkg.com/prismjs@1.20.0/components/prism-core.min.js"></script>
+
+  
+  <script src="https://unpkg.com/prismjs@1.20.0/plugins/autoloader/prism-autoloader.min.js"
+    data-autoloader-path="https://unpkg.com/prismjs@1.20.0/components/"></script>
+
+  
+
+
+</body>
+
+</html>

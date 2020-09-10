@@ -1,0 +1,376 @@
+---
+title: "Smoking and Visualizing - Exploring Tobacco Use and Mortality Data"
+output: html_notebook
+---
+
+### Introduction
+
+The data used in this visual exploratory analysis describes information related to tobacco use in England, from 2004-2015. The data was obtained from https://www.kaggle.com/nhs/tobacco-use, and contains five different data files, each describing a specific aspect. These are as follows:
+
+1. Admissions => Hospital admissions attributed to tobacco use
+2. Fatalities => Fatalities attributed to tobacco use
+3. Metrics => Household expenditures on tobacco (index values)
+4. Prescriptions => Prescription information attributed to tobacco use
+5. Smokers => Smokers by age as percentage of population
+
+The aim here is to simply create clear and aesthetically appealing visualizations, which can provide sufficient insight about each of the five data files. While there is the possibility of creating several charts and tables to explore each and every single variable, that does tend to become a bit tedious and inefficient. Therefore, an additional challenge here is to create no more than 2 visualizations for each data file, that would paint an almost complete picture of how the variables are interacting with each other and what is the overall story being told by the data. The main focus here is visualizing, so the charts and graphs will be doing most of the talking. There are also minor aspects of data processing, which will be mentioned and described in the code comments along the way.
+
+Loading the required libraries and data:
+
+```{r warning=FALSE, message=FALSE}
+#Libraries
+
+library(tidyverse)
+library(reshape2)
+
+#Load data
+
+admissions <- read.csv('admissions.csv')
+fatalities <- read.csv('fatalities.csv')
+metrics <- read.csv('metrics.csv')
+prescriptions <- read.csv('prescriptions.csv')
+smokers <- read.csv('smokers.csv')
+```
+
+
+### Prescriptions
+
+```{r warning=FALSE, message=FALSE}
+#A quick glimpse
+
+head(prescriptions)
+str(prescriptions)
+```
+
+The prescriptions data provides two sets of data related to the overall prescriptions and three specific prescriptions. The first half (or set) describes the total number of prescriptions, while the second half describes the net ingredient cost for the prescriptions. The data is processed, and two visualizations are created showing how each half progresses with time. 
+
+```{r warning=FALSE, message=FALSE}
+#Preprocessing
+
+prescriptions$Year <- strtrim(prescriptions$Year, 4) #trim the year values to show only one year (removing the /)
+
+prescriptions$Year <- as.numeric(prescriptions$Year) #convert year to numeric type
+
+prescriptions <- prescriptions %>% #arrange years in ascending order
+  arrange(Year)
+
+prescriptions[is.na(prescriptions)] <- 0 #convert NA values to 0 
+
+pres_nums <- prescriptions[,1:5] #select first half of data
+
+pres_nums <- melt(pres_nums, id.vars = 'Year') #melt for visualizations
+
+pres_cost <- prescriptions[,c(1,6:9)] #select second half of data
+
+pres_cost <- melt(pres_cost, id.vars = 'Year') #melt for visualizations 
+
+```
+
+Now that the data is processed, the visualizations can be shown.
+
+```{r warning=FALSE, message=FALSE, fig.width=9, fig.height=7}
+#Number of Prescriptions
+
+ggplot(pres_nums, aes(x = Year, y = value)) +
+  geom_area(aes(fill = variable), alpha = 0.7, color = 'black') +
+  theme_minimal() +
+  ylab("Number of Prescriptions") +
+  theme(legend.position = 'none') +
+  scale_fill_manual(values = c('steelblue4', 'steelblue2', 
+                               'steelblue2', 'steelblue2')) +
+  facet_wrap(~variable, scales = "free") 
+
+```
+
+```{r warning=FALSE, message=FALSE, fig.width=9, fig.height=7}
+#Net Ingredient Cost of Prescriptions
+
+ggplot(pres_cost, aes(x = Year, y = value)) +
+  geom_area(aes(fill = variable), alpha = 0.7, color = 'black') +
+  theme_minimal() +
+  ylab("Net Ingredient Cost") +
+  theme(legend.position = 'none') +
+  scale_fill_manual(values = c('slategray4', 'slategray2', 
+                               'slategray2', 'slategray2')) +
+  facet_wrap(~variable, scales = "free") 
+```
+
+The charts are almost exactly the same in terms of shape, indicating that the number of prescriptions and their respective net ingredient cost are very highly correlated with one another, moving in almost the same direction with time.
+
+```{r warning=FALSE, message=FALSE, fig.width=9, fig.height=7}
+#Removing used data, just to keep things clean
+
+remove(pres_nums)
+remove(pres_cost)
+remove(prescriptions)
+```
+
+### Admissions
+
+```{r warning=FALSE, message=FALSE, fig.width=9, fig.height=7}
+#A quick glimpse
+
+head(admissions) 
+str(admissions)
+```
+
+The admissions data includes 7 variables describing hospital admissions potentially related to smoking. The two visualizations created here show two aspects. First, how the number of hospital admissions progresses through the years between men and women. Second, the number of hospital admissions based on the ICD10 Diagnosis and the Diagnosis Type. The data is first processed and cleaned.
+
+```{r warning=FALSE, message=FALSE, fig.width=9, fig.height=7}
+#Preprocessing
+
+admissions$Year <- strtrim(admissions$Year, 4) #trim years to show only single year value (removing /)
+
+admissions$Year <- as.numeric(admissions$Year) #convert year to numeric type
+
+admissions <- admissions %>% #arrange by year (ascending)
+  arrange(Year)
+
+admissions <- admissions %>% #keeping only relevant and required observations
+  filter(!str_detect(Diagnosis.Type, "All ")) %>%
+  filter(!str_detect(Metric, "Attributable number")) %>%
+  filter(str_detect(Sex, "Male|Female"))
+
+admissions[admissions=="."] <- 0 #cleaning..
+
+admissions$Value <- as.numeric(admissions$Value) #convert value to numeric
+
+admissions$Year <- as.character(admissions$Year) #convert year back to character
+
+admit_diag_type <- admissions[,-1:-2] #grouping separate dataframe with diagnosis information
+admit_diag_type <- admit_diag_type %>% #total number of admissions per diagnosis type 
+  group_by(ICD10.Diagnosis, Diagnosis.Type) %>%
+  summarize_at(vars(Value), list(sum)) %>%
+  arrange(desc(Value))
+
+```
+
+While the number of men being admitted into hospital has been gradually decreasing, the number of women being admitted has been increasing. There are however still more men being admitted to hospital than women.
+
+```{r warning=FALSE, message=FALSE, fig.width=9, fig.height=7}
+#Number of Hospital Admissions (Men-Women)
+
+ggplot(admissions, aes(x = Year, y = Value, fill = Sex)) +
+  geom_bar(position = "dodge", stat = "identity") +
+  theme_minimal() +
+  ylab("Number of Hospital Admissions") +
+  scale_fill_manual(values = c('red3','royalblue3'))
+```
+
+The highest number of admissions are attributed to circulatory problems by a large margin, followed by respiratory problems. However, it should be noted that this shows diagnosis which CAN be caused by smoking, not those which definitely were, so hasty conclusions should not be made. 
+
+```{r warning=FALSE, message=FALSE, fig.width=9, fig.height=7}
+#Number of Hospital Admissions by Diagnosis
+
+ggplot(admit_diag_type,
+       aes(x = reorder(ICD10.Diagnosis, Value), y = Value, fill = Diagnosis.Type)) +
+  geom_bar(stat = "identity") +
+  xlab("ICD10.Diagnosis") +
+  ylab("Number of Hospital Admissions") +
+  scale_y_continuous(labels = scales::comma) +
+  scale_fill_brewer(palette = "Set1") +
+  theme_minimal() +
+  coord_flip() +
+  theme(legend.position = c(0.6,0.5), legend.direction = "vertical")
+
+```
+
+```{r warning=FALSE, message=FALSE, fig.width=9, fig.height=7}
+#Removing used data, just to keep things clean
+
+remove(admit_diag_type)
+remove(admissions)
+```
+
+### Fatalities
+
+```{r warning=FALSE, message=FALSE, fig.width=9, fig.height=7}
+#A quick glimpse
+
+head(fatalities) 
+str(fatalities)
+```
+
+The fatalities data is almost identical to the previous admissions data, in terms of shape and variables. The only difference is that instead of hospital admissions, it is now describing the number of fatalities. Due to these similarities, the same two charts will be plotted as previously shown, but this time in the context of fatalities. 
+
+```{r warning=FALSE, message=FALSE, fig.width=9, fig.height=7}
+#Preprocessing
+
+fatalities$Year <- strtrim(fatalities$Year, 4) #trim years to show only single year value (removing /)
+
+fatalities$Year <- as.numeric(fatalities$Year) #convert year to numeric type
+
+fatalities <- fatalities %>% #arrange by year (ascending)
+  arrange(Year)
+
+fatalities <- fatalities %>% #keeping only relevant and required observations
+  filter(!str_detect(Diagnosis.Type, "All ")) %>%
+  filter(!str_detect(Metric, "Attributable number")) %>%
+  filter(str_detect(Sex, "Male|Female"))
+
+fatalities[fatalities=="."] <- 0 #cleaning..
+
+fatalities$Value <- as.numeric(fatalities$Value) #convert value to numeric
+
+fatalities$Year <- as.character(fatalities$Year) #convert year back to character
+
+fatal_diag_type <- fatalities[,-1:-2] #grouping separate dataframe with diagnosis information
+fatal_diag_type <- fatal_diag_type %>% #total number of fatalities per diagnosis type 
+  group_by(ICD10.Diagnosis, Diagnosis.Type) %>%
+  summarize_at(vars(Value), funs(sum)) %>%
+  arrange(desc(Value))
+
+```
+
+Here the number of fatalities potentially caused by smoking has been decreasing over the years for both men and women, with the number of men dying still being higher than women. 
+
+```{r warning=FALSE, message=FALSE, fig.width=9, fig.height=7}
+#Number of Fatalities (Men-Women)
+
+ggplot(fatalities, aes(x = Year, y = Value, fill = Sex)) +
+  geom_bar(position = "dodge", stat = "identity") +
+  theme_minimal() +
+  ylab("Number of Observed Deaths") +
+  scale_fill_manual(values = c('red3','royalblue3'))
+```
+
+The number of fatalities is the highest for circulatory problems too, similar to what was seen earlier. 
+
+```{r warning=FALSE, message=FALSE, fig.width=9, fig.height=7}
+#Number of Fatalities by diagnosis type
+
+ggplot(fatal_diag_type,
+       aes(x = reorder(ICD10.Diagnosis, Value), y = Value, fill = Diagnosis.Type)) +
+  geom_bar(stat = "identity") +
+  xlab("ICD10.Diagnosis") +
+  ylab("Number of Observed Deaths") +
+  scale_y_continuous(labels = scales::comma) +
+  scale_fill_brewer(palette = "Set1") +
+  theme_minimal() +
+  coord_flip() +
+  theme(legend.position = c(0.6,0.5), legend.direction = "vertical")
+```
+
+```{r warning=FALSE, message=FALSE, fig.width=9, fig.height=7}
+#Removing used data, just to keep things clean
+
+remove(fatal_diag_type)
+remove(fatalities)
+```
+
+### Smokers
+
+```{r warning=FALSE, message=FALSE, fig.width=9, fig.height=7}
+#A quick glimpse
+
+head(smokers)
+str(smokers)
+```
+
+This dataset is fairly simple, as it just describes what proportion of each age group of the population are smokers, divided between men and women. A single chart will be enough to show the general progression of these proportions with time. But first, some preprocessing.
+
+```{r warning=FALSE, message=FALSE, fig.width=9, fig.height=7}
+#Preprocessing
+
+smokers <- smokers[,c(-2,-4)] #remove unwanted columns (16 and over removed as not clear if this is a mislabel)
+
+smokers <- smokers %>%
+  filter(str_detect(Sex, "Male|Female")) #filtering complete information
+
+colnames(smokers)[c(3:7)] <- c("16-24","25-34","35-49","50-59","60+") #renaming columns for convenience
+
+smokers_melt <- melt(smokers, id.vars = c("Year","Sex")) #melt for visualizing
+
+```
+
+The general trend here is that with time, the proportion of people smoking from each age group has been decreasing. 
+
+```{r warning=FALSE, message=FALSE, fig.width=9, fig.height=7}
+#Percentage of population of each age group trend
+
+ggplot(smokers_melt, aes(x = Year, y = value, fill = variable)) +
+  geom_area(color = "white") +
+  ylab("Percentage of Population") +
+  theme_minimal() +
+  labs(fill = "Age Group") +
+  scale_fill_brewer(palette = "PuBu") +
+  theme(axis.text.y = element_blank(),
+        legend.position = "bottom") +
+  facet_wrap(~Sex)
+
+```
+
+```{r warning=FALSE, message=FALSE, fig.width=9, fig.height=7}
+#Removing used data, just to keep things clean
+
+remove(smokers_melt)
+remove(smokers)
+```
+
+### Metrics
+
+```{r warning=FALSE, message=FALSE, fig.width=9, fig.height=7}
+#A quick glimpse
+
+head(metrics)
+str(metrics)
+```
+
+This final dataset comprises of index values indicating the expenditure and purchasing habits of households in relation to tobacco. There are a number of variables that can potentially be studied here. However, the most important ones (personal judgement here) are related to the relationship between household expenditure on tobacco and overall household expenditure. Two charts will be plotted, one focusing only on expenditure on tobacco as a percentage, and the other focusing on how the expenditure on tobacco and overall household expenditure progress with time. Conveniently, not a lot of preprocessing is required. 
+
+```{r warning=FALSE, message=FALSE, fig.width=9, fig.height=7}
+#Preprocessing
+
+metrics <- na.omit(metrics) #remove NA values
+
+metrics <- metrics %>% #arrange by year (ascending)
+  arrange(Year)
+
+metrics_house_tobac <- metrics[,c(1,7,8)] # dataframe for expenditure on tobacco and overall expenditure
+
+metrics_house_tobac <- melt(metrics_house_tobac, id.vars = "Year") #melt for visualizing
+
+```
+
+The percentage of the total household expenditure on tobacco has been decreasing with time. However, is this because actual tobacco expenditure has decreased, or is it because overall household expenditure has increased? 
+
+```{r warning=FALSE, message=FALSE, fig.width=9, fig.height=7}
+#Percentage of expenditure of tobacco with time
+
+ggplot(metrics, aes(x = Year, y = Expenditure.on.Tobacco.as.a.Percentage.of.Expenditure)) +
+  geom_line(size = 2, color = "steelblue4") +
+  geom_point() +
+  ylab("Expenditure on Tobacco as % of Total Household Expenditure") +
+  geom_segment(aes(x = Year, xend = Year, 
+                   y = 0, 
+                   yend = Expenditure.on.Tobacco.as.a.Percentage.of.Expenditure), 
+               size = 0.7, linetype = "dotted") +
+  theme_minimal()
+
+```
+
+The chart below answers the previous questions. Although both are increasing, it seems that household expenditure has increased by a larger margin than tobacco expenditure. The tobacco expenditure increase can also be due to the higher prices being implemented on tobacco products. 
+
+```{r warning=FALSE, message=FALSE, fig.width=9, fig.height=7}
+#Expenditure of tobacco and household expenditure with time
+
+ggplot(metrics_house_tobac, aes(x = Year, y = value, fill = variable)) +
+  geom_area() +
+  theme_minimal() +
+  ylab("Index.Value") +
+  scale_fill_manual(values = c("midnightblue","skyblue1")) +
+  theme(legend.position = c(0.3,0.8),
+        legend.title = element_blank())
+
+```
+
+```{r warning=FALSE, message=FALSE, fig.width=9, fig.height=7}
+#Removing used data, just to keep things clean
+
+remove(metrics_house_tobac)
+remove(metrics)
+```
+
+
+
+
