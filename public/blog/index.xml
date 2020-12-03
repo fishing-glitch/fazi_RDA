@@ -78,6 +78,15 @@ The dataset contains some information about computers, with the dependant variab
     </item>
     
     <item>
+      <title>Finance x Data Analysis: Portfolio Optimization and Returns</title>
+      <link>/blog/finance-portfolio-analysis/</link>
+      <pubDate>Mon, 01 Jan 0001 00:00:00 +0000</pubDate>
+      
+      <guid>/blog/finance-portfolio-analysis/</guid>
+      <description>IntroductionThe purpose of this project is to highlight potential applications of data analysis within the finance industry. When it comes to choosing viable securities to invest in based on a certain criteria, there are different methods that can be used, including fundamental or quantitative analysis. The focus in this project is on a quantitative approach, using the price of 10 different stocks to determine an optimum portfolio that generates required returns based on certain risks.</description>
+    </item>
+    
+    <item>
       <title>House Price Predictions with Clusters and Regressions</title>
       <link>/blog/house-price/</link>
       <pubDate>Mon, 01 Jan 0001 00:00:00 +0000</pubDate>

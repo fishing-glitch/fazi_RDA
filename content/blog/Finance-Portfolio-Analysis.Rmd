@@ -1,0 +1,499 @@
+---
+title: "Finance x Data Analysis: Portfolio Optimization and Returns"
+output: html_notebook
+---
+
+### Introduction
+
+The purpose of this project is to highlight potential applications of data analysis within the finance industry. When it comes to choosing viable securities to invest in based on a certain criteria, there are different methods that can be used, including fundamental or quantitative analysis. The focus in this project is on a quantitative approach, using the price of 10 different stocks to determine an optimum portfolio that generates required returns based on certain risks. The stocks are randomly chosen from the current 100 largest entities in the S&P500 (2020), and are as follows:
+
+AAPL (Apple.Inc), MSFT (Microsoft Corporation), AMZN (Amazon.com Inc.), JNJ (Johnson & Johnson), PG (Procter & Gamble Company), NFLX (Netflix Inc.), KO (Coca-Cola Company), XOM (Exxon Mobil Corporation), SBUX (Starbucks Corporation), MS (Morgan Stanley)
+
+Data from 2010-2020 is used, utilising 10 years of daily prices. The data is analysed using standard statistical and quantitative finance techniques. The project is broken down into different sections. Firstly, returns are generated for each of the stocks mentioned using the price data. Following this, a simulation is run to create a collection of portfolios comprising of various weight combinations for each stock. Lastly, two portfolios from this simulation are selected (maximum return and minimum risk). Further statistical and return analysis is then carried out on these two portfolios.
+
+Credit to https://www.codingfinance.com/ for providing a number of easy to follow along code examples that have also been utilized in this project.
+
+### Collecting and Exploring Data
+
+To start, the required libraries are loaded and the data is retrieved based on the stock symbols and time period. A quick check is run to see if there are any missing values present. 
+
+```{r warning=FALSE, message=FALSE, fig.width=9, fig.height=7}
+library(tidyquant)
+library(tidyverse)
+library(timetk)
+library(plotly)
+library(tidyr)
+
+#chosen from s&p 500 top 100 list by weight
+symbols <- c('AAPL', 'MSFT', 'AMZN', 'JNJ', 'PG', 'NFLX', 'KO', 'XOM', 'SBUX', 'MS')
+
+prices <- tq_get(symbols, from = '2010-01-01', 
+                 to = '2020-01-01', get = 'stock.prices')
+
+sum(is.na(prices)) #no missing values
+```
+
+The 10 year price progression for each chart can be visualized below. It can be seen that some stocks have experienced incredible price changes, whereas some have remained relatively stable with time.
+
+```{r warning=FALSE, message=FALSE, fig.width=9, fig.height=7}
+ggplot(prices, aes(x = date, y = adjusted, color = symbol)) +
+  geom_line() +
+  theme_minimal() +
+  ggtitle("Stock Price Progression 10 Years") +
+  ylab("Adjusted Price") +
+  xlab("Date") +
+  scale_x_date(date_breaks = "1 year", date_labels = "%Y")
+```
+
+Instead of basing an investment decision purely on price progression, the log returns for each stock are generated and visualized. The use of log returns is common within financial analysis. Two major reasons for this are firstly that if prices are assumed to log normally distributed, then the returns are normally distributed which makes a lot of further assumptions and analysis much more convenient, due to the prevalence of normality in statistical analysis. Secondly, log returns account for compounding returns optimally (time-additivity) as opposed to using raw returns generated from prices. Further details about the reasons for using log returns can be found at https://quantivity.wordpress.com/2011/02/21/why-log-returns/. 
+
+```{r warning=FALSE, message=FALSE, fig.width=9, fig.height=7}
+#convert to log returns
+log_return <- prices %>%
+  group_by(symbol) %>%
+  tq_transmute(select = adjusted,
+               mutate_fun = periodReturn,
+               period = 'daily',
+               col_rename = 'log_ret',
+               type = 'log')
+
+ggplot(log_return, aes(x = date, y = log_ret, color = symbol)) +
+  geom_line() +
+  theme_minimal() +
+  ggtitle("Log Returns for Selected Stocks") +
+  ylab("Log Return") +
+  xlab("Date") +
+  scale_x_date(date_breaks = "1 year", date_labels = "%Y")
+```
+
+To grasp a better intuition of how these returns progressed with time, the cumulative log returns are calculated and visualized below, assuming that every return was reinvested since the start till the end date. A diverse range of cumulative returns for each stock can be observed from the chart. 
+
+```{r warning=FALSE, message=FALSE, fig.width=9, fig.height=7}
+#cumulative returns
+cumulative_ret <- log_return %>%
+  group_by(symbol) %>%
+  mutate(cum_ret = cumprod(1 + log_ret))
+
+ggplot(cumulative_ret, aes(x = date, y = cum_ret, color = symbol)) +
+  geom_line() +
+  theme_minimal() +
+  ggtitle("Cumulative Log Returns for Selected Stocks") +
+  ylab("Cumulative Log Return") +
+  xlab("Date") +
+  scale_x_date(date_breaks = "1 year", date_labels = "%Y")
+```
+
+The log returns table is then converted into wide format for further calculations. A glimpse at the table shows the daily log returns for each stock.  
+
+```{r warning=FALSE, message=FALSE, fig.width=9, fig.height=7}
+#convert to wide format and xts
+log_return_wide <- log_return %>%
+  spread(symbol, value = log_ret) %>%
+  tk_xts()
+
+head(round(log_return_wide,3))
+```
+
+### Optimal Portfolio Simulations
+
+Before progressing to running the simulations, some initial values need to be calculated and defined. For the formulas to work, the mean return of each stock, covariance matrix, and risk-free rate are required. Through these values, each simulated portfolios return, risk and Sharpe Ratio can be calculated, thus providing different metrics upon which an optimal portfolio can be selected. The risk-free rate is arbitrarily selected as 2% (0.02).
+
+```{r warning=FALSE, message=FALSE, fig.width=9, fig.height=7}
+#calculate mean return for each stock
+mean_return <- colMeans(log_return_wide)
+print(round(mean_return,5))
+
+#annualized covariance matrix for all stocks
+cov_matrix <- cov(log_return_wide) * 252
+print(round(cov_matrix,3))
+
+#select risk free rate 
+rfr <- 0.02 #2%
+```
+
+Next, the simulation function is defined and run. The function essentially generates a random set of weights for each stock (sum to 1), and calculates the associated risk, return and Sharpe Ratio. The number of simulations is equal to the number of portfolios created by the function. In this case, 10000 simulations are run, however any number can be chosen if needed. 
+
+```{r warning=FALSE, message=FALSE, fig.width=9, fig.height=7}
+#Portfolio optimizing simulation function
+run_simulation <- function(symbols, n, mean_return, cov_matrix, rfr) {
+  
+  #number of loops
+  num_runs <- n
+  
+  #matrix for storing weights
+  port_sim_weights <- matrix(nrow = num_runs, 
+                             ncol = length(symbols))
+  
+  #vector to store portfolio returns
+  port_sim_returns <- vector('numeric', length = num_runs)
+  
+  #vector to store portfolio standard deviation
+  port_sim_sddev <- vector('numeric', length = num_runs)
+  
+  #vector to store portfolio Sharpe ratios
+  port_sim_shratio <- vector('numeric', length = num_runs)
+  
+  #run simulation
+  
+  for (i in seq_along(port_sim_returns)) {
+    
+    #generate random weights for return
+    w <- runif(n = length(symbols))
+    w <- w/sum(w) #ensures sum weights = 1
+    
+    port_sim_weights[i,] <- w #add to weight matrix
+    
+    #use weights to generate annualized average portfolio return
+    portfolio_return <- ((sum(w * mean_return) + 1) ^ 252) - 1
+    
+    port_sim_returns[i] <- portfolio_return #add to return vector
+    
+    #portfolio risk annualized
+    portfolio_risk <- sqrt(t(w) %*% (cov_matrix %*% w))
+    
+    port_sim_sddev[i] <- portfolio_risk #add to sd.dev vector
+    
+    #calculate Sharpe ratio
+    sharpe_ratio <- (portfolio_return - rfr)/portfolio_risk
+    
+    port_sim_shratio[i] <- sharpe_ratio #add to ratio vector
+    
+  }
+  
+  #combine everything into one tibble table
+  simulation_values <- tibble(Return = port_sim_returns,
+                              Risk = port_sim_sddev,
+                              SharpeRatio = port_sim_shratio)
+  
+  port_sim_weights <- tk_tbl(port_sim_weights)
+  colnames(port_sim_weights) <- colnames(log_return_wide)
+  
+  portfolio_sim_table <- tk_tbl(cbind(port_sim_weights, simulation_values))
+  return(round(portfolio_sim_table,3))
+  
+} #function end
+
+#generate simulated portfolio combinations
+set.seed(1234)#for reproducibility
+portfolio_sim_table <- run_simulation(symbols = symbols,
+                                      n = 10000,
+                                      mean_return = mean_return,
+                                      cov_matrix = cov_matrix,
+                                      rfr = rfr)
+#glimpse of the simulated data
+head(portfolio_sim_table)
+```
+
+The table above shows the initial few portfolios generated from the total 10000. The interactive chart below visualises all the portfolios based on their risk, return and Sharpe Ratios. Observing the chart closely indicates the presence of the familiar Efficient Frontier shape towards the left, indicating the location of the optimal portfolios based on the required return and risk characteristics (based on the Modern Portfolio Theory). An investor can potentially utilise such analysis to help in determining how to spread their investment across their choice of securities to meet their return and risk requirements. 
+
+```{r warning=FALSE, message=FALSE, fig.width=7.5, fig.height=4.5}
+#Visualizing Simulations
+ggplotly(ggplot(portfolio_sim_table, aes(x = Risk, y = Return, color = SharpeRatio)) +
+           geom_point() +
+           theme_minimal() +
+           scale_y_continuous(labels = scales::percent) +
+           scale_x_continuous(labels = scales::percent) +
+           ylab("Annualized Return") +
+           xlab("Annualized Risk (Std.Dev)") +
+           ggtitle("Simulated Portfolio Combinations of Selected Stocks"))
+```
+
+### Comparing Maximum Return and Minimum Risk Portfolio Statistics
+
+Having run the simulations earlier, further analysis can be carried out on any portfolio selection. For the purpose of this section, two extreme cases are selected: a portfolio that maximizes return (regardless of risk), and a portfolio that minimizes risk (regardless of return). These extreme cases will significantly highlight the different statistical properties present in each. The weight composition for each portfolio is visualized below. A clear difference in stock preferences is shown between the two, with the maximum return portfolio favouring high return stocks, and the minimum risk portfolio favouring more stable low variance stocks. 
+
+```{r warning=FALSE, message=FALSE, fig.width=9, fig.height=7}
+#suppose want maximum return (regardless of risk)
+max_return <- max(portfolio_sim_table$Return)
+portfolio_max_return <- portfolio_sim_table %>%
+  filter(Return == max_return)
+
+portfolio_max_return_tall <- pivot_longer(portfolio_max_return,
+                                          cols = 1:10,
+                                          names_to = "symbol",
+                                          values_to = "weight") 
+
+ggplot(portfolio_max_return_tall, aes(x = symbol, y = weight, fill = symbol)) +
+  geom_bar(stat = 'identity') +
+  geom_text(aes(label = paste(weight * 100, "%")),
+                position=position_dodge(width=0.9), vjust=-0.25) +
+  theme_minimal() +
+  ggtitle("Maximum Return Portfolio Weight Composition") +
+  scale_y_continuous(labels = scales::percent) +
+  ylab("Weight %") +
+  xlab("Stock Symbol")
+
+#suppose want minimum risk (regardless of return)
+min_risk <- min(portfolio_sim_table$Risk)
+portfolio_min_risk <- portfolio_sim_table %>%
+  filter(Risk == min_risk)
+
+portfolio_min_risk_tall <- pivot_longer(portfolio_min_risk,
+                                        cols = 1:10,
+                                        names_to = "symbol",
+                                        values_to = "weight") 
+
+ggplot(portfolio_min_risk_tall, aes(x = symbol, y = weight, fill = symbol)) +
+  geom_bar(stat = 'identity') +
+  geom_text(aes(label = paste(weight * 100, "%")),
+            position=position_dodge(width=0.9), vjust=-0.25) +
+  theme_minimal() +
+  ggtitle("Minimum Risk Portfolio Weight Composition") +
+  scale_y_continuous(labels = scales::percent) +
+  ylab("Weight %") +
+  xlab("Stock Symbol")
+
+```
+
+While the overall standard deviation for each portfolio can be calculated, using the rolling standard deviation can provide a more complete picture of how the standard deviation for each portfolio changed through the years. This can be important from an investing perspective as the composition can be changed prior to any periods of high volatility (if the investor is assumed to be risk-averse). The plots below show that while the overall progression of standard deviation in terms of direction is similar during the 10 year period, the scales of the y axis indicate that there were significantly larger changes in volatility for the maximum return portfolio as compared to the minimum risk portfolio. 
+
+```{r warning=FALSE, message=FALSE, fig.width=9, fig.height=7}
+#use weights to form max return and min risk portfolio
+max_ret_weights <- portfolio_max_return_tall[,4:5]
+
+max_ret_portfolio <- merge(log_return, max_ret_weights, by = "symbol", all.x = TRUE)
+
+max_ret_portfolio <- max_ret_portfolio %>%
+  mutate(weighted_returns  = log_ret * weight) %>%
+  group_by(date) %>%
+  summarise(w_return = sum(weighted_returns))
+
+min_risk_weights <- portfolio_min_risk_tall[,4:5]
+
+min_risk_portfolio <- merge(log_return, min_risk_weights, by = "symbol", all.x = TRUE)
+
+min_risk_portfolio <- min_risk_portfolio %>%
+  mutate(weighted_returns  = log_ret * weight) %>%
+  group_by(date) %>%
+  summarise(w_return = sum(weighted_returns))
+
+#rolling standard deviation of portfolios 
+
+window = 252 #1 year window (252 trading days a year)
+
+maxr_port_rolling_sd <- max_ret_portfolio %>%
+  tq_mutate(mutate_fun = rollapply,
+            width = window,
+            FUN = sd,
+            col_rename = "rolling_sd") %>%
+  select(date, rolling_sd) %>%
+  na.omit()
+
+ggplot(maxr_port_rolling_sd, aes(x = date, y = rolling_sd)) +
+  geom_line() +
+  theme_minimal() +
+  ggtitle("Rolling Standard Deviation Maximum Return Portfolio") +
+  ylab("Std.Dev") +
+  xlab("Date") +
+  scale_x_date(date_breaks = "1 year", date_labels = "%Y")
+  
+minr_port_rolling_sd <- min_risk_portfolio %>%
+  tq_mutate(mutate_fun = rollapply,
+            width = window,
+            FUN = sd,
+            col_rename = "rolling_sd") %>%
+  select(date, rolling_sd) %>%
+  na.omit()
+
+ggplot(minr_port_rolling_sd, aes(x = date, y = rolling_sd)) +
+  geom_line() +
+  theme_minimal() +
+  ggtitle("Rolling Standard Deviation Minimum Risk Portfolio") +
+  ylab("Std.Dev") +
+  xlab("Date") +
+  scale_x_date(date_breaks = "1 year", date_labels = "%Y")
+
+```
+
+The rolling skewness is another statistic that can be used to visualize portfolio performance. Periods of high positive skewness can indicate several small negative returns and few large positive returns, and vice versa for a negative skew. This can help investors better understand the risk exposure of their portfolio. It can be seen that for the maximum return portfolio, there is more variability in its skewness, with strong negative and positive skew values during 2012-2013 and 2013-2014 respectively. On the other hand, the skewness pattern for the minimum risk portfolio remains relatively consistent throughout, with the exception of a very large change towards a negative skew during 2018-2019. 
+
+```{r warning=FALSE, message=FALSE, fig.width=9, fig.height=7}
+#rolling skewness of portfolios
+
+maxr_port_rolling_skew <- max_ret_portfolio %>%
+  tq_mutate(mutate_fun = rollapply,
+            width = window,
+            FUN = skewness,
+            col_rename = "rolling_skew") %>%
+  select(date, rolling_skew) %>%
+  na.omit()
+
+ggplot(maxr_port_rolling_skew, aes(x = date, y = rolling_skew)) +
+  geom_line() +
+  theme_minimal() +
+  ggtitle("Rolling Skewness Maximum Return Portfolio") +
+  ylab("Skew") +
+  xlab("Date") +
+  scale_x_date(date_breaks = "1 year", date_labels = "%Y")
+
+minr_port_rolling_skew <- min_risk_portfolio %>%
+  tq_mutate(mutate_fun = rollapply,
+            width = window,
+            FUN = skewness,
+            col_rename = "rolling_skew") %>%
+  select(date, rolling_skew) %>%
+  na.omit()
+
+ggplot(minr_port_rolling_skew, aes(x = date, y = rolling_skew)) +
+  geom_line() +
+  theme_minimal() +
+  ggtitle("Rolling Skewness Minimum Risk Portfolio") +
+  ylab("Skew") +
+  xlab("Date") +
+  scale_x_date(date_breaks = "1 year", date_labels = "%Y")
+
+```
+
+Similarly, the rolling kurtosis function can also be used, with a high value of kurtosis indicating that an increasing number of high magnitude returns (positive and negative) are being generated at the tails of the return distribution. This can potentially impact investment decisions depending on the risk appetite. The kurtosis plots below match the pattern of the skewness plots above, indicating the presence of higher magnitude tail-end returns during the previously mentioned periods of high positive/negative skewness.  
+
+```{r warning=FALSE, message=FALSE, fig.width=9, fig.height=7}
+#rolling kurtosis of portfolios
+
+maxr_port_rolling_kurtosis <- max_ret_portfolio %>%
+  tq_mutate(mutate_fun = rollapply,
+            width = window,
+            FUN = kurtosis,
+            col_rename = "rolling_kurtosis") %>%
+  select(date, rolling_kurtosis) %>%
+  na.omit()
+
+ggplot(maxr_port_rolling_kurtosis, aes(x = date, y = rolling_kurtosis)) +
+  geom_line() +
+  theme_minimal() +
+  ggtitle("Rolling Kurtosis Maximum Return Portfolio") +
+  ylab("Kurtosis") +
+  xlab("Date") +
+  scale_x_date(date_breaks = "1 year", date_labels = "%Y")
+
+minr_port_rolling_kurtosis <- min_risk_portfolio %>%
+  tq_mutate(mutate_fun = rollapply,
+            width = window,
+            FUN = kurtosis,
+            col_rename = "rolling_kurtosis") %>%
+  select(date, rolling_kurtosis) %>%
+  na.omit()
+
+ggplot(minr_port_rolling_kurtosis, aes(x = date, y = rolling_kurtosis)) +
+  geom_line() +
+  theme_minimal() +
+  ggtitle("Rolling Kurtosis Minimum Risk Portfolio") +
+  ylab("Kurtosis") +
+  xlab("Date") +
+  scale_x_date(date_breaks = "1 year", date_labels = "%Y")
+```
+
+### Maximum Return and Minimum Risk Portfolio Beta
+
+Another aspect that can be considered is how the two portfolios compare to the general market. Often, the overall market performance is used as a benchmark to gauge individual portfolio performance based on different metrics. One such metric is the Beta. The Beta measure how volatile the portfolio (or investment) is compared to the market itself. A beta value of 1 indicates that the investment is as volatile as the market. A value higher or lower than 1 indicates higher or lower volatility respectively. This is synonymous to the CAPM theory of portfolio return calculation. 
+
+The market benchmark used here is the S&P500 itself (specifically the SPY ETF). Plots comparing the market and portfolio returns are shown below. Both plots indicate a positive correlation with the market returns, with the maximum return portfolio plot being slightly more spread out. 
+
+```{r warning=FALSE, message=FALSE, fig.width=9, fig.height=7}
+#gather benchmark performance (S&P500)
+snp <- tq_get('SPY',from = '2010-01-01', 
+              to = '2020-01-01', get = 'stock.prices')
+
+#log return of market
+log_snp_return <- snp %>%
+  tq_transmute(select = adjusted,
+               mutate_fun = periodReturn,
+               period = 'daily',
+               col_rename = 'log_snp_ret',
+               type = 'log')
+
+#combine portfolio and market data
+comparison_snp_maxport <- merge(x = max_ret_portfolio, y = log_snp_return, 
+                                by = 'date', all.x = TRUE)
+
+
+ggplot(comparison_snp_maxport, aes(x = w_return, y = log_snp_ret)) +
+  geom_point(alpha = 0.5) +
+  geom_smooth(method = 'lm', se = FALSE) +
+  ggtitle("Max Return Portfolio Returns vs Market (SPY) Returns") +
+  xlab("Portfolio Return") +
+  ylab("SPY Return") +
+  theme_minimal()
+
+comparison_snp_minport <- merge(x = min_risk_portfolio, y = log_snp_return, 
+                                by = 'date', all.x = TRUE)
+
+
+ggplot(comparison_snp_minport, aes(x = w_return, y = log_snp_ret)) +
+  geom_point(alpha = 0.5) +
+  geom_smooth(method = 'lm', se = FALSE) +
+  ggtitle("Min Risk Portfolio Returns vs Market (SPY) Returns") +
+  xlab("Portfolio Return") +
+  ylab("SPY Return") +
+  theme_minimal()
+```
+
+A numerical value of Beta can provide a better understanding. Simple linear regression is used below to calculate the value of Beta. 
+
+```{r warning=FALSE, message=FALSE, fig.width=9, fig.height=7}
+max_port_lm <- lm(comparison_snp_maxport$w_return ~ comparison_snp_maxport$log_snp_ret)
+max_port_beta <- max_port_lm$coefficients[2]
+cat("Max Return Portfolio Beta: ", max_port_beta)
+
+min_port_lm <- lm(comparison_snp_minport$w_return ~ comparison_snp_minport$log_snp_ret)
+min_port_beta <- min_port_lm$coefficients[2]
+cat("Min Risk Portfolio Beta: ", min_port_beta)
+
+```
+
+As expected, the maximum return portfolio is more volatile than the market (albeit marginally), with a value slightly greater than 1, whereas the minimum risk portfolio is less volatile than the market with a value less than 1. 
+
+### Comparing Portfolios and Market Cumulative Return
+
+To conclude this analysis, the cumulative returns for both portfolios are compared to those of the market in the charts below. It comes as no surprise that the maximum return portfolio has clearly outperformed the market, albeit subject to much more volatility and risk. On the other hand, the minimum risk portfolio has performed almost equivalent to the market. 
+
+```{r warning=FALSE, message=FALSE, fig.width=9, fig.height=7}
+cumulative_maxret_snp <- comparison_snp_maxport %>%
+  mutate(Portfolio_MaxRet = cumprod(1 + w_return)) %>%
+  mutate(SNP_Ret = cumprod(1 + log_snp_ret))
+
+cumulative_maxret_snp <- cumulative_maxret_snp[,c(-2,-3)]
+
+cumulative_maxret_snp_long <- pivot_longer(cumulative_maxret_snp,
+                                           cols = 2:3,
+                                           names_to = "asset",
+                                           values_to = "cumulative_return")
+
+cumulative_minrisk_snp <- comparison_snp_minport %>%
+  mutate(Portfolio_MinRisk = cumprod(1 + w_return)) %>%
+  mutate(SNP_Ret = cumprod(1 + log_snp_ret))
+
+cumulative_minrisk_snp <- cumulative_minrisk_snp[,c(-2,-3)]
+
+cumulative_minrisk_snp_long <- pivot_longer(cumulative_minrisk_snp,
+                                           cols = 2:3,
+                                           names_to = "asset",
+                                           values_to = "cumulative_return")
+
+ggplot(cumulative_maxret_snp_long, 
+       aes(x = date, y = cumulative_return, color = asset)) +
+  geom_line() +
+  ggtitle("Cumulative Log Max Return Portfolio Returns vs Market (SPY) Returns") +
+  xlab("Date") +
+  ylab("Cumulative Log Return") +
+  scale_color_discrete(name = "Asset", labels = c("Max Return Portfolio", 
+                                                  "SPY Market Return")) +
+  theme_minimal() +
+  scale_x_date(date_breaks = "1 year", date_labels = "%Y")
+
+ggplot(cumulative_minrisk_snp_long, 
+       aes(x = date, y = cumulative_return, color = asset)) +
+  geom_line() +
+  ggtitle("Cumulative Log Min Risk Portfolio Returns vs Market (SPY) Returns") +
+  xlab("Date") +
+  ylab("Cumulative Log Return") +
+  scale_color_discrete(name = "Asset", labels = c("Min Risk Portfolio", 
+                                                  "SPY Market Return")) +
+  theme_minimal() +
+  scale_x_date(date_breaks = "1 year", date_labels = "%Y")
+
+```
+
+### Conclusion
+
+Depending on the risk/return preferences of the investor, an optimal balance can be found by selecting the correct portfolio component weights for the stocks in order to yield the desired results. The methods used in this project are an example of how data analysis techniques can be used to assist in such investment decisions. 
+
