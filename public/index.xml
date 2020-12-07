@@ -96,6 +96,15 @@ The dataset contains some information about computers, with the dependant variab
     </item>
     
     <item>
+      <title>Jazz, Metal, Electronic - Analyzing and Clustering Music</title>
+      <link>/blog/music/</link>
+      <pubDate>Mon, 01 Jan 0001 00:00:00 +0000</pubDate>
+      
+      <guid>/blog/music/</guid>
+      <description>IntroductionTo appreciate the flexibility of data analysis, this project aims to explore the applications of analytic techniques on audio data. The role of audio currently within data science is increasingly strengthening, with machine learning applications being used for voice sentiment analysis and developing voice assistant services as an example. In this project, music data from three highly different genres(jazz, metal and electronic) will be used for analysis. Each genre is represented by one artist, with Miles Davis for jazz, Opeth for metal, and Deadmau5 for electronic.</description>
+    </item>
+    
+    <item>
       <title>Mining Religious and Sacred Texts</title>
       <link>/blog/religious-and-sacred-texts/</link>
       <pubDate>Mon, 01 Jan 0001 00:00:00 +0000</pubDate>

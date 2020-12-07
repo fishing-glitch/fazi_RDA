@@ -1,0 +1,302 @@
+---
+title: "Jazz, Metal, Electronic - Analyzing and Clustering Music"
+output: html_notebook
+---
+
+### Introduction
+
+To appreciate the flexibility of data analysis, this project aims to explore the applications of analytic techniques on audio data. The role of audio currently within data science is increasingly strengthening, with machine learning applications being used for voice sentiment analysis and developing voice assistant services as an example. In this project, music data from three highly different genres(jazz, metal and electronic) will be used for analysis. Each genre is represented by one artist, with Miles Davis for jazz, Opeth for metal, and Deadmau5 for electronic. The data will be explored using audio specific features to highlight the differences between the music. Using these features, a simple clustering algorithm will also be run to see if a machine is capable of grouping together different music pieces in the correct categories based on the features extracted. While more data and several other artists can be used, it is not necessary for this project as the highest possible accuracy and developing the strongest model is not the aim here. 
+
+The analysis is carried out in Python using Google Colab. Some useful links referred to for code examples related to audio analysis in Python are:
+https://www.kdnuggets.com/2020/02/audio-data-analysis-deep-learning-python-part-1.html
+https://musicinformationretrieval.com/spectral_features.html#:~:text=Spectral%20rolloff%20is%20the%20frequency,spectral_rolloff%20%3D%20librosa.
+
+Before beginning, the required libraries are loaded. 
+
+```{python, engine.path = 'C:\\Users\\faiza\\Anaconda3\\python.exe', eval = FALSE}
+#Libraries
+import librosa
+import matplotlib.pyplot as plt
+import librosa.display
+import os
+import sklearn
+import matplotlib as mpl
+import numpy as np
+import pandas as pd
+import seaborn as sns
+from sklearn.preprocessing import StandardScaler
+from sklearn.cluster import DBSCAN
+```
+
+### Loading Audio Data
+
+In order to visualize and describe audio data and the features that can be extracted from it, three different songs are being used. Each song represents its respective genre (and are also personal favourites). These three songs are vastly different from each other when they are heard. Therefore, the data they contain should contrast against each other well. The songs are "Alone With You - Deadmau5", "Burden - Opeth" and "You're My Everything - Miles Davis". 
+
+The tracks are loaded into the Python environment using the librosa library, which essentially converts the audio into a digital format by sampling the sound wave at specific intervals. The sampling rate here is the default 22kHz (22,000 times a second). While a higher sampling rate will lead to more data, the default rate is maintained to reduce the load on memory and make plotting the data easier.
+
+```{python, engine.path = 'C:\\Users\\faiza\\Anaconda3\\python.exe', eval = FALSE}
+#Files
+AloneWithYou_Deadmau5 = '/content/drive/MyDrive/Music_Analysis/Alone with You.mp3'
+Burden_Opeth = '/content/drive/MyDrive/Music_Analysis/04-Burden.mp3'
+YoureMyEverything_MilesDavis = "/content/drive/MyDrive/Music_Analysis/You're My Everything.mp3"
+
+#Digitizing and sampling - sr = 22,000 (22kHz)
+Alone_With_You, sr = librosa.load(AloneWithYou_Deadmau5)
+Burden, sr = librosa.load(Burden_Opeth)
+Youre_My_Everything, sr = librosa.load(YoureMyEverything_MilesDavis)
+
+#Dictionary data for the three songs
+songs = {"Alone With You":Alone_With_You,
+         "Burden":Burden, 
+         "You're My Everything":Youre_My_Everything}
+
+```
+
+### Visualizing Sound
+
+With the songs loaded and digitized, the data can now be plotted using wave plots. Wave plots visualize how the amplitude of the wave varies as it progresses through time, which in this case is the length of the track. The amplitude is defined as the degree with which the wave deviates from its average value in a time frame. In terms of audio, it provides a visual measure of the degree with which audio particles are displaced. The more the displacement, the higher the amplitude, which in turns leads to louder sound. 
+
+```{python, engine.path = 'C:\\Users\\faiza\\Anaconda3\\python.exe', eval = FALSE}
+#Wave plots for each song
+for name, val in songs.items():
+  plt.figure(figsize=(12,6))
+  plt.title(name)
+  plt.ylabel('Amplitude')
+  plt.xlabel('Time')
+  librosa.display.waveplot(val, sr = sr)
+
+```
+
+![](/images/song1-waveplot.png)
+![](/images/song2-waveplot.png)
+![](/images/song3-waveplot.png)
+
+The above wave plots help visualize the kind of loudness and energy expected from each song at a basic level, with the electronic track showing the highest consistent amplitude levels, implying a more energetic track. While on the other hand, the jazz track seems much more relaxed in comparison, with the occasional high amplitude variation. The metal track has both high and low amplitude periods, which is in line with the louder and quieter parts of the song.  
+
+Moving on from the basic wave plot, the next plot to visualize audio is a spectrogram. A spectrogram shows how the frequency of the sound varies with each point in time as sampled. This provides a visual representation of how much energy is present at specific frequency ranges and how this energy changes with time. In the below spectrograms, the vertical frequency axis Hertz (Hz) has been converted into a log scale to improve scaling, and the horizontal axis represents the duration of the song. 
+
+```{python, engine.path = 'C:\\Users\\faiza\\Anaconda3\\python.exe', eval = FALSE}
+#spectrograms
+for name, val in songs.items():
+  X = librosa.stft(val)
+  Xdb = librosa.amplitude_to_db(abs(X))
+  plt.figure(figsize=(10,10))
+  plt.title(name)
+  librosa.display.specshow(Xdb, sr = sr, x_axis='time', y_axis='log')
+  plt.colorbar()
+```
+
+![](/images/song1-spectogram.png)
+![](/images/song2-spectogram.png)
+![](/images/song3-spectogram.png)
+
+The spectrograms for the three songs again show the differences in sound signature. The electronic track has a lot of energy focused towards the lower end of the frequency range, which is synonymous with the strong bass of the song's beat. The metal song has energy more evenly distributed across the frequency ranges, with a lower focus on bass compared to the first song. This is due to the higher variety of instruments, sounds and vocals being utilised in the song. The jazz track utilizes the least energy overall across the frequency range, again reflecting the cool and relaxed nature of the song. 
+
+### Feature Extraction
+
+After developing an overall visual understanding of each song's sound signature and structure, the next step is to explore specific features present in the audio that provides more detail about the audio characteristics. While there are numerous options to explore, to keep matters succinct only three specific features will be explored in this analysis: 1) chroma features, 2) spectral centroid and 3) spectral contrast.  
+
+Chroma features help define the audio according to different pitch profiles. This is similar to the spectrograms mentioned earlier, but instead of highlighting the energy at a specific frequency value, chroma features highlight the energy of the sound at different musical scales (B-A-G-F-E-D-C as in this case). One main property of chroma features is that they are able to capture the harmonic and melodic characteristics of music while remaining robust to changes in timbre (quality of a sound/tone) and instrumentation (https://en.wikipedia.org/wiki/Chroma_feature). Chroma features provide the advantage of being able to understand the sound signature of the audio in more detail by using musical scaling as a reference, as opposed to pure frequency values. The chroma features for the three songs are plotted below. To provide a clearer visualization (at the cost of some data loss), the hop_length parameter has been set to 100, which indicates the number of samples being used in each column of the spectrogram.  
+
+```{python, engine.path = 'C:\\Users\\faiza\\Anaconda3\\python.exe', eval = FALSE}
+#chroma feature
+for name, val in songs.items():
+  X = librosa.feature.chroma_stft(val, sr = sr, hop_length=100)
+  plt.figure(figsize=(12,6))
+  plt.title(name)
+  librosa.display.specshow(X, sr = sr, x_axis='time', y_axis='chroma', 
+                           cmap = 'coolwarm',hop_length=100)
+  plt.colorbar()
+
+```
+
+![](/images/song1-chroma.png)
+![](/images/song2-chroma.png)
+
+![](/images/song3-chroma.png)
+
+Similar to the spectrograms, the electronic song has the most energy overall, but with a higher focus on the extreme ends of the given musical scale. The metal song appears more balanced, with peaks in energy at various scales during different points in time. The jazz song also has a wide spread across the musical scale, but at comparatively much lower energy levels.
+
+Spectral centroid is a concept used in wave theory, which helps identify where the centre of mass of a digital signal is on a spectrum. If this concept is applied to sound waves, then the spectral centroid can be used to visually represent how "bright" the sound signature is i.e. how pronounced the sound is within its overall wave spectrum at a given point in time. This provides a useful metric for assessing the tone quality of audio. 
+
+```{python, engine.path = 'C:\\Users\\faiza\\Anaconda3\\python.exe', eval = FALSE}
+#spectral centroid
+for name, val in songs.items():
+  spectral_centroids = librosa.feature.spectral_centroid(val + 0.01, sr=sr)[0]
+  # Computing the time variable for visualization
+  plt.figure(figsize=(12, 6))
+  frames = range(len(spectral_centroids))
+  t = librosa.frames_to_time(frames)
+  # Normalising the spectral centroid for visualisation
+  def normalize(val, axis=0):
+    return sklearn.preprocessing.minmax_scale(val, axis=axis)
+  #Plotting the Spectral Centroid along the waveform
+  librosa.display.waveplot(val, sr=sr, alpha=0.4)
+  plt.plot(t, normalize(spectral_centroids), color='r')
+  plt.title(name)
+```
+
+![](/images/song1-centroid.png)
+![](/images/song2-centroid.png)
+![](/images/song3-centroid.png)
+
+The three plots above all show the progression of the centroid almost parallel in direction in the general direction of the sound wave amplitude. The centroid for the jazz track is almost equivalent to the overall amplitude of the sound. A possible reason for this is that as the song was released in 1956, it is unlikely that any artificial effects were introduced to the track, therefore leaving the sound exactly how it was recorded (regardless of quality). Another reason could be the fewer numbers of instruments being used, providing a more focused sound and little to no background audio. This could explain the centroid behaviour of the metal song as well, where the strength of the centroid doesn't match the overall amplitude during the busy section of the track in the middle, where there are a number of instruments being utilised. The electronic track has two periods of a centroid magnitude valley, which (if the track is heard) coincide perfectly with two notable drops in the energy of the beat (prior to being increased again).
+
+The third feature to explore is the spectral contrast. Spectral contrast is a unique feature for analysing audio signals spread across a frequency spectrum. It considers the difference between spectral peaks and spectral valleys (sharp rises and declines) of the audio signal at different frequency categories (low to high). The plot can then be used to visualize how much the sound signal spectrum deviates from the average, thus highlighting a unique characteristic of the sound. This can also be compared with the song's original spectrogram (as shown earlier). This feature has been used in audio classification problems with promising results. The following paper can be referred to for more technical details regarding spectral contrast: 
+
+Dan-Ning Jiang, Lie Lu, Hong-Jiang Zhang, Jian-Hua Tao and Lian-Hong Cai, "Music type classification by spectral contrast feature," Proceedings. IEEE International Conference on Multimedia and Expo, Lausanne, Switzerland, 2002, pp. 113-116 vol.1, doi: 10.1109/ICME.2002.1035731.
+
+```{python, engine.path = 'C:\\Users\\faiza\\Anaconda3\\python.exe', eval = FALSE}
+#spectral contrast
+for name, val in songs.items():
+  X = librosa.feature.spectral_contrast(val, sr = sr, n_bands = 6)
+  plt.figure(figsize=(12,6))
+  plt.title(name)
+  librosa.display.specshow(X, x_axis='time')
+  plt.colorbar()
+  plt.ylabel('Frequency Bands')
+```
+
+![](/images/song1-contrast.png)
+![](/images/song2-contrast.png)
+![](/images/song3-contrast.png)
+
+Overall, the spectral contrast plots show similar characteristics to those visualized by the chroma features and spectrograms. The electronic track has a higher deviation occurring at the extreme ends of the frequency band spectrum. The metal song is more balanced across the frequency bands, and more consistent across time. The jazz track has a lot more deviation occurring at the higher frequency band (could be the trumpet being the dominating instrument), with a more balanced (but less consistent) deviation across the rest of the frequency bands.
+
+### Clustering Music
+
+Having explored the aforementioned audio features, the next section of this analysis is to apply a clustering algorithm in an attempt to correctly categorize songs based solely on these features. A simple DBSCAN model will be run across 96 songs. The reasons for choosing DBSCAN is simply that it does not require any prior cluster value to identify the clusters, unlike in k-means clustering where a prior value of k is required. The songs are split into the same three genres (jazz, metal, electronic), and to make things easier for the clustering algorithm in terms of consistency, the artists are the same as well. The albums for each artist used are as follows:
+
+Miles Davis: Relaxin', The Complete Birth Of The Cool, Steamin'
+Opeth: Damnation, Ghost Reveries, Still Life, Watershed
+Deadmau5: 4x4=12, At Play, Random Album Title
+
+The number of songs across all three artists are roughly equal, providing an almost even spread of songs for the three genres. An exceptionally accurate clustering result is not to be expected as the limitations are evident. The amount of data and the number of features are too limited to provide any clear differentiating results. However, at the very least the expected result is that the DBSCAN algorithm will be able to detect three clusters (representing the three genres), as the sound signature for the three genres are clearly different from each other, as shown by the earlier feature exploration. 
+
+The audio tracks are loaded, and a dataframe is created representing the feature values of each song. It should be noted here that when the features are extracted, they are in the form of a large multidimensional array. As it would be highly complicated to represent these arrays as a single element in a dataframe for the DBSCAN clustering algorithm to work on, the mean of all the array values for each tracks specific feature is used instead. While this does make things much more simple, the downside is that a large chunk of unique and potentially important information is lost for the sake of a single mean value. This can severely impact the differentiating aspects of each song. Therefore, if the goal is a more serious and extremely accurate model, a different solution to this array problem should probably be explored.
+
+```{python, engine.path = 'C:\\Users\\faiza\\Anaconda3\\python.exe', eval = FALSE}
+#create empty list for each feature and song name
+chroma = []
+centroid = []
+contrast = []
+songs = []
+
+#run loop to load data, extract features, and append empty lists 
+#note: depending on system capabilities, this may take a while.
+#it took Google Colab about half an hour to run this loop.
+for song in os.listdir('/content/drive/MyDrive/Music'):
+  songname = f'/content/drive/MyDrive/Music/{song}'
+  songs.append(songname)
+  x, sr = librosa.load(songname)
+  chroma_ft = librosa.feature.chroma_stft(x, sr = sr, hop_length=100)
+  spectral_centroids = librosa.feature.spectral_centroid(x + 0.01, sr=sr)
+  spectral_contrast = librosa.feature.spectral_contrast(x, sr = sr, n_bands = 6)
+  #converting high dimension arrays into single mean value for ease of calculation
+  mean_chroma_ft = np.mean(chroma_ft)
+  mean_spectral_centroids = np.mean(spectral_centroids)
+  mean_spectral_contrast = np.mean(spectral_contrast)
+  #appending mean value to respective list for each song
+  chroma.append(mean_chroma_ft)
+  centroid.append(mean_spectral_centroids)
+  contrast.append(mean_spectral_contrast)
+
+#tidying song names
+songs_trim = map(lambda each:each.strip("/content/drive/MyDrive/Music/"), songs)
+songs_trim = list(songs_trim)
+
+#combining all values into a dataframe
+music_table = pd.DataFrame(
+    {"songs":songs_trim,
+    "chroma":chroma,
+    "centroid":centroid,
+    "contrast":contrast}
+)
+
+#glimpse of the data
+music_table.head()
+```
+![](/images/music-table.png)
+
+The next step applies the DBSCAN model with default parameter settings. Prior to this, the numerical features are scaled. The clusters are then assigned to the respective songs in an additional column of the dataframe. 
+
+Note: In DBSCAN, a -1 cluster label represents an outlier (not part of any cluster).  
+
+```{python, engine.path = 'C:\\Users\\faiza\\Anaconda3\\python.exe', eval = FALSE}
+#scale data
+scale = StandardScaler()
+music_features_scaled = scale.fit_transform(music_table[['chroma', 'centroid', 'contrast']])
+
+#apply model and assign cluster labels to dataframe
+cluster = DBSCAN()
+model = cluster.fit(music_features_scaled)
+music_clusters = pd.DataFrame(model.fit_predict(music_features_scaled))
+music_table["clusters"] = music_clusters
+
+#glimpse of data
+music_table.head()
+```
+![](/images/music-table-cluster.png)
+
+Once the labels are assigned to the dataframe, the clusters can be visualized. Three plots are created, representing each combination of the three features. 
+
+```{python, engine.path = 'C:\\Users\\faiza\\Anaconda3\\python.exe', eval = FALSE}
+#chroma-contrast
+fig = plt.figure(figsize=(10,10)); ax = fig.add_subplot(111)
+scatter = ax.scatter(music_features['chroma'],
+                     music_features['contrast'],
+                     c=music_features["clusters"])
+ax.set_title("DBSCAN Clustering of 3 Music Genres")
+ax.set_xlabel("chroma")
+ax.set_ylabel("contrast")
+plt.colorbar(scatter)
+plt.show()
+
+#chroma centroid
+fig = plt.figure(figsize=(10,10)); ax = fig.add_subplot(111)
+scatter = ax.scatter(music_features['chroma'],
+                     music_features['centroid'],
+                     c=music_features["clusters"])
+ax.set_title("DBSCAN Clustering of 3 Music Genres")
+ax.set_xlabel("chroma")
+ax.set_ylabel("centroid")
+plt.colorbar(scatter)
+plt.show()
+
+#contrast-centroid
+fig = plt.figure(figsize=(10,10)); ax = fig.add_subplot(111)
+scatter = ax.scatter(music_features['contrast'],
+                     music_features['centroid'],
+                     c=music_features["clusters"])
+ax.set_title("DBSCAN Clustering of 3 Music Genres")
+ax.set_xlabel("contrast")
+ax.set_ylabel("centroid")
+plt.colorbar(scatter)
+plt.show()
+```
+
+![](/images/cluster-1.png)
+
+![](/images/cluster-2.png)
+![](/images/cluster-3.png)
+
+The number of songs in each cluster is shown below:
+
+```{python, engine.path = 'C:\\Users\\faiza\\Anaconda3\\python.exe', eval = FALSE}
+#number of songs in each cluster
+cluster_1 = music_table.loc[music_table['clusters'] == 0, 'songs']
+cluster_2 = music_table.loc[music_table['clusters'] == 1, 'songs']
+cluster_3 = music_table.loc[music_table['clusters'] == 2, 'songs']
+outliers = music_table.loc[music_table['clusters'] == -1, 'songs']
+
+print("Cluster 1:", cluster_1.count(), "Cluster 2:", cluster_2.count(),
+      "Cluster 3:", cluster_3.count(), "Outliers:", outliers.count()) 
+```
+![](/images/clusters.png)
+
+The results from this clustering indicate that the model has indeed discovered three clusters. However, the plots and the number of songs in each cluster indicate that the category separation of the songs is not entirely clear or distinct. There are also a high number of outliers. While fine tuning the DBSCAN model may improve performance marginally, it appears that taking the mean value of the feature arrays is in fact not enabling clear differentiation between the song genres. On the plus side though, the detection of at least 3 clusters does meet the minimum expectation, which is a good sign indicating that the features are useful and that successful unsupervised learning on audio samples based on such numerical features is a strong possibility.  
+
+### Conclusion
+
+The above analysis has explored potential methods of using data analytic techniques in analysing audio data. While the features explored here are useful, there are a number of other potentially useful features as well that can provide further insights into the characteristics of audio samples. A greater number of features, along with larger amounts of data would allow for not only a more thorough analysis, but can also improve the performance of any machine learning techniques being applied on the data, such as the unsupervised clustering algorithm earlier. 
+
