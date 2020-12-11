@@ -123,6 +123,15 @@ The dataset contains some information about computers, with the dependant variab
     </item>
     
     <item>
+      <title>Poetry Classification with KNNs</title>
+      <link>/blog/poems/</link>
+      <pubDate>Mon, 01 Jan 0001 00:00:00 +0000</pubDate>
+      
+      <guid>/blog/poems/</guid>
+      <description>IntroductionThe following is an exercise in multi-class text classification, with the data comprising of various poems. The poems in this project are classified according to their category type: love, nature, and mythology &amp;amp; folklore. K-nearest neighbours (KNN) is the machine learning algorithm used here for classification. While there are more robust algorithms available, KNN was selected due to its advantages for being quite simple to understand and implement. It also does not require any assumptions about the data, and can therefore be used on classes that are not linearly separable as well, which is quite likely the case with text data.</description>
+    </item>
+    
+    <item>
       <title>Predicting Forest Fires with Regressions</title>
       <link>/blog/forest-fires/</link>
       <pubDate>Mon, 01 Jan 0001 00:00:00 +0000</pubDate>

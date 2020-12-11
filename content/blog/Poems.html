@@ -1,0 +1,210 @@
+---
+title: "Poetry Classification with KNNs"
+output: html_notebook
+---
+
+
+
+<div id="introduction" class="section level3">
+<h3>Introduction</h3>
+<p>The following is an exercise in multi-class text classification, with the data comprising of various poems. The poems in this project are classified according to their category type: love, nature, and mythology &amp; folklore. K-nearest neighbours (KNN) is the machine learning algorithm used here for classification. While there are more robust algorithms available, KNN was selected due to its advantages for being quite simple to understand and implement. It also does not require any assumptions about the data, and can therefore be used on classes that are not linearly separable as well, which is quite likely the case with text data. Tuning the KNN model is also simpler compared to some more advanced models, with usually only 2 important parameters that require tuning: k (the number of neighbours to consider) and metric (the distance measure used).</p>
+<p>The data was freely obtained from <a href="https://www.kaggle.com/ultrajack/modern-renaissance-poetry" class="uri">https://www.kaggle.com/ultrajack/modern-renaissance-poetry</a>. Python was used for this analysis. Before progressing forward, the required libraries and data are loaded.</p>
+<pre class="python"><code>#Libraries
+import nltk
+import re
+import pandas as pd
+import numpy as np
+import warnings
+from sklearn.feature_extraction.text import TfidfVectorizer
+import matplotlib.pyplot as plt
+from wordcloud import WordCloud
+from sklearn.model_selection import train_test_split
+import seaborn as sns
+from sklearn.neighbors import KNeighborsClassifier
+from sklearn.metrics import accuracy_score
+from sklearn.model_selection import GridSearchCV
+from sklearn.metrics import plot_confusion_matrix
+
+#Loading data
+poems = pd.read_csv(&#39;/content/drive/MyDrive/Poems project/poems.csv&#39;)</code></pre>
+</div>
+<div id="data-exploration" class="section level3">
+<h3>Data Exploration</h3>
+<p>The data comprises of 573 different poems, classified by the author, the poem name, the age and the type. This amounts to a total of 5 columns in the dataframe (including the poems themselves). As the poem names are most likely unique to each poem, it is unlikely that this feature will provide any useful analytic value further on. However, the other features can be explored. It should be noted that there is absolutely no numeric data in this dataset.</p>
+<p>The table and plot below explore the author name feature. Poems from 67 authors are used here, with the distribution of the number of poems from each author being highly uneven. The table of the top 10 authors with the most poems in this data show the highest number of 71 poems going to William Shakespeare, followed by Sir Philip Sidney by quite a large margin. Already a potential problem of imbalanced data can be seen. The plot provides a view of the number of poems by all the present authors. It can be seen that only the top 6 have more than 20 poems, while the rest of the 61 have less than 20. If the writing style of each author were to be considered, it should be taken into account that the data is heavily skewed towards the styles of the top 6 authors, whose poems account for about 41% of the entire dataset.</p>
+<pre class="python"><code>#Top 10 authors with most poems
+poems[&#39;author&#39;].value_counts().head(10)
+
+#Plot for number of poems by each author
+plt.figure(figsize=(14,4))
+plt.bar(poems[&#39;author&#39;].unique(),
+        poems[&#39;author&#39;].value_counts())
+plt.xticks(poems[&#39;author&#39;].unique(), rotation = 90)
+plt.show()</code></pre>
+<p><img src="/images/author-count.png" /></p>
+<p><img src="/images/author-count-chart.png" /></p>
+<p>The next plot visualizes the distribution of the target classes, which are the three categories/types of poems present in the data. Once again the problem of imbalanced data is highlighted, with the number of poems in the love category accounting for over half of the total number of poems present. In comparison, mythology &amp; folklore poems are severely outnumbered. The problem of fixing this class imbalance is a bit complex in this specific case due to all the data being in text. This rules out any synthetic data generation techniques that can be used. Under-sampling can be a potential option, but given the nature of the imbalance, the under-sampling would be very aggressive, and could lead to too little data being left. The only viable and robust option here to solve the imbalanced data problems is to just get more data related to the required class.</p>
+<pre class="python"><code>#Poem type plot
+plt.figure(figsize=(10,8))
+sns.countplot(y = poems[&#39;type&#39;])
+sns.despine()</code></pre>
+<p><img src="/images/type-count-chart.png" /></p>
+<p>The plot below visualizes how the poems are distributed between the the two ages: Renaissance and Modern. While an imbalance exists here as well, it is not as severe as the other features, with poems written in the Renaissance period being only about 50 more than Modern era poems.</p>
+<pre class="python"><code>#Poem age plot
+plt.figure(figsize=(10,8))
+sns.countplot(y = poems[&#39;age&#39;])
+sns.despine()</code></pre>
+<p><img src="/images/age-count-chart.png" /></p>
+<p>An interesting combination to explore is how the poem types are distributed between the two ages. The plot below shows mythology &amp; folklore still being the lowest in both ages (although this may only be due to a lack of data). However, the Renaissance period appears to be vastly dominated by love poems, whereas the Modern era has a majority of poems related to the nature category.</p>
+<pre class="python"><code>#Poem age/type plot
+plt.figure(figsize=(10,8))
+sns.countplot(y = poems[&#39;age&#39;], hue = poems[&#39;type&#39;])
+sns.despine()</code></pre>
+<p><img src="/images/age-type-chart.png" /></p>
+<p>Finally, the poems themselves are explored. As it is text data, a useful and well known illustration that is used here is the wordcloud, which highlights the most frequently used words. Three wordclouds are plotted, related to each of the three poem types/categories. An interesting observation from the wordclouds is how there appears to be a greater cluster of words in mythology &amp; folklore, despite all three having the same limit of a maximum of the top 300 most commonly occurring words. This can imply that high frequency words are more evenly distributed within mythology &amp; folklore poems, compared to the other 2 categories which have a fewer selection of words occurring quite frequently. Perhaps this is because mythology &amp; folklore may be more diverse, while love and nature would tend to follow more restricted and common themes.</p>
+<pre class="python"><code>#Filter out stop words
+nltk.download(&#39;stopwords&#39;)
+stop_words = set(nltk.corpus.stopwords.words(&#39;english&#39;))
+
+#splitting poems by type
+poems_love = poems[poems[&#39;type&#39;] == &#39;Love&#39;]
+poems_nature = poems[poems[&#39;type&#39;] == &#39;Nature&#39;]
+poems_myth = poems[poems[&#39;type&#39;] == &#39;Mythology &amp; Folklore&#39;]
+
+#wordcloud for love
+wordcloud = WordCloud(
+    stopwords = stop_words,
+    max_words = 300,
+    random_state = 123,
+    max_font_size = 35
+).generate(str(poems_love[&#39;content&#39;]))
+
+plt.figure(figsize=(12,8))
+plt.imshow(wordcloud)
+plt.axis(&#39;off&#39;)
+plt.title(&#39;Love&#39;)
+plt.show()
+
+#wordcloud for nature
+wordcloud = WordCloud(
+    stopwords = stop_words,
+    max_words = 300,
+    random_state = 123,
+    max_font_size = 35
+).generate(str(poems_nature[&#39;content&#39;]))
+
+plt.figure(figsize=(12,8))
+plt.imshow(wordcloud)
+plt.axis(&#39;off&#39;)
+plt.title(&#39;Nature&#39;)
+plt.show()
+
+#wordcloud for mythology &amp; folklore
+wordcloud = WordCloud(
+    stopwords = stop_words,
+    max_words = 300,
+    random_state = 123,
+    max_font_size = 35
+).generate(str(poems_myth[&#39;content&#39;]))
+
+plt.figure(figsize=(12,8))
+plt.imshow(wordcloud)
+plt.axis(&#39;off&#39;)
+plt.title(&#39;Mythology and Folklore&#39;)
+plt.show()</code></pre>
+<p><img src="/images/love-wordcloud.png" />
+<img src="/images/nature-wordcloud.png" />
+<img src="/images/myth-wordcloud.png" /></p>
+</div>
+<div id="data-preprocessing" class="section level3">
+<h3>Data Preprocessing</h3>
+<p>Before applying the KNN model, the model needs to be preprocessed. Initially, unwanted feature are removed, leaving only the actual poems themselves and their type.</p>
+<pre class="python"><code>#Removing unwanted features
+poems = poems.drop([&#39;author&#39;, &#39;poem name&#39;, &#39;age&#39;], axis = 1)
+
+#A glimpse of the data
+poems.head()</code></pre>
+<p><img src="/images/poems-cut-head.png" /></p>
+<p>Next, the data is split into feature (poems) and target (type). Training and testing data is then created (70-30 split) before further text processing to avoid any data leakage.</p>
+<pre class="python"><code>#Feature/target split
+X = poems[&#39;content&#39;]
+y = poems[&#39;type&#39;]
+
+#Train/test split
+X_train, X_test, y_train, y_test = train_test_split(X, y, test_size = 0.3, random_state = 1234)</code></pre>
+<p>After splitting, the poems can now be processed further to make them suitable for applying a machine learning model. Functions are created to carry out the following steps on the text: convert everything to lower case, remove numbers, tokenize the text, remove punctuation, and remove stopwords. All these steps are carried out to reduce the amount of redundant information present in the text, leaving behind only relevant data that can be used for analysis. The functions are run on the training and test sets of the feature data. The final step is to vectorize the text data, or in other words convert the text into a numerical format. Among the different methods available, the TFIDF vectorizing method is chosen here. TDIDF (term frequency inverse document frequency) assigns a numeric value to each term based not only on their absolute frequency but also adjusts for the terms’ importance based on how frequently the term occurs across different text documents (different poems in this case). No adjustments are needed for the target variable as the variables will already be considered as categorical classes once the model is run. All these steps are carried out in the code chunk below.</p>
+<pre class="python"><code>#Process text data
+stop_words = set(nltk.corpus.stopwords.words(&#39;english&#39;))
+def remove_stopwords(tokens):
+    return [word for word in tokens if word not in stop_words]
+
+def process_text(text):
+    #everything to lower case
+    text = text.lower()
+    #remove numbers
+    text = re.sub(r&#39;\d+&#39;,&#39;&#39;,text)
+    #tokenize and remove punctuation
+    token = nltk.tokenize.RegexpTokenizer(r&#39;\w+&#39;)
+    text = token.tokenize(text)
+    #remove stop words
+    text = remove_stopwords(text)
+    #return text
+    return text
+    
+X_train = pd.Series(process_text(x) for x in X_train)
+X_test = pd.Series(process_text(x) for x in X_test)
+
+#TFIDF vectorizer
+vect = TfidfVectorizer()
+vect.fit(poems[&#39;content&#39;])
+x_train = vect.transform(X_train.apply(lambda x: &#39; &#39;.join(x)))
+x_test = vect.transform(X_test.apply(lambda x: &#39; &#39;.join(x)))</code></pre>
+</div>
+<div id="knn-classifier" class="section level3">
+<h3>KNN Classifier</h3>
+<p>Now that the texts have been processed and converted into suitable formats, the KNN model can be applied for classification. Two variants of the KNN will applied here. First, an initial model with default parameter settings will be applied to provide a benchmark performance. Following this, a more robust grid search approach will be used, testing various parameter values to find the best parameter settings which leads to maximum accuracy performance.</p>
+<pre class="python"><code>#Benchmark knn model
+knn = KNeighborsClassifier()
+knn.fit(x_train, y_train)
+y_pred_knn = knn.predict(x_test)
+
+knn_acc = accuracy_score(y_test, y_pred_knn)
+knn_acc</code></pre>
+<p><img src="/images/knn-acc.png" />
+The benchmark model’s accuracy score is noted to be about 69%. The grid search model is run next. Three parameters are being tuned here. For k (number of neighbours), values ranging from 2 to 30 are used to find the optimal k value. Weights refers to how the neighbours are treated in terms of importance, with uniform meaning equal importance, and distance meaning higher importance to neighbours with lower distances. The third parameter is the metric, which is simply selecting the better method for calculating the distances (in this case a choice of Euclidean or Manhattan distance measures).</p>
+<pre class="python"><code>#Grid search knn model
+grid_params = {
+    &#39;n_neighbors&#39; : list(range(2,31,1)),
+    &#39;weights&#39; : [&#39;uniform&#39;, &#39;distance&#39;],
+    &#39;metric&#39; : [&#39;euclidean&#39;, &#39;manhattan&#39;]
+}
+
+grid_knn  = GridSearchCV(KNeighborsClassifier(),
+                            grid_params, cv = 10)
+
+grid_knn.fit(x_train, y_train)
+y_pred_gridknn = grid_knn.predict(x_test)
+
+grid_acc = accuracy_score(y_test, y_pred_gridknn)
+grid_acc</code></pre>
+<p><img src="/images/knn-grid-acc.png" /></p>
+<p>The grid search has yielded an accuracy of about 73%, which is higher than the benchmark KNN model. The best parameters selected by the grid search are shown below.</p>
+<pre class="python"><code>#Grid parameters knn model
+grid_knn.best_params_</code></pre>
+<p><img src="/images/knn-grid-params.png" /></p>
+<p>However, simply relying on accuracy would hide key information about how the models are actually performing. To provide more detailed information about both the models, confusion matrices are plotted below.</p>
+<pre class="python"><code>#Benchmark matrix
+plot_confusion_matrix(knn, x_test, y_test)
+plt.show()
+
+#Grid matrix
+plot_confusion_matrix(grid_knn, x_test, y_test)
+plt.show()</code></pre>
+<p><img src="/images/knn-matrix.png" /></p>
+<p><img src="/images/grid-knn-matrix.png" /></p>
+<p>The confusion matrices provide some useful information impacting the performance of the models. Both models were able to classify love poems with the highest success. However, a lot of nature poems seem to be predicted under the love category. Also, both models were unable to improve performance in correctly classifying mythology &amp; folklore, instead classifying a majority of these under the love category.</p>
+</div>
+<div id="conclusion" class="section level3">
+<h3>Conclusion</h3>
+<p>Depending on personal requirements, a 73% accuracy may be good or promising at the least. However, as mentioned earlier, there are certain aspects of the data which may be detrimental to the performance of the models. Assuming that the class imbalance is fixed by adding more data in the minority categories, it is possible that the model will avoid incorrectly categorizing mythology and nature under the love category, as shown in the confusion matrices. Including the age and author features may also help the model in performing better. Lastly, while models more robust and complex than KNN can be used on this data to improve accuracy, unless the inherent characteristics of the data are not improved themselves, the higher accuracy obtained by the more complex models may not be the most reliable, and could be prone to other problems such as overfitting.</p>
+</div>
