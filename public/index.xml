@@ -23,6 +23,15 @@
     </item>
     
     <item>
+      <title>Art and Machines - Experimenting with GANs</title>
+      <link>/blog/dcgan/</link>
+      <pubDate>Mon, 01 Jan 0001 00:00:00 +0000</pubDate>
+      
+      <guid>/blog/dcgan/</guid>
+      <description>IntroductionGenerative Adversarial Networks (GANs) are one of the more advanced forms of machine learning/deep learning models present. In short, a GAN is used to analyse a given set of training data in order to synthetically produce “fake” data that is highly similar to the original sample. This is done by using two models in the framework: a generator and a discriminator. The discriminator determines whether a given piece of data is fake or real, and the generator works to generate data that is good enough to fool the discriminator, hence creating plausible (even possibly perfect) synthetic data that would actually seem to be part of the training data.</description>
+    </item>
+    
+    <item>
       <title>Brent Oil Prices - Time Series with ML Models</title>
       <link>/blog/brent-oil/</link>
       <pubDate>Mon, 01 Jan 0001 00:00:00 +0000</pubDate>

@@ -1,0 +1,137 @@
+---
+title: "Art and Machines - Experimenting with GANs"
+output: html_notebook
+---
+
+### Introduction
+
+Generative Adversarial Networks (GANs) are one of the more advanced forms of machine learning/deep learning models present. In short, a GAN is used to analyse a given set of training data in order to synthetically produce "fake" data that is highly similar to the original sample. This is done by using two models in the framework: a generator and a discriminator. The discriminator determines whether a given piece of data is fake or real, and the generator works to generate data that is good enough to fool the discriminator, hence creating plausible (even possibly perfect) synthetic data that would actually seem to be part of the training data.
+
+A specific variant of GANs is the Deep Convolutional GAN (DCGAN). The DCGAN utilises convolutional layers in its generator and discriminator models, similar to a regular Convolutional Neural Network. This enables the use case of GANs to be expanded in image data analysis and creation. A well known and regularly cited example is the creation of synthetic human faces based on a sample of real human pictures, with the synthetic images looking exactly like an actual human face would. This can be expanded further to generating other realistic images as well, such as those of animals or cartoons. 
+
+The common theme in the previously mentioned use cases is training the model to study the specific features of the sample data well enough to easily replicate those features into a new creation. This is easier to understand in cases like replicating features of a human face, where it is established that there are fixed features such as eyes, nose, hair, and so on. However, what happens in the case where such features are not as evidently clear? This project aims to experiment with the DCGAN framework to observe whether such a model can be trained to understand images with unclear features, in this case the images being abstract art pieces. A benchmark model will be run, followed by 2 further versions of the model after conducting hyperparameter tuning and other changes to observe how the results differ, and what challenges the model faces with such datasets. 
+
+In short, the question this project tries to answer is: can a machine create art?
+
+As a side note, since art is very subjective, it really entirely depends on the individual on what can be considered good or bad art (or what can be considered art at all), especially with abstract pieces. However, an objectively reasonable judgement can be made based on comparing the sample data and the synthetic images on what generated image piece can be considered "bad" or "good" art. 
+
+
+### Data Collection
+
+A total of 1098 abstract art images are used as a training dataset. The data was collected using a Python web scraper found on Github to scrape Google Images Data. The link to the scraper can be found [here](https://github.com/jazir/ImageScraper). Credit goes to the original creator of the scraper. A sample of the scraped images is shown below. 
+
+![](/images/sample.png)
+
+The sample indicates variety within the abstract art styles as well. For instance, some pieces follow a geometric art style, with clear distinct shapes being visible. Others include a blend of reality, such as the human face painted in an abstract manner. A common theme that can be seen is the strong contrasting use of color in almost every piece, which makes that image stand out. Perhaps the DCGAN will be able to detect this contrast as a useful feature. 
+
+### DCGAN Model and Hyperparameters 
+
+The DCGAN model used in this project is based on the model developed by the paper [Unsupervised Representation Learning with Deep Convolutional Generative Adversarial Networks (Radford et. al.)](https://arxiv.org/pdf/1511.06434.pdf). An implementation of this model using the suggested parameters to generate celebrity images is present on the original PyTorch tutorial [website](https://pytorch.org/tutorials/beginner/dcgan_faces_tutorial.html). As most of the code is copied from the mentioned tutorial, there is no point in rewriting all of it here. Only specific parts of the code that were adjusted during parameter tuning will be shown. 
+
+The area where the most alterations are made compared to the original code are in the hyperparameters, as shown below. Compared to the original, the only change made to the parameters in the first test run was to batch_size. The original uses 128 as a batch size, but is reduced to 64 in this project to account for the comparatively smaller sample size. Batch size can be defined as the number of samples used from the training dataset in a single training iteration of the model. Depending on the size of the training sample, a lower batch size is preferable as the the model will be able to generalize better across different segments of the sample during training. However, a correct balance needs to be found as a batch size too low can result in excessive computation time.
+
+```{python, engine.path = 'C:\\Users\\faiza\\Anaconda3\\python.exe', eval = FALSE}
+#defining some initial variables (for the first run)
+root = '/content/drive/MyDrive/Abstract Art Samples' #data directory
+batch_size = 64 #batch size for training
+image_size = 64 #image resize
+nc = 3 #color channels RGB
+nz = 100 #generator input size
+ngf = 64 #feature maps generator
+ndf = 64 #feature maps discriminator
+epochs = 100 #epochs
+lr = 0.0002 #learning rate
+beta1 = 0.5 #beta parameter for adam optimizer
+
+```
+
+The other hyperparameters that were tuned and differ from the original code are: 
+
+- Learning rate: This hyperparameter is used by an optimizing algorithm which determines by how much the weights of the model are updated with respect to the loss gradient. In other words, it defines how quickly the model is trying to learn from its past mistakes. If the learning rate is set too low, the computation time is too high and the model may even get stuck. However, if the learning rate is set too high, the model will update too quickly and even fail to find an optimal solution entirely.
+
+- Beta1 (Adam optimizer): Adam is a commonly used and well performing optimizing algorithm used in minimizing the loss of a model. A part of Adam utilises moving average calculations (momentum) of the gradient changes. Beta1 is the hyperparameter that controls this moving average. A higher value of beta1 (for example the default recommended 0.9) means that more previous gradient values are being incorporated in the moving average calculation. A lower value of beta1 implies more of the previous gradients being ‘forgotten’ (not included in the moving average calculation). In tuning, it is important to note that beta values and the learning rates interact with each other to determine the final change in weights. In the original code, the authors differ from the recommended 0.9 beta1 value to a lower 0.5 value, as this led to more stable results.
+
+Additional changes to the original are discussed further with each version. 
+
+### Version 1 (benchmark)
+
+To create a benchmark performance, apart from changing the batch_size variable, the original is run as it is on the abstract art samples. It is expected that even though the model performs well for creating celebrity faces, it may not do so well with abstract art samples. Nevertheless, the model is run first for a 100 epochs, with the results shown below. 
+
+![](/images/100-epochs-result.png)
+
+![](/images/100-epoch-GD-loss.png)
+
+These results are not very promising about the performance. While the losses of the discriminator and the generator seem to reach an equilibrium in terms of direction, the differences between the two is quite large compared to well performing DCGAN models. Also, it can be observed from the generated images that the generator is tending to repeat itself. To confirm whether the model is indeed performing poorly, it is run again over a 1000 epochs. 
+
+![](/images/1000-epochs-result.png)
+
+![](/images/1000-epochs-GD-loss.png)
+
+This confirms that the original model has indeed completely failed over the abstract art samples. Specifically, the repetition in the generated images is now much more clear, implying the existence of mode collapse. Simply put, mode collapse occurs when the generator is able to find a highly plausible output that is enough to repeatedly fool the discriminator, thus leading to the generator always producing that output instead of a variety of different outputs which is more desirable. Along with this, the generators losses are completely all over the place in later iterations. These results suggest that the overall model has failed to effectively learn the characteristics of the training data.
+
+To improve this performance, hyperparameters are tuned and version 2 of this model is run. 
+
+### Version 2
+
+In an effort to improve model performance, the following changes are made:
+
+- The batch size is reduced from 64 to 32, allowing the model the chance to generalize better. 
+- Beta1 is reduced from 0.5 to 0.2. This is done based on the how the authors of the paper mentioned earlier found more stable results at a lower beta1 value. Perhaps given this data, the model may stabilise at an even lower beta1 value by changing the rate at which the weights and biases are being optimised. 
+- Leaky ReLU: ReLU on its own is an activation function used frequently in CNN problems due it being less computationally expensive and leads to faster evaluations, while also being suitable for introducing non-linearity as is usually the case with complex data such as images. However, ReLU has a weakness known as “dying ReLU”, which simply implies that once a neuron is considered inactive, it is unlikely that over time such neurons will be useful as the ReLU will not be able to produce a slope for the neuron to be active. This is especially the case if there is a negative bias present in the network. 'Dying ReLU' can effectively lead to a model where majority of the neurons are completely inactive and not contributing anything. To prevent the creation of useless neurons and perhaps improve performance, Leaky ReLU is used in the generator as well (as opposed to normal ReLU) to allow a small negative slope for this potential negative bias. This adjustment is shown in the code block for the generator below:
+
+```{python, engine.path = 'C:\\Users\\faiza\\Anaconda3\\python.exe', eval = FALSE}
+# Generator Code
+class Generator(nn.Module):
+    def __init__(self):
+        super(Generator, self).__init__()
+        self.main = nn.Sequential(
+            # input is Z, going into a convolution
+            nn.ConvTranspose2d( nz, ngf * 8, 4, 1, 0, bias=False),
+            nn.BatchNorm2d(ngf * 8),
+            nn.LeakyReLU(0.2, inplace=True),
+            # state size. (ngf*8) x 4 x 4
+            nn.ConvTranspose2d(ngf * 8, ngf * 4, 4, 2, 1, bias=False),
+            nn.BatchNorm2d(ngf * 4),
+            nn.LeakyReLU(0.2, inplace=True),
+            # state size. (ngf*4) x 8 x 8
+            nn.ConvTranspose2d( ngf * 4, ngf * 2, 4, 2, 1, bias=False),
+            nn.BatchNorm2d(ngf * 2),
+            nn.LeakyReLU(0.2, inplace=True),
+            # state size. (ngf*2) x 16 x 16
+            nn.ConvTranspose2d( ngf * 2, ngf, 4, 2, 1, bias=False),
+            nn.BatchNorm2d(ngf),
+            nn.LeakyReLU(0.2, inplace=True),
+            # state size. (ngf) x 32 x 32
+            nn.ConvTranspose2d( ngf, nc, 4, 2, 1, bias=False),
+            nn.Tanh()
+            # state size. (nc) x 64 x 64
+        )
+
+    def forward(self, input):
+        return self.main(input)
+```
+
+No other changes were made to any of the other parameters or the discriminator model. The new version of the model is then run for a 100 epochs, with the results shown below.
+
+![](/images/100-epochs-result-iter2.png)
+
+![](/images/100-epoch-GD-loss-iter2.png)
+
+A much improved performance can be seen for this version of the model. During initial iterations, the loss difference between discriminator and generator is significantly reduced and is more in line with what the chart looks like for successful models. The discriminator loss improves in later iterations, indicating that it is performing well in detecting which image is real and which is fake. The impact of mode collapse seems to be significantly reduced, as there is a larger variety of images being produced. It also seems the the model has grasped the idea of incorporating contrasting colors. However, there are still deficiencies present in the model. Some images fail to render any kind of color or discernible picture, instead producing only a kind of blank blur. Along with this, the losses of the generator and the discriminator start to lose their convergence along later iterations, indicating a lack of equilibrium between the two. 
+
+### Version 3
+
+In the final version of this model, the learning rate is slightly increased to 0.0005 instead of 0.0002, and the results are noted below (again for a 100 epochs).
+
+![](/images/100-epochs-result-iter3.png)
+
+![](/images/100-epoch-GD-loss-iter3.png)
+
+The results of this version are similar to those of version 2. During initial iterations, the loss of the generator appears to be doing well. The images again indicate the presence of variety, and in fact almost all the generated in version 3 have some sort of color contrast present in the images. However, in terms of loss, the convergence between the discriminator and generator is even worse during later iterations, indicating that the model is unable to find an equilibrium between the two. Also, while the results are more colorful, and some of the generated images might actually even be considered potentially good abstract pieces (again completely subjective and depends on the individual), there is still a hint of repetition from the generator, and some images are completely lacking any kind of discernible feature or form at all, especially if compared to the original samples.
+
+### So, can a machine create art?
+
+Well, the answer to this is not completely straightforward. DCGANs are capable of many great things, and tuning the hyperparameters accordingly can provide good results (even though GANs are notoriously difficult to tune). In the above example, better performance can be achieved with a larger sample size (10000 images instead of a 1000). Perhaps adding a couple of additional layers to both the generator and discriminator could allow the model to capture even more intricate features, such as the presence of geometry in some of the samples. However, the more broad question is whether the model would be able to capture the 'human' element in art, especially in such abstract forms. As mentioned earlier, art in itself is very subjective in nature, and unlike data such as human or animal faces, the features of art pieces vary quite significantly from each other. It is already shown that an abstract construction of different colors and lines is possible by the machine The question therefore should be: can the machine replicate the exact properties that make such an image be considered 'a work of art'?
+
+Food for thought. 
+
