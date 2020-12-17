@@ -32,6 +32,15 @@
     </item>
     
     <item>
+      <title>Art and Machines - Neural Style Transfer</title>
+      <link>/blog/neuralstyle/</link>
+      <pubDate>Mon, 01 Jan 0001 00:00:00 +0000</pubDate>
+      
+      <guid>/blog/neuralstyle/</guid>
+      <description>IntroductionThe aim of this post is to explain the overall process of neural style transfer as simply as possible, while avoiding technical jargon unless necessary. This is done so that an individual who is not well versed in machine learning and data analytic techniques is also able to appreciate and understand the unique nature of this deep learning method, and its potential implications. The technique was introduced in the paper A Neural Algorithm of Artistic Style (Gatys et.</description>
+    </item>
+    
+    <item>
       <title>Brent Oil Prices - Time Series with ML Models</title>
       <link>/blog/brent-oil/</link>
       <pubDate>Mon, 01 Jan 0001 00:00:00 +0000</pubDate>

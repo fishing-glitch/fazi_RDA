@@ -1,0 +1,246 @@
+---
+title: "Art and Machines - Neural Style Transfer"
+output: html_notebook
+---
+
+
+
+<div id="introduction" class="section level3">
+<h3>Introduction</h3>
+<p>The aim of this post is to explain the overall process of neural style transfer as simply as possible, while avoiding technical jargon unless necessary. This is done so that an individual who is not well versed in machine learning and data analytic techniques is also able to appreciate and understand the unique nature of this deep learning method, and its potential implications. The technique was introduced in the paper <a href="https://arxiv.org/pdf/1508.06576.pdf">A Neural Algorithm of Artistic Style (Gatys et. al.)</a>. This post is written based on reading the aforementioned paper itself, and by following along the excellent <a href="https://pytorch.org/tutorials/advanced/neural_style_tutorial.html">PyTorch tutorial</a> where the technique is implemented in Python code. This post first provides an overall simple explanation of the style transfer process. Following this, the code in the PyTorch tutorial is used as an example to demonstrate how the technique works. A simple explanation before each major code step is written to create an overall understanding of how the model is built and progresses. Credit to the original author of the code tutorial, which can be seen via the link mentioned earlier.</p>
+</div>
+<div id="what-is-neural-style-transfer" class="section level3">
+<h3>What is Neural Style Transfer?</h3>
+<p>To summarise neural style transfer in one sentence: it utilises deep learning principles to combine the objects (subject matter) of one image with the ‘style’ (or texture) of another image to create a new image showing both characteristics. An example of this is illustrated below:</p>
+<p><img src="/images/sample-transfer.png" /></p>
+<p>When deep learning models are used for image processing and classification, a Convolutional Neural Network (CNN) is the most frequently used infrastructure. In a normal image classification task, the CNN is trained to recognise and learn certain objects or characteristics from an image using filters on the pixels of the images. Once the model is able to learn these characteristics, it will be able to correctly classify a new image by applying what it has learned and identifying the same or similar characteristics in new images. Generally, while there are other aspects to an image apart from only the subject(s), further along the CNN process more emphasis is placed on these subject(s) as opposed to other components. Therefore, this can be used to extract mostly subject related data from an image, which forms half of the requirement for a neural style transfer to take place. In the illustrated example above, this would be detecting objects such as the lotus flower in the left image (while ignoring things like color, white balance etc).</p>
+<p>The challenge then arises on how to capture the style or texture of an image. In a CNN, when a filter is applied on a set of pixels of an image, the output through that filter is called a feature map. Normally in a CNN model there are a number of different layers and filters being applied, therefore resulting in a number of feature maps being created. However, in order to shift the focus of the model away from subject recognition and more towards style recognition, correlations between the created feature maps are also included in the model. When these correlations are included in a CNN model, the model is able to capture texture/style instead of the actual subjects in an image. This is particularly useful in analysing the characteristics of paintings, such as the middle image in the above example. Similar to a normal CNN, further along this modified CNN more emphasis is placed on capturing the style of the image.</p>
+<p>The main and most important finding by the authors of the mentioned paper is that by using CNNs, the style and content of an image (two different characteristics of a single image) can be separated and extracted. Therefore, if the subject of one image and the style of another image can be extracted, both these characteristics can be combined to form a new image, which in the illustrated example above is the image on the right. This process of extracting and combining is currently known as neural style transfer. It should be noted that while the extraction and combination is almost impossible to be perfect, the trade-off between more style or more subject matter can be regulated during the modelling process to create a new image that has the desirable quantity of both characteristics.</p>
+</div>
+<div id="pytorch-implementation" class="section level3">
+<h3>PyTorch Implementation</h3>
+<p>Following an overview of the concept, this section will now explore the style transfer process by going over an implemented code example. This will also introduce some specific details that need to be considered during implementation.</p>
+<pre class="python"><code>#libraries
+from __future__ import print_function
+import torch
+import torch.nn as nn
+import torch.nn.functional as F
+import torch.optim as optim
+from PIL import Image
+import matplotlib.pyplot as plt
+import torchvision.transforms as transforms
+import torchvision.models as models
+import copy
+
+#set device to gpu if available
+device = torch.device(&quot;cuda&quot; if torch.cuda.is_available() else &quot;cpu&quot;)</code></pre>
+<p>The primary principle involves using three images. One image is used to provide the content (subjects). This is labelled as the content image. The second image is used to provide the style, and is labelled as the style image. A third image is then used upon which the combination of style and content will be applied. This input image can either be the same as the content image, or white noise. In the tutorial, the input image and content image are the same, but here white noise will be used as an input image just to appreciate how well the process works in combining style and content. This combination on the input image takes place by minimizing two differences: the difference in content with the content image, and the difference in style with the style image.</p>
+<p>The content and style images are loaded and resized to have the same dimensions. The input image will be loaded later. Here the style image is an abstract art painting and the content image is a bison walking in snow.</p>
+<pre class="python"><code>#load and resize images
+imsize = 512 
+loader = transforms.Compose([transforms.Resize(imsize),
+                             transforms.ToTensor()])
+
+def image_loader(image_name):
+  image = Image.open(image_name)
+  image = loader(image).unsqueeze(0)
+  return image.to(device, torch.float)
+
+style_img = image_loader(&#39;/content/drive/MyDrive/Neural Style Transfer/abstract2.jpg&#39;)
+content_img = image_loader(&#39;/content/drive/MyDrive/Neural Style Transfer/WinterBison.jpg&#39;)
+
+#display images
+unloader = transforms.ToPILImage()
+plt.ion()
+def imshow(tensor, title = None):
+  image = tensor.cpu().clone()
+  image = image.squeeze(0)
+  image = unloader(image)
+  plt.imshow(image)
+  if title is not None:
+    plt.title(title)
+  plt.pause(0.001)
+
+plt.figure(figsize=(10,10))
+imshow(style_img, title = &#39;Style Image&#39;)
+
+plt.figure(figsize=(10,10))
+imshow(content_img, title = &#39;Content Image&#39;)</code></pre>
+<p><img src="/images/style.png" /></p>
+<p><img src="/images/content.png" /></p>
+<p>To compute the differences between content and style, two separate functions are created (one for each). Each incorporates a loss function that will provide a quantifiable measure for the required differences. It is important to note that in calculating the style difference, a function gram_matrix is included. This is the result of multiplying a matrix with its own transpose. This is included to incorporate the previously mentioned correlation aspect between feature maps in order to shift the model focus from object detection to style detection.</p>
+<pre class="python"><code>#measuring content difference
+class ContentLoss(nn.Module):
+
+  def __init__(self, target):
+    super(ContentLoss, self).__init__()
+    self.target = target.detach()
+
+  def forward(self, input):
+    self.loss = F.mse_loss(input, self.target)
+    return input
+
+#measuring style difference    
+def gram_matrix(input):
+  a,b,c,d = input.size()
+  features = input.view(a*b, c*d)
+  G = torch.mm(features, features.t())
+  return G.div(a*b*c*d)
+  
+class StyleLoss(nn.Module):
+
+  def __init__(self, target_feature):
+    super(StyleLoss, self).__init__()
+    self.target = gram_matrix(target_feature).detach()
+  
+  def forward(self, input):
+    G = gram_matrix(input)
+    self.loss = F.mse_loss(G, self.target)
+    return input</code></pre>
+<p>The paper uses a pre-trained freely available CNN model known as <a href="https://arxiv.org/abs/1409.1556">VGG-19</a>, which as the name suggests comprises of 19 layers. This is done to obtain the best possible results from a known high performing model that is able to reach the required depth in order to properly extract style and content.</p>
+<pre class="python"><code>#load vgg-19
+cnn = models.vgg19(pretrained=True).features.to(device).eval()
+
+#applying specific normalization to image channels required by vgg-19
+cnn_normalization_mean = torch.tensor([0.485, 0.456, 0.406]).to(device)
+cnn_normalization_std = torch.tensor([0.229, 0.224, 0.225]).to(device)
+
+class Normalization(nn.Module):
+    def __init__(self, mean, std):
+        super(Normalization, self).__init__()
+        self.mean = torch.tensor(mean).view(-1, 1, 1)
+        self.std = torch.tensor(std).view(-1, 1, 1)
+
+    def forward(self, img):
+        return (img - self.mean) / self.std</code></pre>
+<p>In PyTorch, the VGG model has two parts, a convolutional segment and a fully connected neural network for classifying. Here only the convolutional section will be needed as the outputs from the convolutional layers are needed to calculate the content and style differences. Once selected, the loss layers need to added correctly after their respective convolutional layers.</p>
+<pre class="python"><code>#incoporating loss layers in the required places
+content_layers_default = [&#39;conv_4&#39;]
+style_layers_default = [&#39;conv_1&#39;, &#39;conv_2&#39;, &#39;conv_3&#39;, &#39;conv_4&#39;, &#39;conv_5&#39;]
+
+def get_style_model_and_losses(cnn, normalization_mean, normalization_std,
+                               style_img, content_img,
+                               content_layers=content_layers_default,
+                               style_layers=style_layers_default):
+    cnn = copy.deepcopy(cnn)
+
+    normalization = Normalization(normalization_mean, normalization_std).to(device)
+
+    content_losses = []
+    style_losses = []
+
+    model = nn.Sequential(normalization)
+
+    i = 0  
+    for layer in cnn.children():
+        if isinstance(layer, nn.Conv2d):
+            i += 1
+            name = &#39;conv_{}&#39;.format(i)
+        elif isinstance(layer, nn.ReLU):
+            name = &#39;relu_{}&#39;.format(i)
+            layer = nn.ReLU(inplace=False)
+        elif isinstance(layer, nn.MaxPool2d):
+            name = &#39;pool_{}&#39;.format(i)
+        elif isinstance(layer, nn.BatchNorm2d):
+            name = &#39;bn_{}&#39;.format(i)
+        else:
+            raise RuntimeError(&#39;Unrecognized layer: {}&#39;.format(layer.__class__.__name__))
+
+        model.add_module(name, layer)
+
+        if name in content_layers:
+            target = model(content_img).detach()
+            content_loss = ContentLoss(target)
+            model.add_module(&quot;content_loss_{}&quot;.format(i), content_loss)
+            content_losses.append(content_loss)
+
+        if name in style_layers:
+            target_feature = model(style_img).detach()
+            style_loss = StyleLoss(target_feature)
+            model.add_module(&quot;style_loss_{}&quot;.format(i), style_loss)
+            style_losses.append(style_loss)
+
+    for i in range(len(model) - 1, -1, -1):
+        if isinstance(model[i], ContentLoss) or isinstance(model[i], StyleLoss):
+            break
+
+    model = model[:(i + 1)]
+
+    return model, style_losses, content_losses</code></pre>
+<p>The white noise image is then generated. This must have the same size/dimensions as the other two images.</p>
+<pre class="python"><code>#white noise
+input_img = torch.randn(content_img.data.size(), device=device)
+
+plt.figure(figsize=(10,10))
+imshow(input_img, title=&#39;Input Image&#39;)</code></pre>
+<p><img src="/images/input.png" /></p>
+<p>In order to minimize the loss functions (differences) while the model is being trained, an optimizing algorithm is required. Following the authors recommendation, the <a href="https://en.wikipedia.org/wiki/Limited-memory_BFGS">L-BFGS</a> optimizing algorithm is utilised.</p>
+<pre class="python"><code>#optimizing algorithm
+def get_input_optimizer(input_img):
+    optimizer = optim.LBFGS([input_img.requires_grad_()])
+    return optimizer</code></pre>
+<p>The last step defines a function which repeatedly inputs an updated input image after each iteration for a given number of steps until the loss functions (content and style differences) are minimized and the required result is produced. As different images were used by the tutorial, the weights assigned to style and content needed to be changed until the correct values were found which produce the optimal output. This of course will vary with the images used and the required result. The final output is shown below.</p>
+<pre class="python"><code>#minimizing function
+def run_style_transfer(cnn, normalization_mean, normalization_std,
+                       content_img, style_img, input_img, num_steps=300,
+                       style_weight=1000000, content_weight=3):
+    &quot;&quot;&quot;Run the style transfer.&quot;&quot;&quot;
+    print(&#39;Building the style transfer model..&#39;)
+    model, style_losses, content_losses = get_style_model_and_losses(cnn,
+        normalization_mean, normalization_std, style_img, content_img)
+    optimizer = get_input_optimizer(input_img)
+
+    print(&#39;Optimizing..&#39;)
+    run = [0]
+    while run[0] &lt;= num_steps:
+
+        def closure():
+            input_img.data.clamp_(0, 1)
+
+            optimizer.zero_grad()
+            model(input_img)
+            style_score = 0
+            content_score = 0
+
+            for sl in style_losses:
+                style_score += sl.loss
+            for cl in content_losses:
+                content_score += cl.loss
+
+            style_score *= style_weight
+            content_score *= content_weight
+
+            loss = style_score + content_score
+            loss.backward()
+
+            run[0] += 1
+            if run[0] % 50 == 0:
+                print(&quot;run {}:&quot;.format(run))
+                print(&#39;Style Loss : {:4f} Content Loss: {:4f}&#39;.format(
+                    style_score.item(), content_score.item()))
+                print()
+
+            return style_score + content_score
+
+        optimizer.step(closure)
+
+    input_img.data.clamp_(0, 1)
+
+    return input_img
+    
+#run function and show result
+output = run_style_transfer(cnn, cnn_normalization_mean, cnn_normalization_std,
+                            content_img, style_img, input_img)
+
+plt.figure(figsize=(10,10))
+imshow(output, title=&#39;Output Image&#39;)
+
+plt.ioff()
+plt.show()</code></pre>
+<p><img src="/images/new.png" /></p>
+</div>
+<div id="conclusion" class="section level3">
+<h3>Conclusion</h3>
+<p>There is currently no unanimous consensus over what concepts and features make something be considered a ’work of art. Perhaps this may be due to the subjective nature of art itself. Using even the most advanced machine learning technology to create an original work of art is a difficult task as first the machine needs to understand what are the components behind what makes something be considered art, and the further features that categorise art as either good or bad.</p>
+<p>Neural style transfer is a very unique way of understanding two specific components of an image - style and content. An algorithmic method that is capable of separating these two components of an image is simply a step closer to fully understanding how and why humans perceive and appreciate images the way they do. It provides a more objective insight into human vision and how the mind processes and categorises what the eyes see. This is therefore another step closer to understanding why art is considered, well, art.</p>
+</div>
