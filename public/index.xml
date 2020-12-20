@@ -78,6 +78,16 @@ The dataset contains some information about computers, with the dependant variab
     </item>
     
     <item>
+      <title>Dementia Classification - Interpreting models with LIME</title>
+      <link>/blog/dementia/</link>
+      <pubDate>Mon, 01 Jan 0001 00:00:00 +0000</pubDate>
+      
+      <guid>/blog/dementia/</guid>
+      <description>IntroductionThis is a fairly simple binary classification problem using data generated from MRI scans of the human brain. The data is provided by the Open Access Series of Imaging Studied (OASIS) to enable further research and discoveries in the neuroscience field. The dataset (https://www.kaggle.com/jboysen/mri-and-alzheimers) used in this specific project relates to longitudinal MRI data, with the following relevant features:
+Group: patient is either demented or non-demented (Target Variable)M.</description>
+    </item>
+    
+    <item>
       <title>Drugs and Memories - The impact of Interaction in Regressions</title>
       <link>/blog/drugs-and-memories/</link>
       <pubDate>Mon, 01 Jan 0001 00:00:00 +0000</pubDate>

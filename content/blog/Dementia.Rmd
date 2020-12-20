@@ -1,0 +1,237 @@
+---
+title: "Dementia Classification - Interpreting models with LIME"
+output: html_notebook
+---
+
+### Introduction
+
+This is a fairly simple binary classification problem using data generated from MRI scans of the human brain. The data is provided by the Open Access Series of Imaging Studied (OASIS) to enable further research and discoveries in the neuroscience field. The dataset (https://www.kaggle.com/jboysen/mri-and-alzheimers) used in this specific project relates to longitudinal MRI data, with the following relevant features:
+
+- Group: patient is either demented or non-demented (Target Variable)
+- M.F  : gender of patient (male or female)
+- Age  : age of patient
+- EDUC : number of years of education
+- SES  : socio-economic status (1 highest, 5 lowest)
+- MMSE : mini-mental state examination score (0 worst, 30 best)
+- eTIV : intracranial volume (estimated)
+- nWBV : whole-brain volume (normalized)
+- ASF  : atlas scaling factor
+
+Using the above features, the aim is to apply a machine learning model that performs well in classifying the existence or absence of dementia in a patient. Following this, the focus will shift towards interpreting the model itself. This implies developing a deeper understanding of how the model utilizes the features to generate predictions. Interpreting how a complex machine learning model works is an important aspect of the analysis workflow, as without a proper understanding the correct model cannot be adopted in the appropriate situation or business case. Alongside this, it is easier to trust the results of a model that is better understood than that which is not. The LIME algorithm will be used for interpreting the selected model.  
+
+The required libraries and data are loaded.
+
+```{r warning=FALSE, message=FALSE, fig.width=9, fig.height=7}
+#Libraries
+library(tidyverse)
+library(GGally)
+library(rsample)
+library(caret)
+library(ROCR)
+library(vip)
+library(lime)
+
+#Data
+longitudinal <- read.csv('oasis-longitudinal.csv')
+
+```
+
+### Data Processing
+
+Before progressing further with the analysis, the original data needs to be cleaned and processed a bit. Some original features not mentioned previously are removed as they have no impact or use on the analysis. These include the ID variables, whether the patient is right or left handed (they are all right handed, hence the removal), and the variable CDR. CDR refers to the Clinical Dementia Rating, measuring how severe the dementia case is from 0 (no dementia) to 3 (severe). This is removed as it conflicts with the Group variable as being a potential target since both variables identify whether dementia is present or not. Therefore, to keep things simple and maintain a binary problem, the Group variable is kept and the CDR variable is removed. 
+
+There are some observations in the Group variable labelled as 'Converted'. These refer to patients who were first categorised as non-demented but were later diagnosed with dementia. Therefore, all 'Converted' observations are relabelled as 'Demented', in line with the final diagnosis.
+
+As the Group and M.F variables are string type data, these are converted to factor data type to represent their categorical nature while making them suitable for model fitting.
+
+Lastly, there are 21 missing values in total in the SES and MMSE variables. These missing values are imputed with the mean of both the variables. All these processing steps are carried out in the code block below.
+
+```{r warning=FALSE, message=FALSE, fig.width=9, fig.height=7}
+#remove unwanted variables
+longitudinal <- longitudinal[, c(-1, -2, -4, -5, -7, -12)]
+
+#replace converted to demented in Group variable
+longitudinal[longitudinal == 'Converted'] <- 'Demented'
+
+#convert target and gender to factor
+longitudinal$Group <- as.factor(longitudinal$Group)
+longitudinal$M.F <- as.factor(longitudinal$M.F)
+
+
+#replace NA values with median of column
+longitudinal$SES[is.na(longitudinal$SES)] <- median(longitudinal$SES, na.rm = TRUE)
+longitudinal$MMSE[is.na(longitudinal$MMSE)] <- median(longitudinal$MMSE, na.rm = TRUE)
+```
+
+With the data clean, the next step is some simple data exploration.
+
+### Data Exploration
+
+From the summary statistics of the data below, it can be seen that the two classes (Demented and Nondemented) are almost equal, meaning there is no issue of class imbalance. There are also more female patients than male patients in the data. 
+
+```{r warning=FALSE, message=FALSE, fig.width=9, fig.height=7}
+pander::pander(summary(longitudinal), style='rmarkdown')
+```
+While there are more female patients than male, the plot below shows that male patients have a higher percentage of dementia occurrence than females, implying that males are more likely to be diagnosed with dementia. 
+
+```{r warning=FALSE, message=FALSE, fig.width=9, fig.height=7}
+#higher percentage of dementia in men than in women
+ggplot(longitudinal, aes(x = M.F)) +
+  geom_bar(aes(fill = Group), position = 'fill', color = 'black') +
+  ggtitle('Percentage Demented/Non-Demented by Gender') +
+  ylab("") +
+  scale_fill_manual(values = c("gray", "skyblue")) +
+  theme_minimal()
+```
+
+To capture how the diagnosis is distributed by age within each gender, box plots are shown below. The distributions appear to be very similar, with the only noticeable difference being seen in the median age of dementia cases in females, which is lower than the rest. 
+
+```{r warning=FALSE, message=FALSE, fig.width=9, fig.height=7}
+#greater age range of dementia among men than in women
+ggplot(longitudinal, aes(x = M.F, y = Age, fill = Group)) +
+  geom_boxplot() +
+  coord_flip() +
+  ggtitle("Boxplot Dementia Distribution by Age per Gender") +
+  scale_fill_manual(values = c("gray", "skyblue")) +
+  theme_minimal()
+```
+The numerical variables and their relationships with each other can the be explored with the matrix plot below. Three notable observations include the strong negative correlation between eTIV and ASF, the somewhat strong correlation between Age and nWBV, and the high negative skew of the MMSE variable. The strong correlation between eTIV and ASF means that one of these variables should be removed before proceeding further to avoid redundant information being present. The high negative skew of the MMSE variable means most of the patients were obtaining a high score on the mini-mental state examination. 
+
+```{r warning=FALSE, message=FALSE, fig.width=9, fig.height=7}
+ggpairs(longitudinal[,3:9])
+```
+
+### KNN and Random Forests
+
+With the data explored, the next stage is applying classification models. Two models have been selected, the KNN and Random Forest (RF) models. KNN is being used as a benchmark for performance, and it is expected that the RF model will produce the best results. The data is split into a 75/25 train-test split, and 10-fold repeated cross-validation is used as the resampling strategy. The ASF variable is also removed due to the correlation mentioned earlier. 
+
+```{r warning=FALSE, message=FALSE, fig.width=9, fig.height=7}
+#remove ASF
+longitudinal <- longitudinal[, -9]
+
+#train test split
+set.seed(1234)
+split <- initial_split(longitudinal, prop = 0.75)
+train <- training(split)
+test <- testing(split)
+
+#cross-validation
+cv <- trainControl(method = "repeatedcv",
+                   number = 10,
+                   repeats = 10)
+```
+
+The two models are then run with default parameter settings.
+
+```{r warning=FALSE, message=FALSE, fig.width=9, fig.height=7}
+#knn
+set.seed(1234)
+knn <- train(Group ~ ., 
+             data = train,
+             method = 'knn',
+             trControl = cv)
+
+#random forest
+set.seed(1234)
+rf <- train(Group ~ .,
+            data = train,
+            method = 'rf',
+            trControl = cv)
+```
+
+To visualize how well the models perform in this classification task, confusion matrices are plotted. The first matrix relates to the KNN model, while the second matrix relates to the RF model. 
+
+```{r warning=FALSE, message=FALSE, fig.width=9, fig.height=7}
+#confusion matrices
+
+knn_pred <- predict(knn, test)
+confusionMatrix(data = knn_pred,
+                reference = test$Group)
+
+rf_pred <- predict(rf, test)
+confusionMatrix(data = rf_pred,
+                reference = test$Group)
+```
+
+As expected, the RF model has performed significantly better than the KNN model, achieving the highest accuracy and Kappa score. The better performance of the RF can also be visualized using ROC curves, as the RF model has a larger area under the curve (AUC).
+```{r warning=FALSE, message=FALSE, fig.width=9, fig.height=7}
+#ROC
+
+pred_ROCR_knn <- prediction(as.numeric(knn_pred), as.numeric(test$Group))
+
+perf_ROCR_knn <- performance(pred_ROCR_knn, 
+                                measure = "tpr", x.measure = "fpr")
+
+
+pred_ROCR_rf <- prediction(as.numeric(rf_pred), as.numeric(test$Group))
+
+perf_ROCR_rf <- performance(pred_ROCR_rf, 
+                             measure = "tpr", x.measure = "fpr")
+
+plot(perf_ROCR_knn, col = "red", lty = 2)
+plot(perf_ROCR_rf, add = TRUE, col = "blue", lty = 3)
+legend(0.8, 0.2, legend = c("KNN", "RF"),
+       col = c("red", "blue"), lty = c(2, 3), cex = 1)
+
+```
+
+With the RF model being established as the better performing model, it can now be selected as the model to use for the next section dealing with model interpretation. 
+
+### Model Interpretation
+
+Within model interpretation, there are two categories that can be considered: global and local interpretation. In global interpretation, the entire relationship between the input features and the overall predictive outputs of the model is considered. In other words, global interpretation provides a more big picture focus on how the input features influence the entire model. An example of this can be the variable importance plot (vip) below. The vip shows how each of the input features weighed in on the predictions based on their importance. The vip below shows that the MMSE variable had the highest overall impact on the predictions, followed by nWBV and eTIV.
+
+```{r warning=FALSE, message=FALSE, fig.width=9, fig.height=7}
+#vip
+vip(rf) +
+  theme_minimal()
+```
+
+Global interpretation is good to provide an overall understanding, but what if this understanding is required at the level of individual predictions? In this case, local interpretation is used. Using local interpretation, the impact of the input feature on individual predictions can be visualized and understood. This is especially useful in cases where the models' performance on some specific input values needs to be understood. 
+
+One technique which helps to explain individual predictions is known as the Local Interpretable Model-agnostic Explanations (LIME) algorithm. Model agnostic means that it can be applied to any regression and classification model. LIME enables the creation of visualization similar to that of the vip above but for individual predictions instead. The algorithm essentially tries to fit a simple model for a single prediction that will mimic how the more complex model would operate on that same prediction. A more detailed explanation of how the algorithm works can be found [here](https://uc-r.github.io/lime).
+
+The plot below shows the output of four individual predictions (predicting the patient has dementia) from LIME.
+
+```{r warning=FALSE, message=FALSE, fig.width=9, fig.height=7}
+explain_rf <- lime(train, rf)
+
+set.seed(1234)
+explained_rf <- explain(
+  x = test[1:4,],
+  explainer = explain_rf,
+  n_permutations = 5000,
+  dist_fun = "gower",
+  kernel_width = 0.75,
+  n_features = 4,
+  labels = 'Demented'
+)
+
+plot_features(explained_rf)
+```
+
+From the above plot, probability refers to the probability of obtaining the "Demented" classification. This probability is influenced by the top 4 most influential features, with blue showing features positively influencing the probability and red showing features reducing the probability. For example, in case 17, MMSE <= 27 has the highest influence on achieving a "Demented" classification. The explanation fit can be considered as the level of confidence in LIMEs performance (similar to R-square in regressions). In the above cases the explanation fit values appear to be quite poor. 
+
+In order to improve the explanation fit values, the LIME model can be tuned. Specifically in this case, the simple model that is used by LIME is changed to be a Lasso Regression, and the distance measure used is set to Manhattan. The results of these changes are shown below. 
+
+```{r warning=FALSE, message=FALSE, fig.width=9, fig.height=7}
+set.seed(1234)
+explained_rf_tuned <- explain(
+  x = test[1:4,],
+  explainer = explain_rf,
+  n_permutations = 5000,
+  dist_fun = "manhattan",
+  kernel_width = 0.75,
+  n_features = 4,
+  labels = 'Demented',
+  feature_select = 'lasso_path'
+)
+
+plot_features(explained_rf_tuned)
+```
+
+An improvement in all of the cases can be observed. Overall, a higher level of confidence can now be placed on how specific features are influencing certain predictions based on the estimates provided by LIME. Further fine tuning of the algorithm, along with scaling and normalizing the numerical features of the data can potentially lead to better results. 
+
+### Conclusion
+
+Having run the LIME algorithm on the selected RF model, further decisions and discoveries can be made regarding which features are more influential in creating a prediction. Given the above example, a focus on model interpretation can particularly be useful in medical research for dementia as it can help further understand this already little understood disease. Along with LIME, there are other algorithms as well for model interpretation, such as Shapely values, which considers that predictions may be generated by features working together, thus potentially providing a more robust visual of each features contribution. Using such model interpretation techniques, further useful insights can be generated from an analytics project that would otherwise be lost.   
