@@ -1,0 +1,645 @@
+<!DOCTYPE html>
+<html lang="en-us">
+
+<head>
+  <title>OkCupid Online Dating Profiles - Visualizing the differences/similarities between men and women | Fazi_RDA</title>
+
+  <meta charset="UTF-8">
+  <meta name="language" content="en">
+  <meta name="description" content="">
+  <meta name="keywords" content="">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta http-equiv="content-type" content="text/html; charset=utf-8">
+  <meta http-equiv="X-UA-Compatible" content="IE=edge">
+
+  
+  
+
+  <link rel="shortcut icon" type="image/png" href="/favicon.ico" />
+
+  
+  
+    
+ 
+  
+  
+  
+  
+  
+  
+    
+    <link rel="stylesheet" href="/css/post.min.3b28d14676e4769849164baf362f2b0aa069ab25702fef98f0c4227cb68d74cd.css" integrity="sha256-OyjRRnbkdphJFkuvNi8rCqBpqyVwL&#43;&#43;Y8MQifLaNdM0="/>
+  
+    
+    <link rel="stylesheet" href="/css/custom.min.e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855.css" integrity="sha256-47DEQpj8HBSa&#43;/TImW&#43;5JCeuQeRkm5NMpJWZG3hSuFU="/>
+  
+  
+   
+   
+    
+
+<script type="application/ld+json">
+  
+    {
+      "@context" : "http://schema.org",
+      "@type" : "BlogPosting",
+      "mainEntityOfPage": {
+            "@type": "WebPage",
+            "@id": "\/"
+      },
+      "articleSection" : "blog",
+      "name" : "OkCupid Online Dating Profiles - Visualizing the differences\/similarities between men and women",
+      "headline" : "OkCupid Online Dating Profiles - Visualizing the differences\/similarities between men and women",
+      "description" : "",
+      "inLanguage" : "en-US",
+      "author" : "",
+      "creator" : "",
+      "publisher": "",
+      "accountablePerson" : "",
+      "copyrightHolder" : "",
+      "copyrightYear" : "0001",
+      "datePublished": "0001-01-01 00:00:00 \u002b0000 UTC",
+      "dateModified" : "0001-01-01 00:00:00 \u002b0000 UTC",
+      "url" : "\/blog\/okcupid\/",
+      "wordCount" : "2665",
+      "keywords" : ["Blog"]
+    }
+  
+  </script>
+</head>
+
+<body>
+  <div class="burger__container">
+  <div class="burger" aria-controls="navigation" aria-label="Menu">
+    <div class="burger__meat burger__meat--1"></div>
+    <div class="burger__meat burger__meat--2"></div>
+    <div class="burger__meat burger__meat--3"></div>
+  </div>
+</div>
+ 
+
+  <nav class="nav" role="navigation">
+  <ul class="nav__list">
+    
+    
+      <li>
+        <a  href="/">about</a>
+      </li>
+    
+      <li>
+        <a  class="active"
+         href="/blog">projects</a>
+      </li>
+    
+  </ul>
+</nav>
+
+
+  <main>
+    
+    
+
+    <div class="flex-wrapper">
+      <div class="post__container">
+        <div class="post">
+          <header class="post__header">
+            <h1 id="post__title">OkCupid Online Dating Profiles - Visualizing the differences/similarities between men and women</h1>
+            <time datetime="0001-01-01 00:00:00 &#43;0000 UTC" class="post__date"
+            > </time>
+          </header>
+          <article class="post__content">
+              
+
+
+
+<div id="introduction" class="section level3">
+<h3>Introduction</h3>
+<p>While online match-making and dating services/websites have tried to streamline the process of finding a romantic partner, this has also simultaneously amplified the question of what someone might be looking for in a potential match. The reason for this amplification is the significant amount of additional tangible data that has been added into the match-making equation. This data is produced when a user of these online platforms is asked to fill out details specific to themselves to make a profile describing themselves, which other people can use to judge their suitability.</p>
+<p>This project attempts to provide some clarification on the criteria people use to find a potential match. This is done by creating high-quality visuals about several different aspects of various users’ online profiles. As there are a large number of criteria that can be examined, to make this project more specific the differences and similarities between men and women in their profiles is explored.</p>
+<p>The focus here is to create simple yet highly informative visuals that are sufficient enough to tell a comprehensive story about the data on their own. This can potentially then form the basis for further analysis, such as using clustering techniques to group similar people together based on the provided information.</p>
+</div>
+<div id="data-description" class="section level3">
+<h3>Data Description</h3>
+<p>The data used here are profiles (made anonymous) on the OkCupid online dating service, and was freely obtained from <a href="https://www.kaggle.com/andrewmvd/okcupid-profiles">here</a>. Following the link will provide more information about how and where the data was specifically sourced. This dataset comprises of over 50000 profiles, thus providing a good range to explore.</p>
+<pre class="r"><code>#required libraries
+library(tm)
+library(tidytext)
+library(caret)
+library(tidyverse)
+library(rlang)
+
+okcupid &lt;- read.csv(&#39;okcupid-profiles.csv&#39;)
+colnames(okcupid)[1] &lt;- &quot;age&quot;
+
+#men/women - unbalanced
+ggplot(okcupid, aes(x = sex)) +
+  geom_bar(aes(fill = sex)) +
+  scale_fill_manual(values = c(&quot;maroon3&quot;, &quot;steelblue4&quot;)) +
+  theme_minimal() +
+  ggtitle(&quot;Number of Profiles - Unbalanced&quot;)</code></pre>
+<p><img src="/blog/okCupid_files/figure-html/unnamed-chunk-1-1.png" width="864" /></p>
+<p>It can be seen that the number of profiles for men is greater than those of women (by 11712 to be exact). In order to make the comparison more fair, random undersampling on the male profiles is carried out so that there are an equal number of profiles present for both men and women.</p>
+<pre class="r"><code>#undersampling
+okcupid$sex &lt;- as.factor(okcupid$sex)
+okcupid &lt;- downSample(x = okcupid[, -ncol(okcupid)],
+                   y = okcupid$sex)
+#plot balanced profiles
+ggplot(okcupid, aes(x = sex)) +
+  geom_bar(aes(fill = sex)) +
+  scale_fill_manual(values = c(&quot;maroon3&quot;, &quot;steelblue4&quot;)) +
+  theme_minimal() +
+  ggtitle(&quot;Number of Profiles - Balanced&quot;)</code></pre>
+<p><img src="/blog/okCupid_files/figure-html/unnamed-chunk-2-1.png" width="864" /></p>
+<pre class="r"><code>#table for number of profiles
+pander::pander(table(okcupid$sex))</code></pre>
+<table style="width:22%;">
+<colgroup>
+<col width="11%" />
+<col width="11%" />
+</colgroup>
+<thead>
+<tr class="header">
+<th align="center">f</th>
+<th align="center">m</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td align="center">24116</td>
+<td align="center">24116</td>
+</tr>
+</tbody>
+</table>
+<p>With the data balanced, the explored variables can now be defined. The variables can be divided into two groups: individual specific details and essay questions. From individual specific details, the following are explored:</p>
+<ul>
+<li>age distribution</li>
+<li>height distribution</li>
+<li>relationship status</li>
+<li>view on children</li>
+<li>body type</li>
+<li>diet</li>
+<li>level of education</li>
+<li>job/profession</li>
+<li>view on pets</li>
+<li>religious beliefs</li>
+</ul>
+<p>For each of the above variables, the differences/similarities between men and women are explored using 2 charts. One chart highlights the absolute count of the profiles fitting each criteria within the variable, thus providing an overall view of how the profiles are distributed. The second chart provides a proportional view about the percentage split between men and women for each criteria within the variable, thus providing a more specific point of view.</p>
+<p>The second group of variables are the essay questions. These are short paragraphs written by individuals answering the following questions for their profile:</p>
+<ul>
+<li>About Me</li>
+<li>My Current/Future Goals</li>
+<li>My Talents</li>
+<li>My Personal Traits</li>
+<li>My Hobbies</li>
+<li>What can’t I live without?</li>
+<li>What do I think about?</li>
+<li>My average Friday night?</li>
+<li>A Secret</li>
+<li>What am I looking for?</li>
+</ul>
+<p>To explore these questions, text analysis is carried out and charts are created showing the top 50 most frequently used words by both men and women for each question and how this frequency differs between the two.</p>
+<p><em>A note on data integrity: Related to the essay questions, the original data file did not have the questions labelled. Reading the details on the provided link to the data and by reading a number of the actual paragraphs themselves, an informed guess has been made as to which column of paragraphs answers which question</em></p>
+</div>
+<div id="individual-specific-details" class="section level3">
+<h3>Individual Specific Details</h3>
+<p>The variables related to individual details are first explored. Two charts for each of the variables are plotted under their respective heading. These two charts combined paint a complete picture of the comparison between men and women within each of these individual variables. A brief description of the key findings from each chart is also written.</p>
+</div>
+<div id="age-distribution" class="section level3">
+<h3>Age Distribution</h3>
+<p>The age distribution plots show that majority of the profiles are within the age range of 20-40. The cut off point at 18 is most likely because of the minimum age requirement to create a profile. It can also be seen that there are on average more women than men in a specific age after the ages cross 40 (with the exception of 68 and 69).</p>
+<pre class="r"><code>#age
+ggplot(okcupid, aes(x = as.numeric(age))) +
+  geom_density(aes(fill = sex), position = &#39;identity&#39;, alpha = 0.6) +
+  scale_fill_manual(values = c(&quot;maroon3&quot;, &quot;steelblue4&quot;)) +
+  theme_minimal() +
+  xlab(&quot;age&quot;) +
+  ggtitle(&quot;Age Distributions&quot;) +
+  theme(axis.text.x = element_text(angle = 55, hjust = 1)) </code></pre>
+<p><img src="/blog/okCupid_files/figure-html/unnamed-chunk-3-1.png" width="864" /></p>
+<pre class="r"><code>ggplot(okcupid, aes(x = factor(age))) +
+  geom_bar(aes(fill = sex), position = &#39;fill&#39;) +
+  scale_fill_manual(values = c(&quot;maroon3&quot;, &quot;steelblue4&quot;)) +
+  theme_minimal() +
+  xlab(&quot;age&quot;) +
+  ylab(&quot;proportion&quot;) +
+  ggtitle(&quot;Percentage Men-Women by Age&quot;) +
+  theme(axis.text.x = element_text(angle = 55, hjust = 1)) </code></pre>
+<p><img src="/blog/okCupid_files/figure-html/unnamed-chunk-4-1.png" width="864" /></p>
+</div>
+<div id="height-distribution" class="section level3">
+<h3>Height Distribution</h3>
+<p>Making an informed guess, the height is most likely to be measured in inches, based on the values shown. There are some strange outliers present, a cause of which might be incorrect data entry. Some missing values present can also be attributed to this. However focusing on the middle segment shows a reasonable distribution, with more women within the shorter height range and more men in the taller height range.</p>
+<pre class="r"><code>#height
+ggplot(okcupid, aes(x = as.numeric(height))) +
+  geom_density(aes(fill = sex), alpha = 0.6) +
+  scale_fill_manual(values = c(&quot;maroon3&quot;, &quot;steelblue4&quot;)) +
+  theme_minimal() +
+  xlab(&quot;height&quot;) +
+  ggtitle(&quot;Height Distributions&quot;) +
+  theme(axis.text.x = element_text(angle = 55, hjust = 1)) </code></pre>
+<p><img src="/blog/okCupid_files/figure-html/unnamed-chunk-5-1.png" width="864" /></p>
+<pre class="r"><code>ggplot(okcupid, aes(x = factor(height))) +
+  geom_bar(aes(fill = sex), position = &#39;fill&#39;) +
+  scale_fill_manual(values = c(&quot;maroon3&quot;, &quot;steelblue4&quot;)) +
+  theme_minimal() +
+  ggtitle(&quot;Percentage Men-Women by Height&quot;) +
+  xlab(&quot;height&quot;) +
+  ylab(&quot;proportion&quot;) +
+  theme(axis.text.x = element_text(angle = 55, hjust = 1)) </code></pre>
+<p><img src="/blog/okCupid_files/figure-html/unnamed-chunk-6-1.png" width="864" /></p>
+</div>
+<div id="relationship-status" class="section level3">
+<h3>Relationship Status</h3>
+<p>As one would expect, majority of the people on a dating site are probably single, which is shown in the charts below. However there are some profiles within other categories as well. From these, there are proportionally more women than men who are either married or are seeing someone.</p>
+<pre class="r"><code>#status
+ggplot(subset(okcupid, status != &#39;unknown&#39;), aes(x = status)) +
+  geom_bar(aes(fill = sex), position = &#39;dodge&#39;) +
+  scale_fill_manual(values = c(&quot;maroon3&quot;, &quot;steelblue4&quot;)) +
+  theme_minimal() +
+  ggtitle(&quot;Relationship Status (Absolute Count)&quot;)</code></pre>
+<p><img src="/blog/okCupid_files/figure-html/unnamed-chunk-7-1.png" width="864" /></p>
+<pre class="r"><code>ggplot(subset(okcupid, status != &#39;unknown&#39;), aes(x = status)) +
+  geom_bar(aes(fill = sex), position = &#39;fill&#39;) +
+  scale_fill_manual(values = c(&quot;maroon3&quot;, &quot;steelblue4&quot;)) +
+  theme_minimal() +
+  ylab(&quot;proportion&quot;) +
+  ggtitle(&quot;Relationship Status (Percentage Split)&quot;)</code></pre>
+<p><img src="/blog/okCupid_files/figure-html/unnamed-chunk-8-1.png" width="864" /></p>
+</div>
+<div id="view-on-children" class="section level3">
+<h3>View on Children</h3>
+<p>Most of the profiles indicate that the individual does not have any kids. In terms of proportions, more women already have children and don’t want more, or they don’t have children but do want them.</p>
+<pre class="r"><code>#kids
+ggplot(subset(okcupid, offspring != &#39;&#39;), aes(x = offspring)) +
+  geom_bar(aes(fill = sex), position = &#39;dodge&#39;) +
+  coord_flip() +
+  scale_fill_manual(values = c(&quot;maroon3&quot;, &quot;steelblue4&quot;)) +
+  theme_minimal() +
+  ggtitle(&quot;View on Children (Absolute Count)&quot;)</code></pre>
+<p><img src="/blog/okCupid_files/figure-html/unnamed-chunk-9-1.png" width="864" /></p>
+<pre class="r"><code>ggplot(subset(okcupid, offspring != &#39;&#39;), aes(x = offspring)) +
+  geom_bar(aes(fill = sex), position = &#39;fill&#39;) +
+  coord_flip() +
+  scale_fill_manual(values = c(&quot;maroon3&quot;, &quot;steelblue4&quot;)) +
+  theme_minimal() +
+  ylab(&quot;proportion&quot;) +
+  ggtitle(&quot;View on Children (Percentage Split)&quot;)</code></pre>
+<p><img src="/blog/okCupid_files/figure-html/unnamed-chunk-10-1.png" width="864" /></p>
+</div>
+<div id="body-type" class="section level3">
+<h3>Body Type</h3>
+<p>Most of the profiles have labelled body type as average. While more women have labelled themselves as curvy, full-figured and/or thin, more men have labelled themselves as fit and/or athletic.</p>
+<pre class="r"><code>#body type
+ggplot(subset(okcupid, body_type != &#39;&#39;), aes(x = body_type)) +
+  geom_bar(aes(fill = sex), position = &#39;dodge&#39;) +
+  coord_flip() +
+  scale_fill_manual(values = c(&quot;maroon3&quot;, &quot;steelblue4&quot;)) +
+  theme_minimal() +
+  ggtitle(&quot;Body Type (Absolute Count)&quot;)</code></pre>
+<p><img src="/blog/okCupid_files/figure-html/unnamed-chunk-11-1.png" width="864" /></p>
+<pre class="r"><code>ggplot(subset(okcupid, body_type != &#39;&#39;), aes(x = body_type)) +
+  geom_bar(aes(fill = sex), position = &#39;fill&#39;) +
+  coord_flip() +
+  scale_fill_manual(values = c(&quot;maroon3&quot;, &quot;steelblue4&quot;)) +
+  theme_minimal() +
+  ylab(&quot;proportion&quot;) +
+  ggtitle(&quot;Body Type (Percentage Split)&quot;)</code></pre>
+<p><img src="/blog/okCupid_files/figure-html/unnamed-chunk-12-1.png" width="864" /></p>
+</div>
+<div id="diet-habits" class="section level3">
+<h3>Diet Habits</h3>
+<p>While most of the people have stated to being relaxed with diet (mostly anything), there are some strong preferences with religious restrictions on food. An example is the higher proportion of men opting for strictly halal, and a higher proportion of women opting for kosher. There are also proportionally more women who are vegan or vegetarian.</p>
+<pre class="r"><code>#diet
+ggplot(subset(okcupid, diet != &#39;&#39;), aes(x = diet)) +
+  geom_bar(aes(fill = sex), position = &#39;dodge&#39;) +
+  coord_flip() +
+  scale_fill_manual(values = c(&quot;maroon3&quot;, &quot;steelblue4&quot;)) +
+  theme_minimal() +
+  ggtitle(&quot;Diet Habits (Absolute Count)&quot;)</code></pre>
+<p><img src="/blog/okCupid_files/figure-html/unnamed-chunk-13-1.png" width="864" /></p>
+<pre class="r"><code>ggplot(subset(okcupid, diet != &#39;&#39;), aes(x = diet)) +
+  geom_bar(aes(fill = sex), position = &#39;fill&#39;) +
+  coord_flip() +
+  scale_fill_manual(values = c(&quot;maroon3&quot;, &quot;steelblue4&quot;)) +
+  theme_minimal() +
+  ylab(&quot;proportion&quot;) +
+  ggtitle(&quot;Diet Habits (Percentage Split)&quot;)</code></pre>
+<p><img src="/blog/okCupid_files/figure-html/unnamed-chunk-14-1.png" width="864" /></p>
+</div>
+<div id="level-of-education" class="section level3">
+<h3>Level of Education</h3>
+<p>Majority of the people are college/university graduates. Within the three largest criteria shown in the chart below, the proportion of women is greater than men. On the other hand, there are proportionally more men who are either working on or have completed PhD programmes.</p>
+<pre class="r"><code>#education
+ggplot(subset(okcupid, education != &#39;&#39;), aes(x = education)) +
+  geom_bar(aes(fill = sex), position = &#39;dodge&#39;) +
+  coord_flip() +
+  scale_fill_manual(values = c(&quot;maroon3&quot;, &quot;steelblue4&quot;)) +
+  theme_minimal() +
+  ggtitle(&quot;Education Level (Absolute Count)&quot;)</code></pre>
+<p><img src="/blog/okCupid_files/figure-html/unnamed-chunk-15-1.png" width="864" /></p>
+<pre class="r"><code>ggplot(subset(okcupid, education != &#39;&#39;), aes(x = education)) +
+  geom_bar(aes(fill = sex), position = &#39;fill&#39;) +
+  coord_flip() +
+  scale_fill_manual(values = c(&quot;maroon3&quot;, &quot;steelblue4&quot;)) +
+  theme_minimal() +
+  ylab(&quot;proportion&quot;) +
+  ggtitle(&quot;Education Level (Percentage Split)&quot;)</code></pre>
+<p><img src="/blog/okCupid_files/figure-html/unnamed-chunk-16-1.png" width="864" /></p>
+</div>
+<div id="jobprofession" class="section level3">
+<h3>Job/Profession</h3>
+<p>There are some strong preferences between men and women in terms of their profession visible in the charts, with more men in the transport, military, construction and IT sectors, while more women are involved in health, academic, and administrative roles.</p>
+<pre class="r"><code>#job
+ggplot(subset(okcupid, job != &#39;&#39;), aes(x = job)) +
+  geom_bar(aes(fill = sex), position = &#39;dodge&#39;) +
+  coord_flip() +
+  scale_fill_manual(values = c(&quot;maroon3&quot;, &quot;steelblue4&quot;)) +
+  theme_minimal() +
+  ggtitle(&quot;Profession (Absolute Count)&quot;)</code></pre>
+<p><img src="/blog/okCupid_files/figure-html/unnamed-chunk-17-1.png" width="864" /></p>
+<pre class="r"><code>ggplot(subset(okcupid, job != &#39;&#39;), aes(x = job)) +
+  geom_bar(aes(fill = sex), position = &#39;fill&#39;) +
+  coord_flip() +
+  scale_fill_manual(values = c(&quot;maroon3&quot;, &quot;steelblue4&quot;)) +
+  theme_minimal() +
+  ylab(&quot;proportion&quot;) +
+  ggtitle(&quot;Profession (Percentage Split)&quot;)</code></pre>
+<p><img src="/blog/okCupid_files/figure-html/unnamed-chunk-18-1.png" width="864" /></p>
+</div>
+<div id="view-on-pets" class="section level3">
+<h3>View on Pets</h3>
+<p>Generally more men and women seem to like cats and dogs rather than disliking them. A larger proportion of women already have either a cat, a dog or both.</p>
+<pre class="r"><code>#pets
+ggplot(subset(okcupid, pets != &#39;&#39;), aes(x = pets)) +
+  geom_bar(aes(fill = sex), position = &#39;dodge&#39;) +
+  coord_flip() +
+  scale_fill_manual(values = c(&quot;maroon3&quot;, &quot;steelblue4&quot;)) +
+  theme_minimal() +
+  ggtitle(&quot;View on Pets (Absolute Count)&quot;)</code></pre>
+<p><img src="/blog/okCupid_files/figure-html/unnamed-chunk-19-1.png" width="864" /></p>
+<pre class="r"><code>ggplot(subset(okcupid, pets != &#39;&#39;), aes(x = pets)) +
+  geom_bar(aes(fill = sex), position = &#39;fill&#39;) +
+  coord_flip() +
+  scale_fill_manual(values = c(&quot;maroon3&quot;, &quot;steelblue4&quot;)) +
+  theme_minimal() +
+  ylab(&quot;proportion&quot;) +
+  ggtitle(&quot;View on Pets (Percentage Split)&quot;)</code></pre>
+<p><img src="/blog/okCupid_files/figure-html/unnamed-chunk-20-1.png" width="864" /></p>
+</div>
+<div id="religious-beliefs" class="section level3">
+<h3>Religious Beliefs</h3>
+<p>Proportionally there are more men within atheism, while there are more women within Christianity. The least number of people are within Islam and Hinduism, followed by Judaism.</p>
+<pre class="r"><code>#religion
+ggplot(subset(okcupid, religion != &#39;&#39;), aes(x = religion)) +
+  geom_bar(aes(fill = sex), position = &#39;dodge&#39;) +
+  coord_flip() +
+  scale_fill_manual(values = c(&quot;maroon3&quot;, &quot;steelblue4&quot;)) +
+  theme_minimal() +
+  ggtitle(&quot;Religious Beliefs (Absolute Count)&quot;)</code></pre>
+<p><img src="/blog/okCupid_files/figure-html/unnamed-chunk-21-1.png" width="864" /></p>
+<pre class="r"><code>ggplot(subset(okcupid, religion != &#39;&#39;), aes(x = religion)) +
+  geom_bar(aes(fill = sex), position = &#39;fill&#39;) +
+  coord_flip() +
+  scale_fill_manual(values = c(&quot;maroon3&quot;, &quot;steelblue4&quot;)) +
+  theme_minimal() +
+  ylab(&quot;proportion&quot;) +
+  ggtitle(&quot;Religious Beliefs (Percentage Split)&quot;)</code></pre>
+<p><img src="/blog/okCupid_files/figure-html/unnamed-chunk-22-1.png" width="864" /></p>
+</div>
+<div id="essay-questions" class="section level3">
+<h3>Essay Questions</h3>
+<p>Having examined the individual specific questions, the next step is to explore the essay questions. Some light preprocessing is required before doing so. Words such as I, the, it and at are removed so that only meaningful words remain. Numbers are also removed to make the text more tidy. A function is written that will carry out the necessary processing of the text to extract the word frequencies and plot the results for each question.</p>
+<pre class="r"><code>stop_words &lt;- as.data.frame(stopwords())
+colnames(stop_words)[1] &lt;- &quot;word&quot;
+
+numbers &lt;- c(&quot;1&quot;,&quot;2&quot;,&quot;3&quot;,&quot;4&quot;,&quot;5&quot;,&quot;6&quot;)
+numbers &lt;- as.data.frame(numbers)
+colnames(numbers)[1] &lt;- &quot;word&quot;
+
+essay_m &lt;- read.csv(&#39;okcupid-essay-m.csv&#39;)
+essay_f &lt;- read.csv(&#39;okcupid-essay-f.csv&#39;)
+essay_m &lt;- essay_m[sample(nrow(essay_m), 24116), ]
+essay_m &lt;- essay_m[,-1]
+essay_f &lt;- essay_f[,-1]
+
+colors &lt;- c(&quot;f&quot; = &quot;maroon3&quot;, &quot;m&quot; = &quot;steelblue4&quot;)
+
+essay_questions &lt;- function(data_m, data_f, var, title) {
+  x_m &lt;- data_m %&gt;%
+    select_(var) %&gt;%
+    unnest_tokens(word, !! rlang::sym(var)) %&gt;%
+    anti_join(stop_words, by = &#39;word&#39;) %&gt;%
+    anti_join(numbers, by = &#39;word&#39;) %&gt;%
+    count(word, sort = TRUE)
+  
+  x_f &lt;- data_f %&gt;%
+    select_(var) %&gt;%
+    unnest_tokens(word, !! rlang::sym(var)) %&gt;%
+    anti_join(stop_words, by = &#39;word&#39;) %&gt;%
+    anti_join(numbers, by = &#39;word&#39;) %&gt;%
+    count(word, sort = TRUE)
+  
+  same_x_mf &lt;- x_m %&gt;%
+    inner_join(x_f, by = &#39;word&#39;)
+  
+  colnames(same_x_mf)[2] &lt;- &quot;n.m&quot;
+  colnames(same_x_mf)[3] &lt;- &quot;n.f&quot;
+  
+  p &lt;- ggplot(same_x_mf[1:50,]) +
+    geom_segment(aes(x = word, xend = word, y = n.f, yend = n.m),
+                 color = &#39;black&#39;) +
+    geom_point(aes(x = word, y = n.f, color = &#39;f&#39;), size = 3) +
+    geom_point(aes(x = word, y = n.m, color = &#39;m&#39;), size = 3) +
+    scale_color_manual(values = colors) +
+    labs(y = &#39;frequency&#39;, color = &#39;sex&#39;) +
+    ggtitle(paste(&#39;Top 50 most used words:&#39;, title)) +
+    theme_minimal() +
+    coord_flip()
+  
+  return(p)
+  
+} #function to generate word frequency charts for each of the 10 essay questions</code></pre>
+</div>
+<div id="about-me" class="section level3">
+<h3>About Me</h3>
+<p>Love and like are the two most frequently used words in this question. However, the word love is much more frequently used by women compared to men.</p>
+<pre class="r"><code>about_me &lt;- essay_questions(data_m = essay_m,
+                            data_f = essay_f,
+                            var = &#39;essay0&#39;,
+                            title = &#39;About Me&#39;)
+about_me</code></pre>
+<p><img src="/blog/okCupid_files/figure-html/unnamed-chunk-24-1.png" width="864" /></p>
+</div>
+<div id="my-currentfuture-goals" class="section level3">
+<h3>My Current/Future Goals</h3>
+<p>Within the goals question, there is a common theme of using work, working and time most frequently. The strong difference between the usage of love can be seen here as well.</p>
+<pre class="r"><code>goals &lt;- essay_questions(data_m = essay_m,
+                         data_f = essay_f,
+                         var = &#39;essay1&#39;,
+                         title = &#39;My Current/Future Goals&#39;)
+goals</code></pre>
+<p><img src="/blog/okCupid_files/figure-html/unnamed-chunk-25-1.png" width="864" /></p>
+</div>
+<div id="my-talents" class="section level3">
+<h3>My Talents</h3>
+<p>While it may be intuitive that the word good would appear most frequently in a question related to talent, an interesting observation is the second and third most frequently occurring word being making and people respectively.</p>
+<pre class="r"><code>talents &lt;- essay_questions(data_m = essay_m,
+                           data_f = essay_f,
+                           var = &#39;essay2&#39;,
+                           title = &#39;My Talents&#39;)
+talents</code></pre>
+<p><img src="/blog/okCupid_files/figure-html/unnamed-chunk-26-1.png" width="864" /></p>
+</div>
+<div id="my-personal-traits" class="section level3">
+<h3>My Personal Traits</h3>
+<p>When describing traits, it seems that the profiles in this data most frequently refer to eyes, smile, hair and people. The frequency of using the word people is fairly balanced, while the other three are much more strongly favoured by women compared to men, but are still most frequently used by both.</p>
+<pre class="r"><code>traits &lt;- essay_questions(data_m = essay_m,
+                          data_f = essay_f,
+                          var = &#39;essay3&#39;,
+                          title = &#39;My Personal Traits&#39;)
+traits</code></pre>
+<p><img src="/blog/okCupid_files/figure-html/unnamed-chunk-27-1.png" width="864" /></p>
+</div>
+<div id="my-hobbies" class="section level3">
+<h3>My Hobbies</h3>
+<p>Once again that big noticeable difference in the usage of love is visible again. Apart from this, common and frequently occurring words include music, food and movies.</p>
+<pre class="r"><code>hobbies &lt;- essay_questions(data_m = essay_m,
+                          data_f = essay_f,
+                          var = &#39;essay4&#39;,
+                          title = &#39;My Hobbies&#39;)
+hobbies</code></pre>
+<p><img src="/blog/okCupid_files/figure-html/unnamed-chunk-28-1.png" width="864" /></p>
+</div>
+<div id="what-cant-i-live-without" class="section level3">
+<h3>What can’t I live without?</h3>
+<p>According to the chart, the things considered most essential are family, friends, food and music. Within these four, food is favoured more by men compared to women.</p>
+<pre class="r"><code>needs &lt;- essay_questions(data_m = essay_m,
+                         data_f = essay_f,
+                         var = &#39;essay5&#39;,
+                         title = &quot;What can&#39;t I live without?&quot;)
+needs</code></pre>
+<p><img src="/blog/okCupid_files/figure-html/unnamed-chunk-29-1.png" width="864" /></p>
+</div>
+<div id="what-do-i-think-about" class="section level3">
+<h3>What do I think about?</h3>
+<p>There is more variation in terms of word frequency in this chart compared to the charts above. While life and next are commonly used, the word music for instance is favoured more by men whereas the word travel is favoured more by women.</p>
+<pre class="r"><code>thoughts &lt;- essay_questions(data_m = essay_m,
+                         data_f = essay_f,
+                         var = &#39;essay6&#39;,
+                         title = &quot;What do I think about?&quot;)
+thoughts</code></pre>
+<p><img src="/blog/okCupid_files/figure-html/unnamed-chunk-30-1.png" width="864" /></p>
+</div>
+<div id="my-average-friday-night" class="section level3">
+<h3>My average Friday night</h3>
+<p>This chart indicates a strong use of the word friends when descrbing an average Friday night.</p>
+<pre class="r"><code>friday &lt;- essay_questions(data_m = essay_m,
+                            data_f = essay_f,
+                            var = &#39;essay7&#39;,
+                            title = &quot;My average Friday night&quot;)
+friday</code></pre>
+<p><img src="/blog/okCupid_files/figure-html/unnamed-chunk-31-1.png" width="864" /></p>
+</div>
+<div id="a-secret" class="section level3">
+<h3>A Secret</h3>
+<p>Similar to the thoughts chart, there is more variation in this chart compared to the others, with no potential theme being clearly highlighted. The word like is used most frequently, and more by men than women.</p>
+<pre class="r"><code>secret &lt;- essay_questions(data_m = essay_m,
+                          data_f = essay_f,
+                          var = &#39;essay8&#39;,
+                          title = &quot;A Secret&quot;)
+secret</code></pre>
+<p><img src="/blog/okCupid_files/figure-html/unnamed-chunk-32-1.png" width="864" /></p>
+</div>
+<div id="what-am-i-looking-for" class="section level3">
+<h3>What am I looking for?</h3>
+<p>For the final question, and the conclusion of this project, the chart below is plotted. The word like is used most frequently, followed by want (which makes sense based on the question). However for this question the list of frequently occurring words themselves can provide an insight into the common things people consider when answering this question. Examples include words like conversation, laugh, humour and interesting, which can show what people think are important characteristics to look for when they are searching for a romantic match.</p>
+<pre class="r"><code>want &lt;- essay_questions(data_m = essay_m,
+                          data_f = essay_f,
+                          var = &#39;essay9&#39;,
+                          title = &quot;What am I looking for?&quot;)
+want</code></pre>
+<p><img src="/blog/okCupid_files/figure-html/unnamed-chunk-33-1.png" width="864" /></p>
+</div>
+
+
+              
+          </article>
+          
+
+ <div class="pagination">
+  
+    <a class="pagination__item" href="/blog/poems/">
+        <span class="pagination__label">Previous Post</span>
+        <span class="pagination__title">Poetry Classification with KNNs</span>
+    </a>
+  
+
+  
+    <a class="pagination__item" href="/blog/umap-clust/">
+      <span class="pagination__label">Next Post</span>
+      <span class="pagination__title" >Mining Religious and Sacred Texts - Visualizing Clusters with UMAP</a>
+    </a>
+  
+</div>
+
+          
+          <footer class="post__footer">
+            
+
+
+<div class="social-icons">
+  
+     
+    
+  
+     
+    
+  
+     
+    
+  
+     
+    
+  
+     
+    
+  
+     
+    
+  
+     
+    
+  
+     
+    
+     
+</div>
+
+            <p>© 2020 fazi_rda</p>
+          </footer>
+          </div>
+      </div>
+      
+    </div>
+    
+
+  </main>
+
+   
+
+  
+  <script src="/js/index.min.49e4d8a384357d9b445b87371863419937ede9fa77737522ffb633073aebfa44.js" integrity="sha256-SeTYo4Q1fZtEW4c3GGNBmTft6fp3c3Ui/7YzBzrr&#43;kQ=" crossorigin="anonymous"></script>
+  
+  
+  <script src="https://unpkg.com/prismjs@1.20.0/components/prism-core.min.js"></script>
+
+  
+  <script src="https://unpkg.com/prismjs@1.20.0/plugins/autoloader/prism-autoloader.min.js"
+    data-autoloader-path="https://unpkg.com/prismjs@1.20.0/components/"></script>
+
+  
+
+
+</body>
+
+</html>

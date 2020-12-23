@@ -151,6 +151,15 @@ The dataset contains some information about computers, with the dependant variab
     </item>
     
     <item>
+      <title>OkCupid Online Dating Profiles - Visualizing the differences/similarities between men and women</title>
+      <link>/blog/okcupid/</link>
+      <pubDate>Mon, 01 Jan 0001 00:00:00 +0000</pubDate>
+      
+      <guid>/blog/okcupid/</guid>
+      <description>IntroductionWhile online match-making and dating services/websites have tried to streamline the process of finding a romantic partner, this has also simultaneously amplified the question of what someone might be looking for in a potential match. The reason for this amplification is the significant amount of additional tangible data that has been added into the match-making equation. This data is produced when a user of these online platforms is asked to fill out details specific to themselves to make a profile describing themselves, which other people can use to judge their suitability.</description>
+    </item>
+    
+    <item>
       <title>Poetry Classification with KNNs</title>
       <link>/blog/poems/</link>
       <pubDate>Mon, 01 Jan 0001 00:00:00 +0000</pubDate>

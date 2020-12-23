@@ -1,0 +1,519 @@
+---
+title: "OkCupid Online Dating Profiles - Visualizing the differences/similarities between men and women"
+output: html_notebook
+---
+### Introduction
+
+While online match-making and dating services/websites have tried to streamline the process of finding a romantic partner, this has also simultaneously amplified the question of what someone might be looking for in a potential match. The reason for this amplification is the significant amount of additional tangible data that has been added into the match-making equation. This data is produced when a user of these online platforms is asked to fill out details specific to themselves to make a profile describing themselves, which other people can use to judge their suitability. 
+
+This project attempts to provide some clarification on the criteria people use to find a potential match. This is done by creating high-quality visuals about several different aspects of various users' online profiles. As there are a large number of criteria that can be examined, to make this project more specific the differences and similarities between men and women in their profiles is explored.
+
+The focus here is to create simple yet highly informative visuals that are sufficient enough to tell a comprehensive story about the data on their own. This can potentially then form the basis for further analysis, such as using clustering techniques to group similar people together based on the provided information. 
+
+### Data Description
+
+The data used here are profiles (made anonymous) on the OkCupid online dating service, and was freely obtained from [here](https://www.kaggle.com/andrewmvd/okcupid-profiles). Following the link will provide more information about how and where the data was specifically sourced. This dataset comprises of over 50000 profiles, thus providing a good range to explore. 
+
+```{r warning=FALSE, message=FALSE, fig.width=9, fig.height=7}
+#required libraries
+library(tm)
+library(tidytext)
+library(caret)
+library(tidyverse)
+library(rlang)
+
+okcupid <- read.csv('okcupid-profiles.csv')
+colnames(okcupid)[1] <- "age"
+
+#men/women - unbalanced
+ggplot(okcupid, aes(x = sex)) +
+  geom_bar(aes(fill = sex)) +
+  scale_fill_manual(values = c("maroon3", "steelblue4")) +
+  theme_minimal() +
+  ggtitle("Number of Profiles - Unbalanced")
+```
+
+It can be seen that the number of profiles for men is greater than those of women (by 11712 to be exact). In order to make the comparison more fair, random undersampling on the male profiles is carried out so that there are an equal number of profiles present for both men and women. 
+
+```{r warning=FALSE, message=FALSE, fig.width=9, fig.height=7}
+#undersampling
+okcupid$sex <- as.factor(okcupid$sex)
+okcupid <- downSample(x = okcupid[, -ncol(okcupid)],
+                   y = okcupid$sex)
+#plot balanced profiles
+ggplot(okcupid, aes(x = sex)) +
+  geom_bar(aes(fill = sex)) +
+  scale_fill_manual(values = c("maroon3", "steelblue4")) +
+  theme_minimal() +
+  ggtitle("Number of Profiles - Balanced")
+#table for number of profiles
+pander::pander(table(okcupid$sex))
+```
+
+With the data balanced, the explored variables can now be defined. The variables can be divided into two groups: individual specific details and essay questions. From individual specific details, the following are explored:
+
+- age distribution
+- height distribution
+- relationship status
+- view on children
+- body type
+- diet
+- level of education
+- job/profession
+- view on pets
+- religious beliefs
+
+For each of the above variables, the differences/similarities between men and women are explored using 2 charts. One chart highlights the absolute count of the profiles fitting each criteria within the variable, thus providing an overall view of how the profiles are distributed. The second chart provides a proportional view about the percentage split between men and women for each criteria within the variable, thus providing a more specific point of view. 
+
+The second group of variables are the essay questions. These are short paragraphs written by individuals answering the following questions for their profile:
+
+- About Me
+- My Current/Future Goals
+- My Talents
+- My Personal Traits
+- My Hobbies
+- What can't I live without?
+- What do I think about?
+- My average Friday night?
+- A Secret
+- What am I looking for? 
+
+To explore these questions, text analysis is carried out and charts are created showing the top 50 most frequently used words by both men and women for each question and how this frequency differs between the two. 
+
+*A note on data integrity: Related to the essay questions, the original data file did not have the questions labelled. Reading the details on the provided link to the data and by reading a number of the actual paragraphs themselves, an informed guess has been made as to which column of paragraphs answers which question*
+
+### Individual Specific Details
+
+The variables related to individual details are first explored. Two charts for each of the variables are plotted under their respective heading. These two charts combined paint a complete picture of the comparison between men and women within each of these individual variables. A brief description of the key findings from each chart is also written.
+
+### Age Distribution
+
+The age distribution plots show that majority of the profiles are within the age range of 20-40. The cut off point at 18 is most likely because of the minimum age requirement to create a profile. It can also be seen that there are on average more women than men in a specific age after the ages cross 40 (with the exception of 68 and 69). 
+
+```{r warning=FALSE, message=FALSE, fig.width=9, fig.height=7}
+#age
+ggplot(okcupid, aes(x = as.numeric(age))) +
+  geom_density(aes(fill = sex), position = 'identity', alpha = 0.6) +
+  scale_fill_manual(values = c("maroon3", "steelblue4")) +
+  theme_minimal() +
+  xlab("age") +
+  ggtitle("Age Distributions") +
+  theme(axis.text.x = element_text(angle = 55, hjust = 1)) 
+```
+
+```{r warning=FALSE, message=FALSE, fig.width=9, fig.height=7}
+ggplot(okcupid, aes(x = factor(age))) +
+  geom_bar(aes(fill = sex), position = 'fill') +
+  scale_fill_manual(values = c("maroon3", "steelblue4")) +
+  theme_minimal() +
+  xlab("age") +
+  ylab("proportion") +
+  ggtitle("Percentage Men-Women by Age") +
+  theme(axis.text.x = element_text(angle = 55, hjust = 1)) 
+```
+
+### Height Distribution
+
+Making an informed guess, the height is most likely to be measured in inches, based on the values shown. There are some strange outliers present, a cause of which might be incorrect data entry. Some missing values present can also be attributed to this. However focusing on the middle segment shows a reasonable distribution, with more women within the shorter height range and more men in the taller height range. 
+
+```{r warning=FALSE, message=FALSE, fig.width=9, fig.height=7}
+#height
+ggplot(okcupid, aes(x = as.numeric(height))) +
+  geom_density(aes(fill = sex), alpha = 0.6) +
+  scale_fill_manual(values = c("maroon3", "steelblue4")) +
+  theme_minimal() +
+  xlab("height") +
+  ggtitle("Height Distributions") +
+  theme(axis.text.x = element_text(angle = 55, hjust = 1)) 
+```
+
+```{r warning=FALSE, message=FALSE, fig.width=9, fig.height=7}
+ggplot(okcupid, aes(x = factor(height))) +
+  geom_bar(aes(fill = sex), position = 'fill') +
+  scale_fill_manual(values = c("maroon3", "steelblue4")) +
+  theme_minimal() +
+  ggtitle("Percentage Men-Women by Height") +
+  xlab("height") +
+  ylab("proportion") +
+  theme(axis.text.x = element_text(angle = 55, hjust = 1)) 
+```
+
+### Relationship Status
+
+As one would expect, majority of the people on a dating site are probably single, which is shown in the charts below. However there are some profiles within other categories as well. From these, there are proportionally more women than men who are either married or are seeing someone. 
+
+```{r warning=FALSE, message=FALSE, fig.width=9, fig.height=7}
+#status
+ggplot(subset(okcupid, status != 'unknown'), aes(x = status)) +
+  geom_bar(aes(fill = sex), position = 'dodge') +
+  scale_fill_manual(values = c("maroon3", "steelblue4")) +
+  theme_minimal() +
+  ggtitle("Relationship Status (Absolute Count)")
+```
+
+```{r warning=FALSE, message=FALSE, fig.width=9, fig.height=7}
+ggplot(subset(okcupid, status != 'unknown'), aes(x = status)) +
+  geom_bar(aes(fill = sex), position = 'fill') +
+  scale_fill_manual(values = c("maroon3", "steelblue4")) +
+  theme_minimal() +
+  ylab("proportion") +
+  ggtitle("Relationship Status (Percentage Split)")
+```
+
+### View on Children
+
+Most of the profiles indicate that the individual does not have any kids. In terms of proportions, more women already have children and don't want more, or they don't have children but do want them. 
+
+```{r warning=FALSE, message=FALSE, fig.width=9, fig.height=7}
+#kids
+ggplot(subset(okcupid, offspring != ''), aes(x = offspring)) +
+  geom_bar(aes(fill = sex), position = 'dodge') +
+  coord_flip() +
+  scale_fill_manual(values = c("maroon3", "steelblue4")) +
+  theme_minimal() +
+  ggtitle("View on Children (Absolute Count)")
+```
+
+```{r warning=FALSE, message=FALSE, fig.width=9, fig.height=7}
+ggplot(subset(okcupid, offspring != ''), aes(x = offspring)) +
+  geom_bar(aes(fill = sex), position = 'fill') +
+  coord_flip() +
+  scale_fill_manual(values = c("maroon3", "steelblue4")) +
+  theme_minimal() +
+  ylab("proportion") +
+  ggtitle("View on Children (Percentage Split)")
+```
+
+### Body Type
+
+Most of the profiles have labelled body type as average. While more women have labelled themselves as curvy, full-figured and/or thin, more men have labelled themselves as fit and/or athletic. 
+
+```{r warning=FALSE, message=FALSE, fig.width=9, fig.height=7}
+#body type
+ggplot(subset(okcupid, body_type != ''), aes(x = body_type)) +
+  geom_bar(aes(fill = sex), position = 'dodge') +
+  coord_flip() +
+  scale_fill_manual(values = c("maroon3", "steelblue4")) +
+  theme_minimal() +
+  ggtitle("Body Type (Absolute Count)")
+```
+
+```{r warning=FALSE, message=FALSE, fig.width=9, fig.height=7}
+ggplot(subset(okcupid, body_type != ''), aes(x = body_type)) +
+  geom_bar(aes(fill = sex), position = 'fill') +
+  coord_flip() +
+  scale_fill_manual(values = c("maroon3", "steelblue4")) +
+  theme_minimal() +
+  ylab("proportion") +
+  ggtitle("Body Type (Percentage Split)")
+```
+
+### Diet Habits
+
+While most of the people have stated to being relaxed with diet (mostly anything), there are some strong preferences with religious restrictions on food. An example is the higher proportion of men opting for strictly halal, and a higher proportion of women opting for kosher. There are also proportionally more women who are vegan or vegetarian.
+
+```{r warning=FALSE, message=FALSE, fig.width=9, fig.height=7}
+#diet
+ggplot(subset(okcupid, diet != ''), aes(x = diet)) +
+  geom_bar(aes(fill = sex), position = 'dodge') +
+  coord_flip() +
+  scale_fill_manual(values = c("maroon3", "steelblue4")) +
+  theme_minimal() +
+  ggtitle("Diet Habits (Absolute Count)")
+```
+
+```{r warning=FALSE, message=FALSE, fig.width=9, fig.height=7}
+ggplot(subset(okcupid, diet != ''), aes(x = diet)) +
+  geom_bar(aes(fill = sex), position = 'fill') +
+  coord_flip() +
+  scale_fill_manual(values = c("maroon3", "steelblue4")) +
+  theme_minimal() +
+  ylab("proportion") +
+  ggtitle("Diet Habits (Percentage Split)")
+```
+
+### Level of Education
+
+Majority of the people are college/university graduates. Within the three largest criteria shown in the chart below, the proportion of women is greater than men. On the other hand, there are proportionally more men who are either working on or have completed PhD programmes.  
+
+```{r warning=FALSE, message=FALSE, fig.width=9, fig.height=7}
+#education
+ggplot(subset(okcupid, education != ''), aes(x = education)) +
+  geom_bar(aes(fill = sex), position = 'dodge') +
+  coord_flip() +
+  scale_fill_manual(values = c("maroon3", "steelblue4")) +
+  theme_minimal() +
+  ggtitle("Education Level (Absolute Count)")
+```
+
+```{r warning=FALSE, message=FALSE, fig.width=9, fig.height=7}
+ggplot(subset(okcupid, education != ''), aes(x = education)) +
+  geom_bar(aes(fill = sex), position = 'fill') +
+  coord_flip() +
+  scale_fill_manual(values = c("maroon3", "steelblue4")) +
+  theme_minimal() +
+  ylab("proportion") +
+  ggtitle("Education Level (Percentage Split)")
+```
+
+### Job/Profession
+
+There are some strong preferences between men and women in terms of their profession visible in the charts, with more men in the transport, military, construction and IT sectors, while more women are involved in health, academic, and administrative roles.
+
+```{r warning=FALSE, message=FALSE, fig.width=9, fig.height=7}
+#job
+ggplot(subset(okcupid, job != ''), aes(x = job)) +
+  geom_bar(aes(fill = sex), position = 'dodge') +
+  coord_flip() +
+  scale_fill_manual(values = c("maroon3", "steelblue4")) +
+  theme_minimal() +
+  ggtitle("Profession (Absolute Count)")
+```
+
+```{r warning=FALSE, message=FALSE, fig.width=9, fig.height=7}
+ggplot(subset(okcupid, job != ''), aes(x = job)) +
+  geom_bar(aes(fill = sex), position = 'fill') +
+  coord_flip() +
+  scale_fill_manual(values = c("maroon3", "steelblue4")) +
+  theme_minimal() +
+  ylab("proportion") +
+  ggtitle("Profession (Percentage Split)")
+```
+
+### View on Pets
+
+Generally more men and women seem to like cats and dogs rather than disliking them. A larger proportion of women already have either a cat, a dog or both. 
+
+```{r warning=FALSE, message=FALSE, fig.width=9, fig.height=7}
+#pets
+ggplot(subset(okcupid, pets != ''), aes(x = pets)) +
+  geom_bar(aes(fill = sex), position = 'dodge') +
+  coord_flip() +
+  scale_fill_manual(values = c("maroon3", "steelblue4")) +
+  theme_minimal() +
+  ggtitle("View on Pets (Absolute Count)")
+```
+
+```{r warning=FALSE, message=FALSE, fig.width=9, fig.height=7}
+ggplot(subset(okcupid, pets != ''), aes(x = pets)) +
+  geom_bar(aes(fill = sex), position = 'fill') +
+  coord_flip() +
+  scale_fill_manual(values = c("maroon3", "steelblue4")) +
+  theme_minimal() +
+  ylab("proportion") +
+  ggtitle("View on Pets (Percentage Split)")
+```
+
+### Religious Beliefs
+
+Proportionally there are more men within atheism, while there are more women within Christianity. The least number of people are within Islam and Hinduism, followed by Judaism.  
+
+```{r warning=FALSE, message=FALSE, fig.width=9, fig.height=7}
+#religion
+ggplot(subset(okcupid, religion != ''), aes(x = religion)) +
+  geom_bar(aes(fill = sex), position = 'dodge') +
+  coord_flip() +
+  scale_fill_manual(values = c("maroon3", "steelblue4")) +
+  theme_minimal() +
+  ggtitle("Religious Beliefs (Absolute Count)")
+```
+
+```{r warning=FALSE, message=FALSE, fig.width=9, fig.height=7}
+ggplot(subset(okcupid, religion != ''), aes(x = religion)) +
+  geom_bar(aes(fill = sex), position = 'fill') +
+  coord_flip() +
+  scale_fill_manual(values = c("maroon3", "steelblue4")) +
+  theme_minimal() +
+  ylab("proportion") +
+  ggtitle("Religious Beliefs (Percentage Split)")
+```
+
+### Essay Questions
+
+Having examined the individual specific questions, the next step is to explore the essay questions. Some light preprocessing is required before doing so. Words such as I, the, it and at are removed so that only meaningful words remain. Numbers are also removed to make the text more tidy. A function is written that will carry out the necessary processing of the text to extract the word frequencies and plot the results for each question.
+
+```{r warning=FALSE, message=FALSE, fig.width=9, fig.height=7}
+
+stop_words <- as.data.frame(stopwords())
+colnames(stop_words)[1] <- "word"
+
+numbers <- c("1","2","3","4","5","6")
+numbers <- as.data.frame(numbers)
+colnames(numbers)[1] <- "word"
+
+essay_m <- read.csv('okcupid-essay-m.csv')
+essay_f <- read.csv('okcupid-essay-f.csv')
+essay_m <- essay_m[sample(nrow(essay_m), 24116), ]
+essay_m <- essay_m[,-1]
+essay_f <- essay_f[,-1]
+
+colors <- c("f" = "maroon3", "m" = "steelblue4")
+
+essay_questions <- function(data_m, data_f, var, title) {
+  x_m <- data_m %>%
+    select_(var) %>%
+    unnest_tokens(word, !! rlang::sym(var)) %>%
+    anti_join(stop_words, by = 'word') %>%
+    anti_join(numbers, by = 'word') %>%
+    count(word, sort = TRUE)
+  
+  x_f <- data_f %>%
+    select_(var) %>%
+    unnest_tokens(word, !! rlang::sym(var)) %>%
+    anti_join(stop_words, by = 'word') %>%
+    anti_join(numbers, by = 'word') %>%
+    count(word, sort = TRUE)
+  
+  same_x_mf <- x_m %>%
+    inner_join(x_f, by = 'word')
+  
+  colnames(same_x_mf)[2] <- "n.m"
+  colnames(same_x_mf)[3] <- "n.f"
+  
+  p <- ggplot(same_x_mf[1:50,]) +
+    geom_segment(aes(x = word, xend = word, y = n.f, yend = n.m),
+                 color = 'black') +
+    geom_point(aes(x = word, y = n.f, color = 'f'), size = 3) +
+    geom_point(aes(x = word, y = n.m, color = 'm'), size = 3) +
+    scale_color_manual(values = colors) +
+    labs(y = 'frequency', color = 'sex') +
+    ggtitle(paste('Top 50 most used words:', title)) +
+    theme_minimal() +
+    coord_flip()
+  
+  return(p)
+  
+} #function to generate word frequency charts for each of the 10 essay questions
+```
+
+### About Me
+
+Love and like are the two most frequently used words in this question. However, the word love is much more frequently used by women compared to men.
+
+```{r warning=FALSE, message=FALSE, fig.width=9, fig.height=7}
+about_me <- essay_questions(data_m = essay_m,
+                            data_f = essay_f,
+                            var = 'essay0',
+                            title = 'About Me')
+about_me
+```
+
+### My Current/Future Goals
+
+Within the goals question, there is a common theme of using work, working and time most frequently. The strong difference between the usage of love can be seen here as well.
+
+```{r warning=FALSE, message=FALSE, fig.width=9, fig.height=7}
+goals <- essay_questions(data_m = essay_m,
+                         data_f = essay_f,
+                         var = 'essay1',
+                         title = 'My Current/Future Goals')
+goals
+```
+
+### My Talents
+
+While it may be intuitive that the word good would appear most frequently in a question related to talent, an interesting observation is the second and third most frequently occurring word being making and people respectively. 
+
+```{r warning=FALSE, message=FALSE, fig.width=9, fig.height=7}
+talents <- essay_questions(data_m = essay_m,
+                           data_f = essay_f,
+                           var = 'essay2',
+                           title = 'My Talents')
+talents
+```
+
+### My Personal Traits
+
+When describing traits, it seems that the profiles in this data most frequently refer to eyes, smile, hair and people. The frequency of using the word people is fairly balanced, while the other three are much more strongly favoured by women compared to men, but are still most frequently used by both. 
+ 
+```{r warning=FALSE, message=FALSE, fig.width=9, fig.height=7}
+traits <- essay_questions(data_m = essay_m,
+                          data_f = essay_f,
+                          var = 'essay3',
+                          title = 'My Personal Traits')
+traits
+```
+
+### My Hobbies
+
+Once again that big noticeable difference in the usage of love is visible again. Apart from this, common and frequently occurring words include music, food and movies.
+
+```{r warning=FALSE, message=FALSE, fig.width=9, fig.height=7}
+hobbies <- essay_questions(data_m = essay_m,
+                          data_f = essay_f,
+                          var = 'essay4',
+                          title = 'My Hobbies')
+hobbies
+```
+
+### What can't I live without?
+
+According to the chart, the things considered most essential are family, friends, food and music. Within these four, food is favoured more by men compared to women. 
+
+```{r warning=FALSE, message=FALSE, fig.width=9, fig.height=7}
+needs <- essay_questions(data_m = essay_m,
+                         data_f = essay_f,
+                         var = 'essay5',
+                         title = "What can't I live without?")
+needs
+```
+
+### What do I think about?
+
+There is more variation in terms of word frequency in this chart compared to the charts above. While life and next are commonly used, the word music for instance is favoured more by men whereas the word travel is favoured more by women. 
+
+```{r warning=FALSE, message=FALSE, fig.width=9, fig.height=7}
+thoughts <- essay_questions(data_m = essay_m,
+                         data_f = essay_f,
+                         var = 'essay6',
+                         title = "What do I think about?")
+thoughts
+```
+
+### My average Friday night
+
+This chart indicates a strong use of the word friends when descrbing an average Friday night.
+
+```{r warning=FALSE, message=FALSE, fig.width=9, fig.height=7}
+friday <- essay_questions(data_m = essay_m,
+                            data_f = essay_f,
+                            var = 'essay7',
+                            title = "My average Friday night")
+friday
+```
+
+### A Secret
+
+Similar to the thoughts chart, there is more variation in this chart compared to the others, with no potential theme being clearly highlighted. The word like is used most frequently, and more by men than women. 
+
+```{r warning=FALSE, message=FALSE, fig.width=9, fig.height=7}
+secret <- essay_questions(data_m = essay_m,
+                          data_f = essay_f,
+                          var = 'essay8',
+                          title = "A Secret")
+secret
+```
+
+### What am I looking for?
+
+For the final question, and the conclusion of this project, the chart below is plotted. The word like is used most frequently, followed by want (which makes sense based on the question). However for this question the list of frequently occurring words themselves can provide an insight into the common things people consider when answering this question. Examples include words like conversation, laugh, humour and interesting, which can show what people think are important characteristics to look for when they are searching for a romantic match.
+
+```{r warning=FALSE, message=FALSE, fig.width=9, fig.height=7}
+want <- essay_questions(data_m = essay_m,
+                          data_f = essay_f,
+                          var = 'essay9',
+                          title = "What am I looking for?")
+want
+```
+
+
+
+
+
+
+
+
+
+
+
+
