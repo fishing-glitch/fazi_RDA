@@ -1,0 +1,225 @@
+---
+title: "Mental Health & Suicide Dashboard"
+author: "fazi_da"
+output:
+  flexdashboard::flex_dashboard:
+    source_code: embed
+---
+
+```{r setup, include = FALSE}
+#libraries
+library(mice)
+library(tidyverse)
+library(reshape2)
+library(GGally)
+library(ggrepel)
+library(plotly)
+library(flexdashboard)
+
+#read data
+age_rate <- read.csv('Age-standardized-suicide-rates.csv')
+crude_rate <- read.csv('Crude-suicide-rates.csv')
+facilities <- read.csv('Facilities.csv')
+HR <- read.csv('Human-Resources.csv')
+happy <- read.csv('whr-2016.csv')
+#all data for year 2016
+#first four is data per 100,000 population
+
+####Processing####
+
+#facilities
+facilities <- subset(facilities, select = -c(Year))
+facilities <- facilities[rowSums(is.na(facilities[,1:6])) <= 2, ]
+facilities_temp <- mice(data = facilities, m = 10, method = "pmm", maxit = 50,
+                        seed = 1234)
+facilities_complete <- complete(facilities_temp, 1)
+
+#HR
+HR <- subset(HR, select = -c(Year))
+HR <- HR[rowSums(is.na(HR[,1:5])) <= 2, ]
+HR_temp <- mice(data = HR, m = 10, method = "pmm", maxit = 50, seed = 1234)
+HR_complete <- complete(HR_temp, 1)
+
+#age_rate
+names(age_rate)[names(age_rate) == 'X2016'] <- '2016'
+age_rate <- age_rate[, 1:3]
+age_rate <- reshape(age_rate, idvar = 'Country', timevar = 'Sex', direction = 'wide')
+colnames(age_rate)[2] <- 'Male&Female'
+colnames(age_rate)[3] <- 'Male'
+colnames(age_rate)[4] <- 'Female'
+
+#happy
+happy <- happy[,c(-3, -5,-6)]
+
+#combine data
+all_data <- happy %>%
+  inner_join(facilities_complete, by = 'Country') %>%
+  inner_join(HR_complete, by = 'Country') %>%
+  inner_join(age_rate, by = 'Country')
+colnames(all_data)[20] <- 'Suicide_Rate_MF'
+colnames(all_data)[4] <- 'Economy'
+colnames(all_data)[6] <- 'Health'
+colnames(all_data)[8] <- 'Gov.Corruption'
+
+#crude_rate
+for (i in seq(1:10)){
+ colnames(crude_rate)[i] <- gsub('X', '', colnames(crude_rate)[i]) 
+}
+crude_rate <- crude_rate %>%
+  filter(Country %in% c(all_data$Country))
+crude_rate <- melt(crude_rate, id.vars = c('Country', 'Sex'), value.name = 'Rate')
+colnames(crude_rate)[3] <- 'Age_Band'
+crude_rate$Country <- reorder(crude_rate$Country, crude_rate$Rate)
+```
+
+
+Country
+=======================================================================
+
+Column {data-width = 650}
+-----------------------------------------------------------------------
+
+### Suicide Rates by Age Group (per gender) (per 100,000 population)
+
+```{r warning=FALSE}
+ggplotly(ggplot(subset(crude_rate, Sex == ' Male'|Sex == ' Female'), 
+       aes(x = Country, y = Rate)) +
+  geom_bar(aes(fill = Age_Band), position = 'stack', stat = 'identity') +
+  theme_minimal() +
+  xlab(" ") +
+  ylab(" ") +
+  theme(axis.text.x = element_blank(),
+        axis.text.y = element_text(size = 7)) +
+  scale_fill_brewer(palette = 'RdBu') +
+  facet_wrap(~Sex) +
+  coord_flip())
+```
+
+
+Column {data-width = 350}
+-----------------------------------------------------------------------
+
+### Suicide Rates by Age Group (both genders) (per 100,000 population)
+
+```{r warning = FALSE}
+ggplotly(ggplot(subset(crude_rate, Sex == ' Both sexes'), 
+       aes(x = Country, y = Rate)) +
+  geom_bar(aes(fill = Age_Band), stat = 'identity', position = 'stack') +
+  theme_minimal() +
+  xlab(" ") +
+  theme(axis.text.x = element_blank(),
+        axis.text.y = element_text(size = 7)) +
+  scale_fill_brewer(palette = 'RdBu') +
+  coord_flip())
+```
+
+Happiness vs Suicide
+=======================================================================
+
+### Happiness Score vs Suicide Rates (per 100,000 population)
+
+```{r warning=FALSE}
+ggplotly(ggplot(all_data, aes(x = Happiness.Score, y = Suicide_Rate_MF, Country = Country)) +
+  geom_point(size = 3, 
+             color = case_when(all_data$Happiness.Score >= 6 ~ 'blue',
+                               all_data$Suicide_Rate_MF >= 15 ~ 'red',
+                               TRUE ~ 'black')) +
+  ylab("Suicide Rate (Male & Female)") +
+  xlab("Happiness Score") +  
+  theme_minimal())
+```
+
+Psychiatrists
+=======================================================================
+
+Column {data-width = 500}
+-----------------------------------------------------------------------
+
+### Psychiatrists by Country (per 100,000 population)
+
+```{r warning=FALSE}
+all_data$Country <- reorder(all_data$Country, all_data$Psychiatrists)
+ggplotly(ggplot(all_data, aes(x = Country, y = Psychiatrists, 
+                     Suicide_Rate = Suicide_Rate_MF, Happines_Score = Happiness.Score)) +
+           geom_bar(stat = 'identity', color = 'black', fill = 'steelblue') +
+           xlab("Country") +
+           theme_minimal() +
+           theme(axis.text.x = element_blank(),
+                 axis.text.y = element_text(size = 7)) +
+           coord_flip())  
+```
+
+Column {data-width = 500}
+-----------------------------------------------------------------------
+
+### Psychiatrists vs Suicide Rate (per 100,000 population)
+
+```{r warning=FALSE}
+ggplotly(ggplot(all_data, aes(x = Psychiatrists, y = Suicide_Rate_MF, Country = Country)) +
+  geom_point(size = 2) +
+  ylab("Suicide Rate (Male & Female)") +
+  theme_minimal())
+```
+
+### Psychiatrists (per 100,000 population) vs Happiness Score
+
+```{r warning=FALSE}
+ggplotly(ggplot(all_data, aes(x = Psychiatrists, y = Happiness.Score, Country = Country)) +
+  geom_point(size = 2) +
+  ylab("Happiness Score") +
+  theme_minimal())
+```
+
+Outpatient Facilities
+=======================================================================
+
+Column {data-width = 500}
+-----------------------------------------------------------------------
+
+### Outpatient Facilities by Country (per 100,000 population)
+
+```{r warning=FALSE}
+all_data$Country <- reorder(all_data$Country, all_data$outpatient._facilities)
+ggplotly(ggplot(all_data, aes(x = Country, y = outpatient._facilities, 
+                              Suicide_Rate = Suicide_Rate_MF, Happines_Score = Happiness.Score)) +
+           geom_bar(stat = 'identity', color = 'black', fill = 'slateblue') +
+           xlab("Country") +
+           ylab("Outpatient Facilities") +
+           theme_minimal() +
+           theme(axis.text.x = element_blank(),
+                 axis.text.y = element_text(size = 7)) +
+           coord_flip()) 
+```
+
+
+Column {data-width = 500}
+-----------------------------------------------------------------------
+
+### Outpatient Facilities vs Suicide Rate (per 100,000 population)
+
+```{r warning=FALSE}
+ggplotly(ggplot(all_data, aes(x = outpatient._facilities, y = Suicide_Rate_MF, Country = Country)) +
+           geom_point(size = 2) +
+           ylab("Suicide Rate (Male & Female)") +
+           xlab("Outpatient Facilities") +
+           theme_minimal())
+```
+
+### Outpatient Facilities (per 100,000 population) vs Happiness Score
+
+```{r warning=FALSE}
+ggplotly(ggplot(all_data, aes(x = outpatient._facilities, y = Happiness.Score, Country = Country)) +
+           geom_point(size = 2) +
+           xlab("Outpatient Facilities") +
+           ylab("Happiness Score") +
+           theme_minimal())
+```
+
+
+
+
+
+
+
+
+

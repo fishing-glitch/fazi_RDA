@@ -197,6 +197,16 @@ Admissions =&amp;gt; Hospital admissions attributed to tobacco useFatalities =&
     </item>
     
     <item>
+      <title>This is a test for dashboard</title>
+      <link>/blog/test/</link>
+      <pubDate>Mon, 01 Jan 0001 00:00:00 +0000</pubDate>
+      
+      <guid>/blog/test/</guid>
+      <description>this is a test for the dashboard.
+the dashbaord link is here</description>
+    </item>
+    
+    <item>
       <title>US Unemployment - Time Series and Neural Networks</title>
       <link>/blog/us-unemp/</link>
       <pubDate>Mon, 01 Jan 0001 00:00:00 +0000</pubDate>
