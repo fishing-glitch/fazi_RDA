@@ -1,0 +1,517 @@
+<!DOCTYPE html>
+<html lang="en-us">
+
+<head>
+  <title>Mental Health and Suicide - Imputation with MICE, Data Dashboard | Fazi_RDA</title>
+
+  <meta charset="UTF-8">
+  <meta name="language" content="en">
+  <meta name="description" content="">
+  <meta name="keywords" content="">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta http-equiv="content-type" content="text/html; charset=utf-8">
+  <meta http-equiv="X-UA-Compatible" content="IE=edge">
+
+  
+  
+
+  <link rel="shortcut icon" type="image/png" href="/favicon.ico" />
+
+  
+  
+    
+ 
+  
+  
+  
+  
+  
+  
+    
+    <link rel="stylesheet" href="/css/post.min.3b28d14676e4769849164baf362f2b0aa069ab25702fef98f0c4227cb68d74cd.css" integrity="sha256-OyjRRnbkdphJFkuvNi8rCqBpqyVwL&#43;&#43;Y8MQifLaNdM0="/>
+  
+    
+    <link rel="stylesheet" href="/css/custom.min.e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855.css" integrity="sha256-47DEQpj8HBSa&#43;/TImW&#43;5JCeuQeRkm5NMpJWZG3hSuFU="/>
+  
+  
+   
+   
+    
+
+<script type="application/ld+json">
+  
+    {
+      "@context" : "http://schema.org",
+      "@type" : "BlogPosting",
+      "mainEntityOfPage": {
+            "@type": "WebPage",
+            "@id": "\/"
+      },
+      "articleSection" : "blog",
+      "name" : "Mental Health and Suicide - Imputation with MICE, Data Dashboard",
+      "headline" : "Mental Health and Suicide - Imputation with MICE, Data Dashboard",
+      "description" : "",
+      "inLanguage" : "en-US",
+      "author" : "",
+      "creator" : "",
+      "publisher": "",
+      "accountablePerson" : "",
+      "copyrightHolder" : "",
+      "copyrightYear" : "0001",
+      "datePublished": "0001-01-01 00:00:00 \u002b0000 UTC",
+      "dateModified" : "0001-01-01 00:00:00 \u002b0000 UTC",
+      "url" : "\/blog\/mental-suicide\/",
+      "wordCount" : "1508",
+      "keywords" : ["Blog"]
+    }
+  
+  </script>
+</head>
+
+<body>
+  <div class="burger__container">
+  <div class="burger" aria-controls="navigation" aria-label="Menu">
+    <div class="burger__meat burger__meat--1"></div>
+    <div class="burger__meat burger__meat--2"></div>
+    <div class="burger__meat burger__meat--3"></div>
+  </div>
+</div>
+ 
+
+  <nav class="nav" role="navigation">
+  <ul class="nav__list">
+    
+    
+      <li>
+        <a  href="/">about</a>
+      </li>
+    
+      <li>
+        <a  class="active"
+         href="/blog">projects</a>
+      </li>
+    
+  </ul>
+</nav>
+
+
+  <main>
+    
+    
+
+    <div class="flex-wrapper">
+      <div class="post__container">
+        <div class="post">
+          <header class="post__header">
+            <h1 id="post__title">Mental Health and Suicide - Imputation with MICE, Data Dashboard</h1>
+            <time datetime="0001-01-01 00:00:00 &#43;0000 UTC" class="post__date"
+            > </time>
+          </header>
+          <article class="post__content">
+              
+
+
+
+<div id="introduction" class="section level3">
+<h3>Introduction</h3>
+<p>The data used in this project combines various data sources for exploratory analysis. Data related to suicide rates and mental health facilities in various countries has been sourced from <a href="https://www.kaggle.com/twinkle0705/mental-health-and-suicide-rates?select=Facilities.csv">here</a>, which has further been referenced from data provided by the World Health Organization (WHO). The <a href="https://www.who.int/data/gho/data/themes/mental-health">mental health data</a> provided by WHO states the approximate suicide rates per 100,000 population is various countries by age and gender, while also providing figures related to the facilities and human resources available for mental health care in each country. This data is combined with data from the World Happiness Report generated each year by the <a href="https://worldhappiness.report/">Sustainable Development Solutions Network</a>. As the data from WHO was last updated to show data from 2016, the happiness report from 2016 will also be used to show any potential relationships between each country’s happiness indicator score and suicide rates.</p>
+<p>This project is split in two sections. The first section focuses on imputing missing values using the Multiple Imputation by Chained Equations (MICE) method. The second section then showcases an interactive dashboard of the data to provide a clear visual representation of the information being given.</p>
+<p>Some useful references related to the MICE method for imputation used in this project are:</p>
+<ul>
+<li><a href="https://www.ncbi.nlm.nih.gov/pmc/articles/PMC3074241/" class="uri">https://www.ncbi.nlm.nih.gov/pmc/articles/PMC3074241/</a></li>
+<li><a href="https://www.r-bloggers.com/2015/10/imputing-missing-data-with-r-mice-package/" class="uri">https://www.r-bloggers.com/2015/10/imputing-missing-data-with-r-mice-package/</a></li>
+<li><a href="https://statisticsglobe.com/predictive-mean-matching-imputation-method/" class="uri">https://statisticsglobe.com/predictive-mean-matching-imputation-method/</a></li>
+<li><a href="https://stefvanbuuren.name/fimd/sec-pmm.html" class="uri">https://stefvanbuuren.name/fimd/sec-pmm.html</a></li>
+</ul>
+<p>This project is completed in R.</p>
+<pre class="r"><code>#libraries
+library(mice)
+library(tidyverse)
+library(reshape2)
+library(plotly)
+library(flexdashboard)
+
+#loading data
+age_rate &lt;- read.csv(&#39;Age-standardized-suicide-rates.csv&#39;)
+crude_rate &lt;- read.csv(&#39;Crude-suicide-rates.csv&#39;)
+facilities &lt;- read.csv(&#39;Facilities.csv&#39;)
+HR &lt;- read.csv(&#39;Human-Resources.csv&#39;)
+happy &lt;- read.csv(&#39;whr-2016.csv&#39;) #happiness report 2016 data</code></pre>
+</div>
+<div id="mice-imputation" class="section level3">
+<h3>MICE Imputation</h3>
+<p>Having loaded the data, it can be seen that there are a number of missing values present in the facilities and HR (human resources) data.</p>
+<pre class="r"><code>pander::pander(summary(facilities)) #facilities</code></pre>
+<table>
+<caption>Table continues below</caption>
+<colgroup>
+<col width="25%" />
+<col width="20%" />
+<col width="27%" />
+<col width="27%" />
+</colgroup>
+<thead>
+<tr class="header">
+<th align="center">Country</th>
+<th align="center">Year</th>
+<th align="center">Mental._hospitals</th>
+<th align="center">health_units</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td align="center">Length:112</td>
+<td align="center">Min. :2016</td>
+<td align="center">Min. :0.00000</td>
+<td align="center">Min. :0.00600</td>
+</tr>
+<tr class="even">
+<td align="center">Class :character</td>
+<td align="center">1st Qu.:2016</td>
+<td align="center">1st Qu.:0.01825</td>
+<td align="center">1st Qu.:0.03575</td>
+</tr>
+<tr class="odd">
+<td align="center">Mode :character</td>
+<td align="center">Median :2016</td>
+<td align="center">Median :0.03650</td>
+<td align="center">Median :0.09350</td>
+</tr>
+<tr class="even">
+<td align="center">NA</td>
+<td align="center">Mean :2016</td>
+<td align="center">Mean :0.24613</td>
+<td align="center">Mean :0.31908</td>
+</tr>
+<tr class="odd">
+<td align="center">NA</td>
+<td align="center">3rd Qu.:2016</td>
+<td align="center">3rd Qu.:0.15875</td>
+<td align="center">3rd Qu.:0.37900</td>
+</tr>
+<tr class="even">
+<td align="center">NA</td>
+<td align="center">Max. :2016</td>
+<td align="center">Max. :8.31400</td>
+<td align="center">Max. :4.54200</td>
+</tr>
+<tr class="odd">
+<td align="center">NA</td>
+<td align="center">NA</td>
+<td align="center">NA’s :22</td>
+<td align="center">NA’s :10</td>
+</tr>
+</tbody>
+</table>
+<table style="width:94%;">
+<colgroup>
+<col width="34%" />
+<col width="25%" />
+<col width="34%" />
+</colgroup>
+<thead>
+<tr class="header">
+<th align="center">outpatient._facilities</th>
+<th align="center">day._treatment</th>
+<th align="center">residential_facilities</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td align="center">Min. : 0.0060</td>
+<td align="center">Min. : 0.0020</td>
+<td align="center">Min. :0.0060</td>
+</tr>
+<tr class="even">
+<td align="center">1st Qu.: 0.1235</td>
+<td align="center">1st Qu.: 0.0225</td>
+<td align="center">1st Qu.:0.0330</td>
+</tr>
+<tr class="odd">
+<td align="center">Median : 0.5730</td>
+<td align="center">Median : 0.1250</td>
+<td align="center">Median :0.1520</td>
+</tr>
+<tr class="even">
+<td align="center">Mean : 1.8751</td>
+<td align="center">Mean : 1.1348</td>
+<td align="center">Mean :0.8733</td>
+</tr>
+<tr class="odd">
+<td align="center">3rd Qu.: 2.2360</td>
+<td align="center">3rd Qu.: 0.7605</td>
+<td align="center">3rd Qu.:0.4790</td>
+</tr>
+<tr class="even">
+<td align="center">Max. :19.7510</td>
+<td align="center">Max. :17.1760</td>
+<td align="center">Max. :6.1780</td>
+</tr>
+<tr class="odd">
+<td align="center">NA’s :12</td>
+<td align="center">NA’s :61</td>
+<td align="center">NA’s :67</td>
+</tr>
+</tbody>
+</table>
+<pre class="r"><code>pander::pander(summary(HR)) #HR</code></pre>
+<table style="width:99%;">
+<caption>Table continues below</caption>
+<colgroup>
+<col width="26%" />
+<col width="20%" />
+<col width="25%" />
+<col width="26%" />
+</colgroup>
+<thead>
+<tr class="header">
+<th align="center">Country</th>
+<th align="center">Year</th>
+<th align="center">Psychiatrists</th>
+<th align="center">Nurses</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td align="center">Length:107</td>
+<td align="center">Min. :2016</td>
+<td align="center">Min. : 0.0070</td>
+<td align="center">Min. : 0.0000</td>
+</tr>
+<tr class="even">
+<td align="center">Class :character</td>
+<td align="center">1st Qu.:2016</td>
+<td align="center">1st Qu.: 0.2198</td>
+<td align="center">1st Qu.: 0.7935</td>
+</tr>
+<tr class="odd">
+<td align="center">Mode :character</td>
+<td align="center">Median :2016</td>
+<td align="center">Median : 1.2310</td>
+<td align="center">Median : 4.1990</td>
+</tr>
+<tr class="even">
+<td align="center">NA</td>
+<td align="center">Mean :2016</td>
+<td align="center">Mean : 4.3405</td>
+<td align="center">Mean : 12.1229</td>
+</tr>
+<tr class="odd">
+<td align="center">NA</td>
+<td align="center">3rd Qu.:2016</td>
+<td align="center">3rd Qu.: 4.5595</td>
+<td align="center">3rd Qu.: 10.9525</td>
+</tr>
+<tr class="even">
+<td align="center">NA</td>
+<td align="center">Max. :2016</td>
+<td align="center">Max. :48.0400</td>
+<td align="center">Max. :150.2510</td>
+</tr>
+<tr class="odd">
+<td align="center">NA</td>
+<td align="center">NA</td>
+<td align="center">NA’s :3</td>
+<td align="center">NA’s :16</td>
+</tr>
+</tbody>
+</table>
+<table style="width:50%;">
+<colgroup>
+<col width="25%" />
+<col width="25%" />
+</colgroup>
+<thead>
+<tr class="header">
+<th align="center">Social_workers</th>
+<th align="center">Psychologists</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td align="center">Min. : 0.0060</td>
+<td align="center">Min. : 0.0000</td>
+</tr>
+<tr class="even">
+<td align="center">1st Qu.: 0.0665</td>
+<td align="center">1st Qu.: 0.2367</td>
+</tr>
+<tr class="odd">
+<td align="center">Median : 0.3755</td>
+<td align="center">Median : 1.1390</td>
+</tr>
+<tr class="even">
+<td align="center">Mean : 4.8326</td>
+<td align="center">Mean : 10.4154</td>
+</tr>
+<tr class="odd">
+<td align="center">3rd Qu.: 1.3513</td>
+<td align="center">3rd Qu.: 5.1502</td>
+</tr>
+<tr class="even">
+<td align="center">Max. :102.5920</td>
+<td align="center">Max. :222.5720</td>
+</tr>
+<tr class="odd">
+<td align="center">NA’s :39</td>
+<td align="center">NA’s :23</td>
+</tr>
+</tbody>
+</table>
+<p>While there are simpler methods which exist to impute missing values, such as replacing the missing entries with the mean or median of the variable, with a case of several missing values this is potentially incorrect as it can lead to a significant amount of bias in the data. Another option would be to just remove the variable, but this has its own problem of leading to potentially important information being lost.</p>
+<p>In such a case, MICE can be a potential solution to the problem for missing values. To explain MICE as simply as possible, it involves creating various copies of the data and replace missing data in each of the copies, after which the results can be combined to produce a more realistic result. The way MICE replaces the missing data is by studying the relationships between all the other variables as well, and using this relationship to predict a value for the missing entry. This is similar to carrying out linear regression. By fitting the simple predictive model on the complete cases, the model can be used to predict what the missing entry could be. This is then done for each copy created, with the results later combined to produce final values for missing data. More specific details about how MICE operates can be found in the links mentioned earlier.</p>
+<p>Before applying MICE in this specific case, two factors need to be accounted for. Firstly, MICE operates under the assumption that the data is missing randomly, as opposed to missing because it simply doesn’t exist. For instance, in this case if the number of mental hospitals for a country is labelled as missing, it is assumed that this is purely by chance rather than that country not having any mental hospitals. Secondly, as MICE still requires some rows of the data to be complete in order to produce a somewhat reliable value, some sample rows from these two datasets (facilities &amp; HR) are deleted as there are simply too many missing values for that specific country. The condition used is that rows with more than 2 missing values are removed, since there are only 5 and 4 relevant variables in the facilities and HR datasets respectively. The year column is also removed as it is not needed.</p>
+<pre class="r"><code>facilities &lt;- subset(facilities, select = -c(Year))
+facilities &lt;- facilities[rowSums(is.na(facilities[,1:6])) &lt;= 2, ]
+
+HR &lt;- subset(HR, select = -c(Year))
+HR &lt;- HR[rowSums(is.na(HR[,1:5])) &lt;= 2, ]</code></pre>
+<p>The pattern of missing values in both these datasets can be seen below. There are 23 rows in facilities with no missing values, and 53 rows in HR without any missing values.</p>
+<pre class="r"><code>md.pattern(facilities, rotate.names = TRUE, plot = TRUE)</code></pre>
+<p><img src="/images/md-pattern-facilities.png" /></p>
+<pre class="r"><code>md.pattern(HR, rotate.names = TRUE, plot = TRUE)</code></pre>
+<p><img src="/images/md-pattern-HR.png" /></p>
+<p>The next step is applying MICE on these two datasets. The three important hyper-parameters are m (number of copies), method (the imputation method) and maxit (the number of cycles for the imputation method). To balance robust results with computational time, 10 copies (m = 10) and 50 cycles (maxit = 50) are selected. The imputation method is chosen to be Predictive Mean Matching (pmm). Pmm is currently a highly robust method for missing value imputation, producing better results than mean value imputation or even linear regression, and is widely used for imputing missing values. Having defined these parameters, the MICE method is carried out on the two datasets. The mice() function generates the values for imputation, which are then placed in the datasets using the complete() function.</p>
+<pre class="r"><code>facilities_temp &lt;- mice(data = facilities, m = 10, method = &quot;pmm&quot;, maxit = 50,
+                        seed = 1234) 
+facilities_complete &lt;- complete(facilities_temp, 1)
+
+HR_temp &lt;- mice(data = HR, m = 10, method = &quot;pmm&quot;, maxit = 50, seed = 1234)
+HR_complete &lt;- complete(HR_temp, 1)</code></pre>
+<p>A quick check to see if any missing values are left:</p>
+<pre class="r"><code>sum(is.na(facilities_complete))</code></pre>
+<pre><code>## [1] 0</code></pre>
+<pre class="r"><code>sum(is.na(HR_complete))</code></pre>
+<pre><code>## [1] 0</code></pre>
+</div>
+<div id="further-processing" class="section level3">
+<h3>Further Processing</h3>
+<p>With the missing value imputation complete facilities and HR, the remaining datasets can now be processed further for creating the dashboard. The age_rate dataset provides the suicide rates for men, women and both divided by different age groups. Data from only 2016 is selected, and the data is then reshaped to make it suitable for visualization. Variables not required for this analysis are removed from the Happiness Report data (confidence intervals, year). These 4 datasets are then combined into one dataset representing all the information. The combination is carried out using an inner join to show information only for countries common in all 4 datasets. The crude_rate dataset is not added to the master dataset as it will be used separately. It shows the suicide rates for men, women and both across all ages for different countries. It is filtered to have the same countries as the master file. All these steps are carried out in the code chunk below.</p>
+<pre class="r"><code>#age_rate
+names(age_rate)[names(age_rate) == &#39;X2016&#39;] &lt;- &#39;2016&#39;
+age_rate &lt;- age_rate[, 1:3]
+age_rate &lt;- reshape(age_rate, idvar = &#39;Country&#39;, timevar = &#39;Sex&#39;, direction = &#39;wide&#39;)
+colnames(age_rate)[2] &lt;- &#39;Male&amp;Female&#39;
+colnames(age_rate)[3] &lt;- &#39;Male&#39;
+colnames(age_rate)[4] &lt;- &#39;Female&#39;
+
+#happy
+happy &lt;- happy[,c(-3, -5,-6)]
+
+#combine data
+all_data &lt;- happy %&gt;%
+  inner_join(facilities_complete, by = &#39;Country&#39;) %&gt;%
+  inner_join(HR_complete, by = &#39;Country&#39;) %&gt;%
+  inner_join(age_rate, by = &#39;Country&#39;)
+colnames(all_data)[20] &lt;- &#39;Suicide_Rate_MF&#39;
+colnames(all_data)[4] &lt;- &#39;Economy&#39;
+colnames(all_data)[6] &lt;- &#39;Health&#39;
+colnames(all_data)[8] &lt;- &#39;Gov.Corruption&#39;
+all_data &lt;- all_data[,c(-2,-21,-22)]
+
+#crude_rate
+for (i in seq(1:10)){
+ colnames(crude_rate)[i] &lt;- gsub(&#39;X&#39;, &#39;&#39;, colnames(crude_rate)[i]) 
+}
+crude_rate &lt;- crude_rate %&gt;%
+  filter(Country %in% c(all_data$Country))
+crude_rate &lt;- melt(crude_rate, id.vars = c(&#39;Country&#39;, &#39;Sex&#39;), value.name = &#39;Rate&#39;)
+colnames(crude_rate)[3] &lt;- &#39;Age_Band&#39;
+crude_rate$Country &lt;- reorder(crude_rate$Country, crude_rate$Rate)</code></pre>
+<p>In total, there is complete data for 62 countries that will be used for the dashboard.</p>
+</div>
+<div id="dashboard" class="section level3">
+<h3>Dashboard</h3>
+<p>The dashboard is split in 5 sections:</p>
+<ul>
+<li>visualizing the suicide rates for each country divided by different age groups</li>
+<li>correlation of happiness score from the Happiness Report with the suicide rates for each country</li>
+<li>visualizing the facilities, human resources and happiness score contributor data for each country</li>
+<li>correlation of facilities and human resources with suicide rates</li>
+<li>correlation of happiness score contributors and suicide rates</li>
+</ul>
+<p>The dashboard can be viewed <a href="/blog/mental-dashboard.html">here</a>. Through the visualizations shown, perhaps a better understanding behind suicide can be developed, thereby leading to better services and help for people suffering from suicide contemplation.</p>
+</div>
+
+
+              
+          </article>
+          
+
+ <div class="pagination">
+  
+    <a class="pagination__item" href="/blog/religious-and-sacred-texts/">
+        <span class="pagination__label">Previous Post</span>
+        <span class="pagination__title">Mining Religious and Sacred Texts</span>
+    </a>
+  
+
+  
+    <a class="pagination__item" href="/blog/music/">
+      <span class="pagination__label">Next Post</span>
+      <span class="pagination__title" >Jazz, Metal, Electronic - Analyzing and Clustering Music</a>
+    </a>
+  
+</div>
+
+          
+          <footer class="post__footer">
+            
+
+
+<div class="social-icons">
+  
+     
+    
+  
+     
+    
+  
+     
+    
+  
+     
+    
+  
+     
+    
+  
+     
+    
+  
+     
+    
+  
+     
+    
+     
+</div>
+
+            <p>© 2020 fazi_rda</p>
+          </footer>
+          </div>
+      </div>
+      
+    </div>
+    
+
+  </main>
+
+   
+
+  
+  <script src="/js/index.min.49e4d8a384357d9b445b87371863419937ede9fa77737522ffb633073aebfa44.js" integrity="sha256-SeTYo4Q1fZtEW4c3GGNBmTft6fp3c3Ui/7YzBzrr&#43;kQ=" crossorigin="anonymous"></script>
+  
+  
+  <script src="https://unpkg.com/prismjs@1.20.0/components/prism-core.min.js"></script>
+
+  
+  <script src="https://unpkg.com/prismjs@1.20.0/plugins/autoloader/prism-autoloader.min.js"
+    data-autoloader-path="https://unpkg.com/prismjs@1.20.0/components/"></script>
+
+  
+
+
+</body>
+
+</html>

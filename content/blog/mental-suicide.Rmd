@@ -1,0 +1,149 @@
+---
+title: "Mental Health and Suicide - Imputation with MICE, Data Dashboard"
+output: html_notebook
+---
+
+### Introduction
+
+The data used in this project combines various data sources for exploratory analysis. Data related to suicide rates and mental health facilities in various countries has been sourced from [here](https://www.kaggle.com/twinkle0705/mental-health-and-suicide-rates?select=Facilities.csv), which has further been referenced from data provided by the World Health Organization (WHO). The [mental health data](https://www.who.int/data/gho/data/themes/mental-health) provided by WHO states the approximate suicide rates per 100,000 population is various countries by age and gender, while also providing figures related to the facilities and human resources available for mental health care in each country. This data is combined with data from the World Happiness Report generated each year by the [Sustainable Development Solutions Network](https://worldhappiness.report/). As the data from WHO was last updated to show data from 2016, the happiness report from 2016 will also be used to show any potential relationships between each country's happiness indicator score and suicide rates. 
+
+This project is split in two sections. The first section focuses on imputing missing values using the Multiple Imputation by Chained Equations (MICE) method. The second section then showcases an interactive dashboard of the data to provide a clear visual representation of the information being given. 
+
+Some useful references related to the MICE method for imputation used in this project are:
+
+- https://www.ncbi.nlm.nih.gov/pmc/articles/PMC3074241/
+- https://www.r-bloggers.com/2015/10/imputing-missing-data-with-r-mice-package/
+- https://statisticsglobe.com/predictive-mean-matching-imputation-method/
+- https://stefvanbuuren.name/fimd/sec-pmm.html
+
+This project is completed in R.
+
+```{r warning=FALSE, message=FALSE, fig.width=7.5, fig.height=4.5}
+#libraries
+library(mice)
+library(tidyverse)
+library(reshape2)
+library(plotly)
+library(flexdashboard)
+
+#loading data
+age_rate <- read.csv('Age-standardized-suicide-rates.csv')
+crude_rate <- read.csv('Crude-suicide-rates.csv')
+facilities <- read.csv('Facilities.csv')
+HR <- read.csv('Human-Resources.csv')
+happy <- read.csv('whr-2016.csv') #happiness report 2016 data
+```
+
+### MICE Imputation
+
+Having loaded the data, it can be seen that there are a number of missing values present in the facilities and HR (human resources) data. 
+
+```{r warning=FALSE, message=FALSE, fig.width=7.5, fig.height=4.5}
+pander::pander(summary(facilities)) #facilities
+pander::pander(summary(HR)) #HR
+```
+
+While there are simpler methods which exist to impute missing values, such as replacing the missing entries with the mean or median of the variable, with a case of several missing values this is potentially incorrect as it can lead to a significant amount of bias in the data. Another option would be to just remove the variable, but this has its own problem of leading to potentially important information being lost. 
+
+In such a case, MICE can be a potential solution to the problem for missing values. To explain MICE as simply as possible, it involves creating various copies of the data and replace missing data in each of the copies, after which the results can be combined to produce a more realistic result. The way MICE replaces the missing data is by studying the relationships between all the other variables as well, and using this relationship to predict a value for the missing entry. This is similar to carrying out linear regression. By fitting the simple predictive model on the complete cases, the model can be used to predict what the missing entry could be. This is then done for each copy created, with the results later combined to produce final values for missing data. More specific details about how MICE operates can be found in the links mentioned earlier. 
+
+Before applying MICE in this specific case, two factors need to be accounted for. Firstly, MICE operates under the assumption that the data is missing randomly, as opposed to missing because it simply doesn't exist. For instance, in this case if the number of mental hospitals for a country is labelled as missing, it is assumed that this is purely by chance rather than that country not having any mental hospitals. Secondly, as MICE still requires some rows of the data to be complete in order to produce a somewhat reliable value, some sample rows from these two datasets (facilities & HR) are deleted as there are simply too many missing values for that specific country. The condition used is that rows with more than 2 missing values are removed, since there are only 5 and 4 relevant variables in the facilities and HR datasets respectively. The year column is also removed as it is not needed.  
+
+```{r warning=FALSE, message=FALSE, fig.width=7.5, fig.height=4.5}
+facilities <- subset(facilities, select = -c(Year))
+facilities <- facilities[rowSums(is.na(facilities[,1:6])) <= 2, ]
+
+HR <- subset(HR, select = -c(Year))
+HR <- HR[rowSums(is.na(HR[,1:5])) <= 2, ]
+
+```
+
+The pattern of missing values in both these datasets can be seen below. There are 23 rows in facilities with no missing values, and 53 rows in HR without any missing values.
+
+```{r warning=FALSE, message=FALSE, fig.width=7.5, fig.height=4.5, eval = FALSE}
+md.pattern(facilities, rotate.names = TRUE, plot = TRUE)
+```
+![](/images/md-pattern-facilities.png)
+```{r warning=FALSE, message=FALSE, fig.width=7.5, fig.height=4.5, eval = FALSE}
+md.pattern(HR, rotate.names = TRUE, plot = TRUE)
+```
+![](/images/md-pattern-HR.png)
+
+The next step is applying MICE on these two datasets. The three important hyper-parameters are m (number of copies), method (the imputation method) and maxit (the number of cycles for the imputation method). To balance robust results with computational time, 10 copies (m = 10) and 50 cycles (maxit = 50) are selected. The imputation method is chosen to be Predictive Mean Matching (pmm). Pmm is currently a highly robust method for missing value imputation, producing better results than mean value imputation or even linear regression, and is widely used for imputing missing values. Having defined these parameters, the MICE method is carried out on the two datasets. The mice() function generates the values for imputation, which are then placed in the datasets using the complete() function.
+
+```{r warning=FALSE, message=FALSE, fig.width=7.5, fig.height=4.5, results='hide'}
+facilities_temp <- mice(data = facilities, m = 10, method = "pmm", maxit = 50,
+                        seed = 1234) 
+facilities_complete <- complete(facilities_temp, 1)
+
+HR_temp <- mice(data = HR, m = 10, method = "pmm", maxit = 50, seed = 1234)
+HR_complete <- complete(HR_temp, 1)
+
+```
+
+A quick check to see if any missing values are left:
+
+```{r warning=FALSE, message=FALSE, fig.width=7.5, fig.height=4.5}
+sum(is.na(facilities_complete))
+sum(is.na(HR_complete))
+```
+
+### Further Processing
+
+With the missing value imputation complete facilities and HR, the remaining datasets can now be processed further for creating the dashboard. The age_rate dataset provides the suicide rates for men, women and both divided by different age groups. Data from only 2016 is selected, and the data is then reshaped to make it suitable for visualization. Variables not required for this analysis are removed from the Happiness Report data (confidence intervals, year). These 4 datasets are then combined into one dataset representing all the information. The combination is carried out using an inner join to show information only for countries common in all 4 datasets. The crude_rate dataset is not added to the master dataset as it will be used separately. It shows the suicide rates for men, women and both across all ages for different countries. It is filtered to have the same countries as the master file. All these steps are carried out in the code chunk below. 
+
+```{r warning=FALSE, message=FALSE, fig.width=7.5, fig.height=4.5}
+#age_rate
+names(age_rate)[names(age_rate) == 'X2016'] <- '2016'
+age_rate <- age_rate[, 1:3]
+age_rate <- reshape(age_rate, idvar = 'Country', timevar = 'Sex', direction = 'wide')
+colnames(age_rate)[2] <- 'Male&Female'
+colnames(age_rate)[3] <- 'Male'
+colnames(age_rate)[4] <- 'Female'
+
+#happy
+happy <- happy[,c(-3, -5,-6)]
+
+#combine data
+all_data <- happy %>%
+  inner_join(facilities_complete, by = 'Country') %>%
+  inner_join(HR_complete, by = 'Country') %>%
+  inner_join(age_rate, by = 'Country')
+colnames(all_data)[20] <- 'Suicide_Rate_MF'
+colnames(all_data)[4] <- 'Economy'
+colnames(all_data)[6] <- 'Health'
+colnames(all_data)[8] <- 'Gov.Corruption'
+all_data <- all_data[,c(-2,-21,-22)]
+
+#crude_rate
+for (i in seq(1:10)){
+ colnames(crude_rate)[i] <- gsub('X', '', colnames(crude_rate)[i]) 
+}
+crude_rate <- crude_rate %>%
+  filter(Country %in% c(all_data$Country))
+crude_rate <- melt(crude_rate, id.vars = c('Country', 'Sex'), value.name = 'Rate')
+colnames(crude_rate)[3] <- 'Age_Band'
+crude_rate$Country <- reorder(crude_rate$Country, crude_rate$Rate)
+```
+
+In total, there is complete data for 62 countries that will be used for the dashboard. 
+
+### Dashboard
+
+The dashboard is split in 5 sections:
+
+- visualizing the suicide rates for each country divided by different age groups
+- correlation of happiness score from the Happiness Report with the suicide rates for each country
+- visualizing the facilities, human resources and happiness score contributor data for each country
+- correlation of facilities and human resources with suicide rates
+- correlation of happiness score contributors and suicide rates
+
+The dashboard can be viewed [here](/blog/mental-dashboard.html). Through the visualizations shown, perhaps a better understanding behind suicide can be developed, thereby leading to better services and help for people suffering from suicide contemplation. 
+
+
+
+
+
+
+
+

@@ -133,6 +133,15 @@ The dataset contains some information about computers, with the dependant variab
     </item>
     
     <item>
+      <title>Mental Health and Suicide - Imputation with MICE, Data Dashboard</title>
+      <link>/blog/mental-suicide/</link>
+      <pubDate>Mon, 01 Jan 0001 00:00:00 +0000</pubDate>
+      
+      <guid>/blog/mental-suicide/</guid>
+      <description>IntroductionThe data used in this project combines various data sources for exploratory analysis. Data related to suicide rates and mental health facilities in various countries has been sourced from here, which has further been referenced from data provided by the World Health Organization (WHO). The mental health data provided by WHO states the approximate suicide rates per 100,000 population is various countries by age and gender, while also providing figures related to the facilities and human resources available for mental health care in each country.</description>
+    </item>
+    
+    <item>
       <title>Mining Religious and Sacred Texts</title>
       <link>/blog/religious-and-sacred-texts/</link>
       <pubDate>Mon, 01 Jan 0001 00:00:00 +0000</pubDate>
@@ -194,16 +203,6 @@ The dataset contains some information about computers, with the dependant variab
       <guid>/blog/tobacco/</guid>
       <description>IntroductionThe data used in this visual exploratory analysis describes information related to tobacco use in England, from 2004-2015. The data was obtained from https://www.kaggle.com/nhs/tobacco-use, and contains five different data files, each describing a specific aspect. These are as follows:
 Admissions =&amp;gt; Hospital admissions attributed to tobacco useFatalities =&amp;gt; Fatalities attributed to tobacco useMetrics =&amp;gt; Household expenditures on tobacco (index values)Prescriptions =&amp;gt; Prescription information attributed to tobacco useSmokers =&amp;gt; Smokers by age as percentage of populationThe aim here is to simply create clear and aesthetically appealing visualizations, which can provide sufficient insight about each of the five data files.</description>
-    </item>
-    
-    <item>
-      <title>This is a test for dashboard</title>
-      <link>/blog/test/</link>
-      <pubDate>Mon, 01 Jan 0001 00:00:00 +0000</pubDate>
-      
-      <guid>/blog/test/</guid>
-      <description>this is a test for the dashboard.
-the dashbaord link is here</description>
     </item>
     
     <item>
