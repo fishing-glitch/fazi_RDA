@@ -1,0 +1,452 @@
+---
+title: "Classifying Strokes - Balancing Classes with SMOTE"
+output: html_notebook
+---
+
+
+
+<div id="introduction" class="section level3">
+<h3>Introduction</h3>
+<p>The following analysis is a simple classification problem, with the aim of predicting whether a patient would likely experience a stroke based on certain input factors. These factors include variables such as age, gender and other lifestyle related parameters. While the classification problem in itself is quite simple, the problem of unbalanced classes within the target variable is prominent in this dataset. In order to accommodate this imbalance, the SMOTE (Synthetic Minority Oversampling Technique) method will be described and used later. The dataset was freely obtained from Kaggle via the following link: <a href="https://www.kaggle.com/fedesoriano/stroke-prediction-dataset" class="uri">https://www.kaggle.com/fedesoriano/stroke-prediction-dataset</a>. The analysis is carried out in R.</p>
+<p>Before progressing further, the required libraries and data are loaded.</p>
+<pre class="r"><code>#Libraries
+library(tidyverse)
+library(rsample)
+library(caret)
+library(DMwR)
+library(pROC)
+
+#Load Data
+strokes &lt;- read.csv(&#39;healthcare-dataset-stroke-data.csv&#39;)</code></pre>
+</div>
+<div id="preprocessing-data" class="section level3">
+<h3>Preprocessing Data</h3>
+<p>The data requires some initial processing and cleaning before it can be used for exploratory analysis and predictive modelling. The unique ID column is removed as it provides no valuable information relevant to the analysis, and a brief description of the remaining variables are shown.</p>
+<pre class="r"><code>strokes &lt;- strokes[,-1] #remove ID column
+
+str(strokes) #variable description</code></pre>
+<pre><code>## &#39;data.frame&#39;:    5110 obs. of  11 variables:
+##  $ gender           : chr  &quot;Male&quot; &quot;Female&quot; &quot;Male&quot; &quot;Female&quot; ...
+##  $ age              : num  67 61 80 49 79 81 74 69 59 78 ...
+##  $ hypertension     : int  0 0 0 0 1 0 1 0 0 0 ...
+##  $ heart_disease    : int  1 0 1 0 0 0 1 0 0 0 ...
+##  $ ever_married     : chr  &quot;Yes&quot; &quot;Yes&quot; &quot;Yes&quot; &quot;Yes&quot; ...
+##  $ work_type        : chr  &quot;Private&quot; &quot;Self-employed&quot; &quot;Private&quot; &quot;Private&quot; ...
+##  $ Residence_type   : chr  &quot;Urban&quot; &quot;Rural&quot; &quot;Rural&quot; &quot;Urban&quot; ...
+##  $ avg_glucose_level: num  229 202 106 171 174 ...
+##  $ bmi              : chr  &quot;36.6&quot; &quot;N/A&quot; &quot;32.5&quot; &quot;34.4&quot; ...
+##  $ smoking_status   : chr  &quot;formerly smoked&quot; &quot;never smoked&quot; &quot;never smoked&quot; &quot;smokes&quot; ...
+##  $ stroke           : int  1 1 1 1 1 1 1 1 1 1 ...</code></pre>
+<p>The above description shows that there are 11 variables in total (including the target variable), with 5110 observations. The bmi variable is converted into a numeric format. As gender, hypertension, heart_disease, ever_married, work_type, Residence_type, avg_glucose_level, smoking_status and stroke are all categorical variables, they are converted to type factor so that they may be treated as categorical variables during analysis and modelling. The stroke variable is relabelled to show “Yes” or “No” instead of 1 and 0 for an easier representation and interpretation of the presence/absence of a stroke.</p>
+<pre class="r"><code>strokes[,9] &lt;- as.numeric(strokes[,9]) #convert bmi to numeric
+
+#convert categorical variables to type factor
+x &lt;- c(1, 3:7, 10, 11)
+
+for (i in x) {
+  strokes[,i] &lt;- as.factor(strokes[,i])
+}
+
+rm(x)
+
+#relabel target variable from 0 and 1 to No and Yes
+levels(strokes$stroke) &lt;- c(&#39;No&#39;, &#39;Yes&#39;)</code></pre>
+<p>A check for any missing values is run.</p>
+<pre class="r"><code>print(paste(&#39;The number of missing values in the data is: &#39;, sum(is.na(strokes))))</code></pre>
+<pre><code>## [1] &quot;The number of missing values in the data is:  201&quot;</code></pre>
+<p>As there are only 201 missing values in data, observations with these values can be removed as it is just a small percentage of the total observations and there is no risk for significant information loss. It is also observed that there is just one observation in the gender variable labelled as ‘Other’. This one observation is also removed purely for the sake of simplicity and reducing potential outliers that can impact model performance. Summary statistics for the processed variables are shown below.</p>
+<pre class="r"><code>#remove 201 NA rows (looks like all from BMI)
+strokes &lt;- na.omit(strokes)
+
+#remove 1 observation with gender labelled as &#39;Other&#39;
+strokes &lt;- subset(strokes, gender != &#39;Other&#39;)
+
+#summary statistics
+pander::pander(summary(strokes))</code></pre>
+<table style="width:100%;">
+<caption>Table continues below</caption>
+<colgroup>
+<col width="18%" />
+<col width="20%" />
+<col width="19%" />
+<col width="20%" />
+<col width="20%" />
+</colgroup>
+<thead>
+<tr class="header">
+<th align="center">gender</th>
+<th align="center">age</th>
+<th align="center">hypertension</th>
+<th align="center">heart_disease</th>
+<th align="center">ever_married</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td align="center">Female:2897</td>
+<td align="center">Min. : 0.08</td>
+<td align="center">0:4457</td>
+<td align="center">0:4665</td>
+<td align="center">No :1704</td>
+</tr>
+<tr class="even">
+<td align="center">Male :2011</td>
+<td align="center">1st Qu.:25.00</td>
+<td align="center">1: 451</td>
+<td align="center">1: 243</td>
+<td align="center">Yes:3204</td>
+</tr>
+<tr class="odd">
+<td align="center">Other : 0</td>
+<td align="center">Median :44.00</td>
+<td align="center">NA</td>
+<td align="center">NA</td>
+<td align="center">NA</td>
+</tr>
+<tr class="even">
+<td align="center">NA</td>
+<td align="center">Mean :42.87</td>
+<td align="center">NA</td>
+<td align="center">NA</td>
+<td align="center">NA</td>
+</tr>
+<tr class="odd">
+<td align="center">NA</td>
+<td align="center">3rd Qu.:60.00</td>
+<td align="center">NA</td>
+<td align="center">NA</td>
+<td align="center">NA</td>
+</tr>
+<tr class="even">
+<td align="center">NA</td>
+<td align="center">Max. :82.00</td>
+<td align="center">NA</td>
+<td align="center">NA</td>
+<td align="center">NA</td>
+</tr>
+</tbody>
+</table>
+<table>
+<caption>Table continues below</caption>
+<colgroup>
+<col width="28%" />
+<col width="22%" />
+<col width="27%" />
+<col width="21%" />
+</colgroup>
+<thead>
+<tr class="header">
+<th align="center">work_type</th>
+<th align="center">Residence_type</th>
+<th align="center">avg_glucose_level</th>
+<th align="center">bmi</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td align="center">children : 671</td>
+<td align="center">Rural:2418</td>
+<td align="center">Min. : 55.12</td>
+<td align="center">Min. :10.30</td>
+</tr>
+<tr class="even">
+<td align="center">Govt_job : 630</td>
+<td align="center">Urban:2490</td>
+<td align="center">1st Qu.: 77.07</td>
+<td align="center">1st Qu.:23.50</td>
+</tr>
+<tr class="odd">
+<td align="center">Never_worked : 22</td>
+<td align="center">NA</td>
+<td align="center">Median : 91.68</td>
+<td align="center">Median :28.10</td>
+</tr>
+<tr class="even">
+<td align="center">Private :2810</td>
+<td align="center">NA</td>
+<td align="center">Mean :105.30</td>
+<td align="center">Mean :28.89</td>
+</tr>
+<tr class="odd">
+<td align="center">Self-employed: 775</td>
+<td align="center">NA</td>
+<td align="center">3rd Qu.:113.50</td>
+<td align="center">3rd Qu.:33.10</td>
+</tr>
+<tr class="even">
+<td align="center">NA</td>
+<td align="center">NA</td>
+<td align="center">Max. :271.74</td>
+<td align="center">Max. :97.60</td>
+</tr>
+</tbody>
+</table>
+<table style="width:47%;">
+<colgroup>
+<col width="31%" />
+<col width="15%" />
+</colgroup>
+<thead>
+<tr class="header">
+<th align="center">smoking_status</th>
+<th align="center">stroke</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td align="center">formerly smoked: 836</td>
+<td align="center">No :4699</td>
+</tr>
+<tr class="even">
+<td align="center">never smoked :1852</td>
+<td align="center">Yes: 209</td>
+</tr>
+<tr class="odd">
+<td align="center">smokes : 737</td>
+<td align="center">NA</td>
+</tr>
+<tr class="even">
+<td align="center">Unknown :1483</td>
+<td align="center">NA</td>
+</tr>
+<tr class="odd">
+<td align="center">NA</td>
+<td align="center">NA</td>
+</tr>
+<tr class="even">
+<td align="center">NA</td>
+<td align="center">NA</td>
+</tr>
+</tbody>
+</table>
+<p>The summary statistics highlights some additional aspects about the data. There is an unknown label present in the smoking_status variable. While this can be considered as a missing value and removed, the large number of observations with this ‘Unknown’ value would result in significant data and information loss if these are removed. Therefore, these values are left as it is and are treated as a unique label itself. The severe class imbalance in the stroke (target) variable can also be seen. Along with the target variable, other categorical variables such work_type, hypertension and heart disease are also showing signs of class imbalances.</p>
+</div>
+<div id="visualizing-and-exploring" class="section level3 tabset tabset-fade">
+<h3>Visualizing and Exploring</h3>
+<p>With the data cleaned and processed, the 11 variables in the dataset can now be visually explored.</p>
+<p>The chart for the target variable clearly highlights that severe class imbalance is present in the data, with a vast majority of observations indicating the absence of a stroke. Such an imbalance is a problem for predictive modelling as the model can incorrectly learn to always predict one output class regardless of the inputs and still show a high but false predictive accuracy. To correct this, the SMOTE method is used later.</p>
+<p>The distribution of age with respect to stroke cases indicates that most of the patients who have experienced a stroke are older, with average ages of roughly 60 and above. The average glucose level chart also seems to indicate that patients with higher average values are more likely to experience a stroke. However, the BMI chart does not show any significant variation between patients who have or have not experienced a stroke based solely on their BMI measurements.</p>
+<p>From the categorical variables, the proportion of patients experiencing hypertension and/or heart disease is higher in the patients who have suffered a stroke. On the other hand, gender and residence type do not seem to have any meaningful impact on the likelihood of a stroke occurring. Within work type, it seems patients who have never worked have not experienced a stroke at all, and also that proportionally unmarried patients are less likely to have a stroke. However, it should be noted that as seen from the summary statistics table earlier, the absolute values of these variables show a significant imbalance. For instance, within the work type variable, only 22 observations show patients who have never worked, which is not significant enough to conclude that patients who have never worked are less likely to experience a stroke. Such imbalances should be kept under consideration when analysing similar datasets.</p>
+<div id="stroke-target" class="section level4">
+<h4>Stroke (Target)</h4>
+<pre class="r"><code>#target variable
+ggplot(strokes, aes(x = stroke)) +
+  geom_bar(aes(fill = stroke)) +
+  scale_y_continuous(labels = scales::comma) +
+  scale_fill_manual(values = c(&quot;thistle3&quot;, &quot;red4&quot;)) +
+  xlab(&#39;Stroke&#39;) +
+  ggtitle(&#39;Presence/Absence of a Stroke (Target Variable)&#39;) +
+  theme_minimal()</code></pre>
+<p><img src="/blog/strokes_files/figure-html/unnamed-chunk-6-1.png" width="864" />
+#### Age</p>
+<pre class="r"><code>#age
+ggplot(strokes, aes(x = age)) +
+  geom_density(aes(fill = stroke), position = &#39;identity&#39;, alpha = 0.75) +
+  scale_fill_manual(values = c(&quot;thistle3&quot;, &quot;red4&quot;)) +
+  xlab(&#39;Age&#39;) +
+  ggtitle(&#39;Age Distributions&#39;) +
+  theme_minimal()</code></pre>
+<p><img src="/blog/strokes_files/figure-html/unnamed-chunk-7-1.png" width="864" />
+#### BMI</p>
+<pre class="r"><code>#bmi
+ggplot(strokes, aes(x = bmi)) +
+  geom_density(aes(fill = stroke), position = &#39;identity&#39;, alpha = 0.75) +
+  scale_fill_manual(values = c(&quot;thistle3&quot;, &quot;red4&quot;)) +
+  xlab(&#39;BMI&#39;) +
+  ggtitle(&#39;BMI Distributions&#39;) +
+  theme_minimal()</code></pre>
+<p><img src="/blog/strokes_files/figure-html/unnamed-chunk-8-1.png" width="864" />
+#### Average Glucose Level</p>
+<pre class="r"><code>#glucose level
+ggplot(strokes, aes(x = avg_glucose_level)) +
+  geom_density(aes(fill = stroke), position = &#39;identity&#39;, alpha = 0.75) +
+  scale_fill_manual(values = c(&quot;thistle3&quot;, &quot;red4&quot;)) +
+  xlab(&#39;Average Glucose Level&#39;) +
+  ggtitle(&#39;Average Glucose Level Distributions&#39;) +
+  theme_minimal()</code></pre>
+<p><img src="/blog/strokes_files/figure-html/unnamed-chunk-9-1.png" width="864" />
+#### Gender</p>
+<pre class="r"><code>#gender 
+ggplot(strokes, aes(x = gender)) +
+  geom_bar(aes(fill = stroke), position = &#39;fill&#39;) +
+  scale_fill_manual(values = c(&quot;thistle3&quot;, &quot;red4&quot;)) +
+  xlab(&#39;Gender&#39;) +
+  ylab(&#39;proportion&#39;) +
+  ggtitle(&#39;Gender Comparison in Stroke Cases (Proportion Split)&#39;) +
+  theme_minimal()</code></pre>
+<p><img src="/blog/strokes_files/figure-html/unnamed-chunk-10-1.png" width="864" />
+#### Hypertension</p>
+<pre class="r"><code>#hypertension
+ggplot(strokes, aes(x = hypertension)) +
+  geom_bar(aes(fill = stroke), position = &#39;fill&#39;) +
+  scale_fill_manual(values = c(&quot;thistle3&quot;, &quot;red4&quot;)) +
+  xlab(&#39;Hypertension (1 - Yes, 0 - No)&#39;) +
+  ylab(&#39;proportion&#39;) +
+  ggtitle(&#39;Hypetersion reported in Stroke Cases (Proportion Split)&#39;) +
+  theme_minimal()</code></pre>
+<p><img src="/blog/strokes_files/figure-html/unnamed-chunk-11-1.png" width="864" />
+#### Heart Disease</p>
+<pre class="r"><code>#heart disease
+ggplot(strokes, aes(x = heart_disease)) +
+  geom_bar(aes(fill = stroke), position = &#39;fill&#39;) +
+  scale_fill_manual(values = c(&quot;thistle3&quot;, &quot;red4&quot;)) +
+  xlab(&#39;Heart Disease (1 - Yes, 0 - No)&#39;) +
+  ylab(&#39;proportion&#39;) +
+  ggtitle(&#39;Heart Disease reported in Stroke Cases (Proportion Split)&#39;) +
+  theme_minimal()</code></pre>
+<p><img src="/blog/strokes_files/figure-html/unnamed-chunk-12-1.png" width="864" />
+#### Marital Status</p>
+<pre class="r"><code>#marital status 
+ggplot(strokes, aes(x = ever_married)) +
+  geom_bar(aes(fill = stroke), position = &#39;fill&#39;) +
+  scale_fill_manual(values = c(&quot;thistle3&quot;, &quot;red4&quot;)) +
+  xlab(&#39;Married (1 - Yes, 0 - No)&#39;) +
+  ylab(&#39;proportion&#39;) +
+  ggtitle(&#39;Marital Status reported in Stroke Cases (Proportion Split)&#39;) +
+  theme_minimal()</code></pre>
+<p><img src="/blog/strokes_files/figure-html/unnamed-chunk-13-1.png" width="864" /></p>
+</div>
+<div id="work-type" class="section level4">
+<h4>Work Type</h4>
+<pre class="r"><code>#work type
+ggplot(strokes, aes(x = work_type)) +
+  geom_bar(aes(fill = stroke), position = &#39;fill&#39;) +
+  scale_fill_manual(values = c(&quot;thistle3&quot;, &quot;red4&quot;)) +
+  xlab(&#39;Type of Work&#39;) +
+  ylab(&#39;proportion&#39;) +
+  ggtitle(&#39;Work Occupation reported in Stroke Cases (Proportion Split)&#39;) +
+  theme_minimal() +
+  coord_flip()</code></pre>
+<p><img src="/blog/strokes_files/figure-html/unnamed-chunk-14-1.png" width="864" />
+#### Residence Type</p>
+<pre class="r"><code>#residence
+ggplot(strokes, aes(x = Residence_type)) +
+  geom_bar(aes(fill = stroke), position = &#39;fill&#39;) +
+  scale_fill_manual(values = c(&quot;thistle3&quot;, &quot;red4&quot;)) +
+  xlab(&#39;Residence Type&#39;) +
+  ylab(&#39;proportion&#39;) +
+  ggtitle(&#39;Residence reported in Stroke Cases (Proportion Split)&#39;) +
+  theme_minimal()</code></pre>
+<p><img src="/blog/strokes_files/figure-html/unnamed-chunk-15-1.png" width="864" />
+#### Smoking Status</p>
+<pre class="r"><code>#smoking
+ggplot(strokes, aes(x = smoking_status)) +
+  geom_bar(aes(fill = stroke), position = &#39;fill&#39;) +
+  scale_fill_manual(values = c(&quot;thistle3&quot;, &quot;red4&quot;)) +
+  xlab(&#39;Smoking Habits&#39;) +
+  ylab(&#39;proportion&#39;) +
+  ggtitle(&#39;Smoking Habits reported in Stroke Cases (Proportion Split)&#39;) +
+  theme_minimal() +
+  coord_flip()</code></pre>
+<p><img src="/blog/strokes_files/figure-html/unnamed-chunk-16-1.png" width="864" /></p>
+</div>
+</div>
+<div id="balancing-target-variable" class="section level3">
+<h3>Balancing Target Variable</h3>
+<p>Before using SMOTE to fix the class imbalance seen in the target variable, the extent of the original imbalance is shown below. Over 95% of all the observations belong to class ‘No’, clearly indicating severe class imbalance.</p>
+<pre class="r"><code>prop.table(table(strokes$stroke)) #proportion of No and Yes responses</code></pre>
+<pre><code>## 
+##         No        Yes 
+## 0.95741646 0.04258354</code></pre>
+<p>Common methods to fix such class imbalance problems include over-sampling and under-sampling. However, given the extent of the imbalance, using these methods will very likely result in either too many repeated observations in the data using over-sampling without any useful information being added, or too much useful information being removed due to under-sampling.</p>
+<p>To avoid these pitfalls, the SMOTE method is used. Simply put, SMOTE involves generating synthetic/artificial observations of the minority class based on the existing samples. These artificial samples are generated based on the feature space of the minority class, and picking samples that are within that feature space and closely similar to the actual values. While synthetic data generation on the face of it might seem like a doubtful approach, the methods used in SMOTE results in synthetic observations that are quite plausible, and therefore do not significantly distort the true information present in the data. It should however be noted that the majority class is completely ignored in this method and can result in some of the synthetic examples being less plausible. The wide usage of SMOTE however indicates that in most situations it is a useful method that often performs the best compared to other methods such as over and under-sampling.</p>
+<p>Implementing SMOTE in R is quite simple, involving only one line of code. However, first the data is split into training (75%) and testing (25%) sets, with SMOTE being applied only to the training data. This is to ensure that the model is tested and evaluated based on its performance on the actual data as opposed to its performance on synthetic data. This will also be useful in comparing how applying SMOTE results in better predictive performance compared to training a model directly on unbalanced data.</p>
+<pre class="r"><code>#create training and testing data
+set.seed(1234)
+
+split &lt;- initial_split(strokes, prop = 0.75, strata = &#39;stroke&#39;)
+train_unbalanced &lt;- training(split)
+test &lt;- testing(split)
+
+#applying SMOTE
+set.seed(1234)
+train_balanced &lt;- SMOTE(stroke ~ ., data = train_unbalanced, k = 10, 
+                          perc.over = 200, perc.under = 200)
+#checking new proportions
+prop.table(table(train_balanced$stroke))</code></pre>
+<pre><code>## 
+##        No       Yes 
+## 0.5714286 0.4285714</code></pre>
+<pre class="r"><code>#Number of observations
+table(train_balanced$stroke)</code></pre>
+<pre><code>## 
+##  No Yes 
+## 596 447</code></pre>
+<p>The new training dataset created has 1043 observations in total. It can be seen that the class distribution in the target variable is now much more balanced compared to the original dataset. As over-sampling and under-sampling both have taken place as part of the SMOTE methodology, it can be a good idea to see the extent of duplicate values present in this new dataset. The table below shows only 59 duplicate observations, which not high enough to lead to significant redundant information being present in the dataset. Using this new dataset, a predictive model can now be trained.</p>
+<pre class="r"><code>#Number of duplicates
+table(duplicated(train_balanced))</code></pre>
+<pre><code>## 
+## FALSE  TRUE 
+##   984    59</code></pre>
+</div>
+<div id="modelling" class="section level3">
+<h3>Modelling</h3>
+<p>For the modelling phase, the SVM (Support Vector Machines) model will be used to generate predictions. SVM is chosen as it is quite robust in classification problems, and since the dataset is not too large, the model will not have a long runtime (as SVMs are known to take quite a long time to run, especially on large datasets). 10-fold repeated cross-validation is used to generate more robust predictions and reduce potential over-fitting. The Cost parameter of the SVM model is tuned to find an optimal value that maximises performance. Varying the Cost parameter allows the SVM model to be more robust to outliers. The model automatically applies the best parameter values to generate further predictions using the test set.</p>
+<p>To compare how different the performance can be between unbalanced and balanced classes, two versions of the SVM are run. One version of the model is run on the raw unbalanced training data, while the other is run on the balanced training data created using SMOTE. The results of the two methods are then compared to see the performance differences and observe the negative impact of using unbalanced data.</p>
+<pre class="r"><code>###Predictions on raw unbalanced data
+
+#apply SVM model on training data
+cv &lt;- trainControl(method = &#39;repeatedcv&#39;, number = 10, repeats = 5,
+                   classProbs = TRUE, summaryFunction = twoClassSummary)
+
+set.seed(1234)
+svm_unbal &lt;- train(stroke ~ .,
+                   train_unbalanced,
+                   method = &#39;svmRadial&#39;,
+                   trControl = cv,
+                   tuneLength = 10,
+                   metric = &#39;ROC&#39;)</code></pre>
+<pre class="r"><code>###Predictions on balanced data
+
+#apply SVM model on training data
+cv &lt;- trainControl(method = &#39;repeatedcv&#39;, number = 10, repeats = 5,
+                   classProbs = TRUE, summaryFunction = twoClassSummary)
+
+set.seed(1234)
+svm_bal &lt;- train(stroke ~ .,
+                 train_balanced,
+                 method = &#39;svmRadial&#39;,
+                 trControl = cv,
+                 tuneLength = 10,
+                 metric = &#39;ROC&#39;)</code></pre>
+<p>Having trained the two models, an initial impression of the performance for each can be observed through confusion matrices. These are shown below.</p>
+<pre class="r"><code>confusionMatrix(svm_unbal) #unbalanced data</code></pre>
+<pre><code>## Cross-Validated (10 fold, repeated 5 times) Confusion Matrix 
+## 
+## (entries are percentual average cell counts across resamples)
+##  
+##           Reference
+## Prediction   No  Yes
+##        No  95.9  4.0
+##        Yes  0.1  0.0
+##                             
+##  Accuracy (average) : 0.9589</code></pre>
+<pre class="r"><code>confusionMatrix(svm_bal) #balanced data</code></pre>
+<pre><code>## Cross-Validated (10 fold, repeated 5 times) Confusion Matrix 
+## 
+## (entries are percentual average cell counts across resamples)
+##  
+##           Reference
+## Prediction   No  Yes
+##        No  47.4  9.0
+##        Yes  9.7 33.9
+##                             
+##  Accuracy (average) : 0.8134</code></pre>
+<p>The confusion matrices above highlight the clear difference in predictive performance for the dataset. On the face of it, it seems that the unbalanced dataset has a much higher accuracy compared to the balanced dataset. However, this accuracy value is extremely distorted, as it can be seen that the model was completely unable to correctly predict the presence of a stroke (class ‘Yes’), and instead almost always predicted ‘No’. Since majority of the classes are labelled ‘No’, constantly predicting ‘No’ results in a false sense of high accuracy. The accuracy metric is therefore quite useless in this situation. To see a more robust representation of performance, ROC curves are plotted and the AUC (Area Under the Curve) scores are calculated for the models performance on the test sets.</p>
+<pre class="r"><code>preds &lt;- predict(svm_unbal, test, type = &#39;prob&#39;) #generate predictions
+
+auc &lt;- roc(test$stroke, preds$Yes) #calculate AUC
+
+plot(auc, main = paste(&quot;AUC for unbalanced model: &quot;, round(auc$auc[[1]], 6))) #plot ROC curve</code></pre>
+<p><img src="/blog/strokes_files/figure-html/unnamed-chunk-25-1.png" width="864" /></p>
+<pre class="r"><code>preds &lt;- predict(svm_bal, test, type = &#39;prob&#39;) #generate predictions
+
+auc &lt;- roc(test$stroke, preds$Yes) #calculate AUC
+
+plot(auc, main = paste(&quot;AUC for balanced model: &quot;, round(auc$auc[[1]], 6))) #plot ROC curve</code></pre>
+<p><img src="/blog/strokes_files/figure-html/unnamed-chunk-26-1.png" width="864" /></p>
+</div>
+<div id="conclusion" class="section level3">
+<h3>Conclusion</h3>
+<p>The AUC scores above show that in fact the model trained on balanced data performs much better than that trained on the unbalanced data, by achieving a significantly higher AUC score. This score can further be improved if there is more data available which can be balanced using SMOTE, as due to under-sampling procedures the total number of observations in the balanced dataset compared to the original unbalanced dataset is lower. Additionally, multiple balanced samples can be created with SMOTE using different seed values to reduce the impact of randomness. Predictions can be generated on each of these samples, which can then be averaged to generate a more robust AUC score and ROC curve.</p>
+</div>
