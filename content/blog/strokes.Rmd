@@ -69,7 +69,7 @@ pander::pander(summary(strokes))
 
 The summary statistics highlights some additional aspects about the data. There is an unknown label present in the smoking_status variable. While this can be considered as a missing value and removed, the large number of observations with this 'Unknown' value would result in significant data and information loss if these are removed. Therefore, these values are left as it is and are treated as a unique label itself. The severe class imbalance in the stroke (target) variable can also be seen. Along with the target variable, other categorical variables such work_type, hypertension and heart disease are also showing signs of class imbalances. 
 
-### Visualizing and Exploring{.tabset .tabset-fade}
+### Visualizing and Exploring
 
 With the data cleaned and processed, the 11 variables in the dataset can now be visually explored.
 
@@ -90,6 +90,7 @@ ggplot(strokes, aes(x = stroke)) +
   ggtitle('Presence/Absence of a Stroke (Target Variable)') +
   theme_minimal()
 ```
+
 #### Age
 ```{r message=FALSE, warning=FALSE, fig.width=9, fig.height=7}
 #age
@@ -100,6 +101,7 @@ ggplot(strokes, aes(x = age)) +
   ggtitle('Age Distributions') +
   theme_minimal()
 ```
+
 #### BMI
 ```{r message=FALSE, warning=FALSE, fig.width=9, fig.height=7}
 #bmi
@@ -110,6 +112,7 @@ ggplot(strokes, aes(x = bmi)) +
   ggtitle('BMI Distributions') +
   theme_minimal()
 ```
+
 #### Average Glucose Level
 ```{r message=FALSE, warning=FALSE, fig.width=9, fig.height=7}
 #glucose level
@@ -120,6 +123,7 @@ ggplot(strokes, aes(x = avg_glucose_level)) +
   ggtitle('Average Glucose Level Distributions') +
   theme_minimal()
 ```
+
 #### Gender
 ```{r message=FALSE, warning=FALSE, fig.width=9, fig.height=7}
 #gender 
@@ -131,6 +135,7 @@ ggplot(strokes, aes(x = gender)) +
   ggtitle('Gender Comparison in Stroke Cases (Proportion Split)') +
   theme_minimal()
 ```
+
 #### Hypertension
 ```{r message=FALSE, warning=FALSE, fig.width=9, fig.height=7}
 #hypertension
@@ -142,6 +147,7 @@ ggplot(strokes, aes(x = hypertension)) +
   ggtitle('Hypetersion reported in Stroke Cases (Proportion Split)') +
   theme_minimal()
 ```
+
 #### Heart Disease
 ```{r message=FALSE, warning=FALSE, fig.width=9, fig.height=7}
 #heart disease
@@ -153,6 +159,7 @@ ggplot(strokes, aes(x = heart_disease)) +
   ggtitle('Heart Disease reported in Stroke Cases (Proportion Split)') +
   theme_minimal()
 ```
+
 #### Marital Status
 ```{r message=FALSE, warning=FALSE, fig.width=9, fig.height=7}
 #marital status 
@@ -177,6 +184,7 @@ ggplot(strokes, aes(x = work_type)) +
   theme_minimal() +
   coord_flip()
 ```
+
 #### Residence Type
 ```{r message=FALSE, warning=FALSE, fig.width=9, fig.height=7}
 #residence
@@ -188,6 +196,7 @@ ggplot(strokes, aes(x = Residence_type)) +
   ggtitle('Residence reported in Stroke Cases (Proportion Split)') +
   theme_minimal()
 ```
+
 #### Smoking Status
 ```{r message=FALSE, warning=FALSE, fig.width=9, fig.height=7}
 #smoking

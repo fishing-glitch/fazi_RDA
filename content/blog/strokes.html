@@ -221,7 +221,7 @@ pander::pander(summary(strokes))</code></pre>
 </table>
 <p>The summary statistics highlights some additional aspects about the data. There is an unknown label present in the smoking_status variable. While this can be considered as a missing value and removed, the large number of observations with this ‘Unknown’ value would result in significant data and information loss if these are removed. Therefore, these values are left as it is and are treated as a unique label itself. The severe class imbalance in the stroke (target) variable can also be seen. Along with the target variable, other categorical variables such work_type, hypertension and heart disease are also showing signs of class imbalances.</p>
 </div>
-<div id="visualizing-and-exploring" class="section level3 tabset tabset-fade">
+<div id="visualizing-and-exploring" class="section level3">
 <h3>Visualizing and Exploring</h3>
 <p>With the data cleaned and processed, the 11 variables in the dataset can now be visually explored.</p>
 <p>The chart for the target variable clearly highlights that severe class imbalance is present in the data, with a vast majority of observations indicating the absence of a stroke. Such an imbalance is a problem for predictive modelling as the model can incorrectly learn to always predict one output class regardless of the inputs and still show a high but false predictive accuracy. To correct this, the SMOTE method is used later.</p>
@@ -237,8 +237,10 @@ ggplot(strokes, aes(x = stroke)) +
   xlab(&#39;Stroke&#39;) +
   ggtitle(&#39;Presence/Absence of a Stroke (Target Variable)&#39;) +
   theme_minimal()</code></pre>
-<p><img src="/blog/strokes_files/figure-html/unnamed-chunk-6-1.png" width="864" />
-#### Age</p>
+<p><img src="/blog/strokes_files/figure-html/unnamed-chunk-6-1.png" width="864" /></p>
+</div>
+<div id="age" class="section level4">
+<h4>Age</h4>
 <pre class="r"><code>#age
 ggplot(strokes, aes(x = age)) +
   geom_density(aes(fill = stroke), position = &#39;identity&#39;, alpha = 0.75) +
@@ -246,8 +248,10 @@ ggplot(strokes, aes(x = age)) +
   xlab(&#39;Age&#39;) +
   ggtitle(&#39;Age Distributions&#39;) +
   theme_minimal()</code></pre>
-<p><img src="/blog/strokes_files/figure-html/unnamed-chunk-7-1.png" width="864" />
-#### BMI</p>
+<p><img src="/blog/strokes_files/figure-html/unnamed-chunk-7-1.png" width="864" /></p>
+</div>
+<div id="bmi" class="section level4">
+<h4>BMI</h4>
 <pre class="r"><code>#bmi
 ggplot(strokes, aes(x = bmi)) +
   geom_density(aes(fill = stroke), position = &#39;identity&#39;, alpha = 0.75) +
@@ -255,8 +259,10 @@ ggplot(strokes, aes(x = bmi)) +
   xlab(&#39;BMI&#39;) +
   ggtitle(&#39;BMI Distributions&#39;) +
   theme_minimal()</code></pre>
-<p><img src="/blog/strokes_files/figure-html/unnamed-chunk-8-1.png" width="864" />
-#### Average Glucose Level</p>
+<p><img src="/blog/strokes_files/figure-html/unnamed-chunk-8-1.png" width="864" /></p>
+</div>
+<div id="average-glucose-level" class="section level4">
+<h4>Average Glucose Level</h4>
 <pre class="r"><code>#glucose level
 ggplot(strokes, aes(x = avg_glucose_level)) +
   geom_density(aes(fill = stroke), position = &#39;identity&#39;, alpha = 0.75) +
@@ -264,8 +270,10 @@ ggplot(strokes, aes(x = avg_glucose_level)) +
   xlab(&#39;Average Glucose Level&#39;) +
   ggtitle(&#39;Average Glucose Level Distributions&#39;) +
   theme_minimal()</code></pre>
-<p><img src="/blog/strokes_files/figure-html/unnamed-chunk-9-1.png" width="864" />
-#### Gender</p>
+<p><img src="/blog/strokes_files/figure-html/unnamed-chunk-9-1.png" width="864" /></p>
+</div>
+<div id="gender" class="section level4">
+<h4>Gender</h4>
 <pre class="r"><code>#gender 
 ggplot(strokes, aes(x = gender)) +
   geom_bar(aes(fill = stroke), position = &#39;fill&#39;) +
@@ -274,8 +282,10 @@ ggplot(strokes, aes(x = gender)) +
   ylab(&#39;proportion&#39;) +
   ggtitle(&#39;Gender Comparison in Stroke Cases (Proportion Split)&#39;) +
   theme_minimal()</code></pre>
-<p><img src="/blog/strokes_files/figure-html/unnamed-chunk-10-1.png" width="864" />
-#### Hypertension</p>
+<p><img src="/blog/strokes_files/figure-html/unnamed-chunk-10-1.png" width="864" /></p>
+</div>
+<div id="hypertension" class="section level4">
+<h4>Hypertension</h4>
 <pre class="r"><code>#hypertension
 ggplot(strokes, aes(x = hypertension)) +
   geom_bar(aes(fill = stroke), position = &#39;fill&#39;) +
@@ -284,8 +294,10 @@ ggplot(strokes, aes(x = hypertension)) +
   ylab(&#39;proportion&#39;) +
   ggtitle(&#39;Hypetersion reported in Stroke Cases (Proportion Split)&#39;) +
   theme_minimal()</code></pre>
-<p><img src="/blog/strokes_files/figure-html/unnamed-chunk-11-1.png" width="864" />
-#### Heart Disease</p>
+<p><img src="/blog/strokes_files/figure-html/unnamed-chunk-11-1.png" width="864" /></p>
+</div>
+<div id="heart-disease" class="section level4">
+<h4>Heart Disease</h4>
 <pre class="r"><code>#heart disease
 ggplot(strokes, aes(x = heart_disease)) +
   geom_bar(aes(fill = stroke), position = &#39;fill&#39;) +
@@ -294,8 +306,10 @@ ggplot(strokes, aes(x = heart_disease)) +
   ylab(&#39;proportion&#39;) +
   ggtitle(&#39;Heart Disease reported in Stroke Cases (Proportion Split)&#39;) +
   theme_minimal()</code></pre>
-<p><img src="/blog/strokes_files/figure-html/unnamed-chunk-12-1.png" width="864" />
-#### Marital Status</p>
+<p><img src="/blog/strokes_files/figure-html/unnamed-chunk-12-1.png" width="864" /></p>
+</div>
+<div id="marital-status" class="section level4">
+<h4>Marital Status</h4>
 <pre class="r"><code>#marital status 
 ggplot(strokes, aes(x = ever_married)) +
   geom_bar(aes(fill = stroke), position = &#39;fill&#39;) +
@@ -317,8 +331,10 @@ ggplot(strokes, aes(x = work_type)) +
   ggtitle(&#39;Work Occupation reported in Stroke Cases (Proportion Split)&#39;) +
   theme_minimal() +
   coord_flip()</code></pre>
-<p><img src="/blog/strokes_files/figure-html/unnamed-chunk-14-1.png" width="864" />
-#### Residence Type</p>
+<p><img src="/blog/strokes_files/figure-html/unnamed-chunk-14-1.png" width="864" /></p>
+</div>
+<div id="residence-type" class="section level4">
+<h4>Residence Type</h4>
 <pre class="r"><code>#residence
 ggplot(strokes, aes(x = Residence_type)) +
   geom_bar(aes(fill = stroke), position = &#39;fill&#39;) +
@@ -327,8 +343,10 @@ ggplot(strokes, aes(x = Residence_type)) +
   ylab(&#39;proportion&#39;) +
   ggtitle(&#39;Residence reported in Stroke Cases (Proportion Split)&#39;) +
   theme_minimal()</code></pre>
-<p><img src="/blog/strokes_files/figure-html/unnamed-chunk-15-1.png" width="864" />
-#### Smoking Status</p>
+<p><img src="/blog/strokes_files/figure-html/unnamed-chunk-15-1.png" width="864" /></p>
+</div>
+<div id="smoking-status" class="section level4">
+<h4>Smoking Status</h4>
 <pre class="r"><code>#smoking
 ggplot(strokes, aes(x = smoking_status)) +
   geom_bar(aes(fill = stroke), position = &#39;fill&#39;) +
