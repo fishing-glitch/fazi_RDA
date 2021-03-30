@@ -124,6 +124,15 @@ The dataset contains some information about computers, with the dependant variab
     </item>
     
     <item>
+      <title>Heart Disease Classification - Exploring Optimal Thresholds</title>
+      <link>/blog/cardiovasc/</link>
+      <pubDate>Mon, 01 Jan 0001 00:00:00 +0000</pubDate>
+      
+      <guid>/blog/cardiovasc/</guid>
+      <description>IntroductionA common problem witnessed in many machine learning applications is that of imbalanced classes. Applying a predictive model on data with imbalanced class labels often leads to incorrect results and a false sense of high accuracy. Along with methods such as over/undersampling or synthetic sampling, another approach to tackle the imabalanced class problem is that of tuning the threshold value used to convert class probabilities into class labels. The analysis carried out here will explore methods with which thresholds can be optimized for maximum predictive performance.</description>
+    </item>
+    
+    <item>
       <title>House Price Predictions with Clusters and Regressions</title>
       <link>/blog/house-price/</link>
       <pubDate>Mon, 01 Jan 0001 00:00:00 +0000</pubDate>

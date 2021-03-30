@@ -1,0 +1,247 @@
+---
+title: "Heart Disease Classification - Exploring Optimal Thresholds"
+output: html_notebook
+---
+
+### Introduction
+
+A common problem witnessed in many machine learning applications is that of imbalanced classes. Applying a predictive model on data with imbalanced class labels often leads to incorrect results and a false sense of high accuracy. Along with methods such as over/undersampling or synthetic sampling, another approach to tackle the imabalanced class problem is that of tuning the threshold value used to convert class probabilities into class labels. The analysis carried out here will explore methods with which thresholds can be optimized for maximum predictive performance. The data used represents a sample of people from a region of South Africa where the risk of heart disease is high. The data was freely obtained from https://www.kaggle.com/yassinehamdaoui1/cardiovascular-disease, where more specific information about the dataset can be found. 
+
+```{r message=FALSE, warning=FALSE, fig.width=9, fig.height=7}
+#load libraries
+library(tidyverse)
+library(rsample)
+library(caret)
+library(GGally)
+library(reshape2)
+library(pROC)
+
+#load data
+cardiovascular <- read.csv2('cardiovascular-data-txt.txt')
+```
+
+### Defining Variables and Preprocessing
+
+Before moving forward with the analysis, the variables present in the dataset are defined as follows (as seen in the link for the dataset shown earlier):
+
+- sbp: systolic blood pressure
+- tobacco: cumulative tobacco consumed (kg)
+- ldl: low density lipoprotein cholesterol
+- adiposity: a numeric vector
+- famhist: family history of heart disease, a factor with levels "Absent" and "Present"
+- typea: type-A behavior
+- obesity: a numeric vector
+- alcohol: current alcohol consumption
+- age: age at onset
+- chd: target variable, absence/presence of coronary heart disease
+
+Some light preprocessing is also carried out by simply converting relevant variables to type numeric and type factor.
+
+```{r message=FALSE, warning=FALSE, fig.width=9, fig.height=7}
+#remove id variable
+cardiovascular <- cardiovascular[,-1]
+
+#convert tobacco, ldl, adiposity, obesity, alcohol to type numeric
+cardiovascular[,c(2,3,4,7,8)] <- as.numeric(unlist(cardiovascular[,c(2,3,4,7,8)]))
+
+#convert famhist and chd to type factor
+cardiovascular[,5] <- as.factor(cardiovascular[,5])
+cardiovascular[,10] <- as.factor(cardiovascular[,10])
+
+#relabel chd for better understanding
+levels(cardiovascular$chd) <- c('No', 'Yes')
+
+#variable description
+str(cardiovascular)
+```
+
+As it can be seen, the dataset is fairly small, with only 462 observations and 10 variables (including the target). It should be noted that while standardizing and normalizing can improve predictive performance, this is not carried out as maximum accuracy is not the goal here. Also, since there is no information given about the units of measurement for most of the variables, it would be improper to begin scaling the data without this information. Therefore, the data in its raw format will be used. A summary statistics table for the variables is shown below. 
+
+```{r message=FALSE, warning=FALSE, fig.width=9, fig.height=7}
+#summary statistics
+pander::pander(summary(cardiovascular))
+```
+
+From the table above, it is apparent that there is in fact a class imbalance present in the target variable (chd). While this is not a severe imbalance, it can still be enough for a model to generate inaccurate and misleading results. 
+
+### Visual Exploration
+
+To provide a clearer view of the class imbalance, the bar chart below is used. It can be seen that from the entire dataset, roughly only 34% of the observations are signifying the presence of heart disease. In much larger datasets, such a percentage may not be problematic, but with a limited number of observations, it is likely that a model will have trouble correctly classifying the classes in this variable. 
+
+```{r message=FALSE, warning=FALSE, fig.width=9, fig.height=7}
+#target variable visual
+ggplot(cardiovascular, aes(chd)) +
+  geom_bar(aes(fill = chd), color = 'black') +
+  scale_fill_manual(values = c('grey60', 'steelblue4')) +
+  xlab('chd') +
+  ggtitle('Absence/Presence of Coronary Heart Disease (Target Variable)') +
+  theme_minimal()
+```
+
+The other dependent numeric variables are also visually explored below. There seems to be a clear disposition for older individuals to contract a coronary heart disease. A similar, but slightly less significantly sized effect can be seen in the tobacco, adiposity and sbp variables. However, the lack of strong differentiation between distributions within most of the variables highlights that the dependent variables in the dataset may not have much of an impact on the target variable. 
+
+```{r message=FALSE, warning=FALSE, fig.width=9, fig.height=7}
+#numeric variable explorations
+melted <- melt(cardiovascular[,-5])
+
+ggplot(melted, aes(value)) +
+  geom_density(aes(fill = chd), alpha = 0.75) +
+  scale_fill_manual(values = c('grey60', 'steelblue4')) +
+  facet_wrap( ~ variable, scales = 'free') +
+  ggtitle('Numeric Variable Distributions based on Heart Disease Status') +
+  theme_minimal()
+
+```
+
+An overall view of the distribution and correlations for each variable (numeric and categorical) is also shown below. There seems to be a strong correlation between adiposity and obesity, and a slight imbalance is also seen in the famhist variable. 
+
+```{r message=FALSE, warning=FALSE, fig.width=9, fig.height=7}
+#overall variable explorations
+ggpairs(cardiovascular) +
+  ggtitle('Overall Variable Correlations and Visuals') +
+  theme_minimal()
+```
+
+### Optimal Threshold
+
+To find the optimal threshold value that will lead to accurate class labelling, first a predictive model needs to be run to generate predictions. In this case, a generalized linear model with regularization is used. The data is split into training and testing sets with a 75-25 split. Repeated cross validation is also used in an effort to enhance model performance. As for the output, instead of predicting the class labels directly, the model is set to produce class probabilities instead, which is essential for the threshold tuning. 
+
+```{r message=FALSE, warning=FALSE, fig.width=9, fig.height=7}
+#set seed for reproducibility
+set.seed(1234)
+
+#train test split
+split <- initial_split(cardiovascular, prop = 0.75, strata = 'chd')
+train <- training(split)
+test <- testing(split)
+
+#repeated cross-validation
+cv <- trainControl(method = 'repeatedcv', number = 10, repeats = 5,
+                   classProbs = TRUE, summaryFunction = twoClassSummary)
+
+#set seed for reproducibility
+set.seed(1234)
+
+#apply model
+glm_cardio <- train(chd ~ .,
+                    data = train,
+                    method = 'glmnet',
+                    trControl = cv,
+                    tuneLength = 10,
+                    metric = 'ROC')
+```
+
+Having run the model, predictions based on the test set are generated. Specifically, class probabilities for predicting the minority class 'Yes' in this case are produced. With these predictions, the ROC curve will be used to find the optimal threshold using three key metrics: Sensitivity, Specificity and Threshold itself. 
+
+- Sensitivity: Defined as the True Positive rate, which measures the proportion of positive ('Yes') cases correctly identified by the model. Having a high sensitivity implies a lower false negative rate. This is crucial in cases such as medical diagnosis, where having a higher false negative rate is much more detrimental than having a higher false positive rate. In the context of this cardiovascular dataset, a high sensitivity would lead to fewer heart disease patients being misclassified as healthy (false negative)
+
+- Specificity: Defined as the True Negative rate, which measures the proportion of negative ('No') cases correctly identified by the model. A high specificity implies a lower false positive rate, which in this case would be fewer healthy people being misclassified as heart disease patients. In an ideal world, the perfect model would have both a high Sensitivity and Specificity, but in practical applications there is often a trade-off between the two. A model is therefore tuned to favour one or the other based on whether a lower false positive rate or false negative rate is more desirable. In most medical cases, a lower false negative is preferred, therefore implying the importance of higher sensitivity. 
+
+- Threshold: This is defined as the value used to convert class probability predictions into class labels. Simply put, if the default threshold value of 0.5 is used, any class probabilities (in the context of the current dataset) equal to and greater than 0.5 will be labelled as class 'Yes' while the rest will be labelled as class 'No'. 
+
+With these three metrics extracted, an ROC curve is plotted and a point is identified as to where the default threshold of 0.5 lies on the ROC curve. 
+
+```{r message=FALSE, warning=FALSE, fig.width=9, fig.height=7}
+#generate predictions and extract metrics
+preds_glm <- predict(glm_cardio, test, type = 'prob')
+
+auc_glm <- roc(test$chd, preds_glm$Yes)
+
+metrics <- data.frame("Sensitivity" = auc_glm$sensitivities,
+                      "Specificity" = auc_glm$specificities,
+                      "Threshold" = auc_glm$thresholds)
+
+#filter out specificity and sensitivity combination with default threshold 0.5
+org_thr <- metrics %>%
+  filter(Threshold == metrics[91,3])
+
+#plot ROC with default threshold
+ggplot(metrics, aes(x = 1-Specificity, y = Sensitivity)) +
+  geom_line() +
+  geom_point(data = org_thr,
+             aes(x = 1-Specificity, y = Sensitivity),
+             size = 4) +
+  ggtitle('ROC Curve with point shown at approximate default threshold of: 0.5') +
+  theme_minimal()
+```
+
+Assuming familiarity with the ROC curve, it is known that the optimal point on the curve is closest to the top left region. However, using the default threshold highlights a point quite further away from the optimal region. Examining the Sensitivity and Specificity values at this threshold can shed further light onto why the default threshold value does not work on this dataset.
+
+```{r message=FALSE, warning=FALSE, fig.width=9, fig.height=7}
+org_thr
+```
+
+At an approximated threshold value of 0.5, the Specificity appears to be quite high implying few false positive cases. However, the Sensitivity value is quite significantly low, which is highly unwanted as this implies a very high rate of false negative cases. This means a large number of patients who actually have a coronary heart disease are being misclassified as healthy (majority class being 'No'/healthy), which is a highly undesirable outcome as this would lead to patients in need of actual medical attention being ignored. Clearly the threshold value of 0.5 is not adequate and needs to be changed.
+
+To find the optimal threshold value, a more balanced trade-off between the Sensitivity and Specificity values needs to be found. One such method to find this balance is through the Geometric Mean (G-Mean). Once the G-Mean for all the combinations of Sensitivity and Specificity are calculated, the threshold value is chosen which is associated with the largest G-Mean value. This shown below using an ROC curve.
+
+```{r message=FALSE, warning=FALSE, fig.width=9, fig.height=7}
+#calculate G-Mean
+metrics$GMeans <- sqrt(metrics$Sensitivity * metrics$Specificity)
+
+#filter maximum G-Mean
+gmean_thr <- metrics %>%
+  filter(GMeans == max(metrics$GMeans))
+
+#plot ROC with G-Mean threshold
+ggplot(metrics, aes(x = 1-Specificity, y = Sensitivity)) +
+  geom_line() +
+  geom_point(data = gmean_thr,
+             aes(x = 1-Specificity, y = Sensitivity),
+             size = 4) +
+  ggtitle(paste('ROC Curve with point shown using G-Mean at optimal threshold of: ',
+                round(gmean_thr$Threshold, 4))) +
+  theme_minimal()
+```
+
+The ROC plot above shows that the optimized threshold value found by the G-Mean calculation is more towards the top left area of the plot as compared to the original default threshold. The improvement in results can be seen by the combination of the Sensitivity and Specificity values associated with the new threshold value.
+
+```{r message=FALSE, warning=FALSE, fig.width=9, fig.height=7}
+gmean_thr
+```
+Compared to the original threshold value, the Specificity has dropped slightly, but with the added benefit of a much higher Sensitivity value. Utilising this new threshold value implies that while there may be slightly more cases of false positives, there are a lot fewer false negative classifications occurring. This is far more beneficial within the context of this dataset as identified earlier, since more people actually infected with a heart disease  are being correctly classified as having a heart disease instead of being incorrectly labelled as healthy.
+
+An alternative method to the G-Means is the Youden's J statistic, which is seemingly quicker and provides the same result. This statistic is optimised more for ROC curves, and its calculation and result is shown below.
+
+```{r message=FALSE, warning=FALSE, fig.width=9, fig.height=7}
+#calculate Youden's J Statistic
+metrics$YJStat <- metrics$Sensitivity + metrics$Specificity - 1
+
+#filter maximum statistic value
+yjstat_thr <- metrics %>%
+  filter(YJStat == max(metrics$YJStat))
+
+#plot ROC with YJstat threshold
+ggplot(metrics, aes(x = 1-Specificity, y = Sensitivity)) +
+  geom_line() +
+  geom_point(data = yjstat_thr,
+             aes(x = 1-Specificity, y = Sensitivity),
+             size = 4) +
+  ggtitle(paste("ROC Curve with point shown using Youden's J Stat at optimal threshold of: ",
+                round(yjstat_thr$Threshold, 4))) +
+  theme_minimal()
+```
+
+```{r message=FALSE, warning=FALSE, fig.width=9, fig.height=7}
+yjstat_thr
+```
+The G-Mean and Youden's J statistic provide the same optimized threshold value of 0.2763, which is lower than the default value of 0.5. This implies a larger number of class probabilities being classified as 'Yes' (heart disease present), which makes sense based on the new sensitivity and specificity values. More 'Yes' classifications will lead to fewer unhealthy people being misclassified, at the cost of slightly more healthy people being misclassified as unhealthy. 
+
+### Conclusion
+
+As shown above, changing the threshold value with which predicted class probabilities are converted into class labels can significantly change the accuracy of predictions generated by a model from imbalanced data. Depending on the context of the analysis, an optimal threshold value can be found that sufficiently balances the true positive and true negative rates of predictions, thereby adjusting for class imbalance and maximizing predictive performance. 
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+

@@ -1,0 +1,331 @@
+---
+title: "Heart Disease Classification - Exploring Optimal Thresholds"
+output: html_notebook
+---
+
+
+
+<div id="introduction" class="section level3">
+<h3>Introduction</h3>
+<p>A common problem witnessed in many machine learning applications is that of imbalanced classes. Applying a predictive model on data with imbalanced class labels often leads to incorrect results and a false sense of high accuracy. Along with methods such as over/undersampling or synthetic sampling, another approach to tackle the imabalanced class problem is that of tuning the threshold value used to convert class probabilities into class labels. The analysis carried out here will explore methods with which thresholds can be optimized for maximum predictive performance. The data used represents a sample of people from a region of South Africa where the risk of heart disease is high. The data was freely obtained from <a href="https://www.kaggle.com/yassinehamdaoui1/cardiovascular-disease" class="uri">https://www.kaggle.com/yassinehamdaoui1/cardiovascular-disease</a>, where more specific information about the dataset can be found.</p>
+<pre class="r"><code>#load libraries
+library(tidyverse)
+library(rsample)
+library(caret)
+library(GGally)
+library(reshape2)
+library(pROC)
+
+#load data
+cardiovascular &lt;- read.csv2(&#39;cardiovascular-data-txt.txt&#39;)</code></pre>
+</div>
+<div id="defining-variables-and-preprocessing" class="section level3">
+<h3>Defining Variables and Preprocessing</h3>
+<p>Before moving forward with the analysis, the variables present in the dataset are defined as follows (as seen in the link for the dataset shown earlier):</p>
+<ul>
+<li>sbp: systolic blood pressure</li>
+<li>tobacco: cumulative tobacco consumed (kg)</li>
+<li>ldl: low density lipoprotein cholesterol</li>
+<li>adiposity: a numeric vector</li>
+<li>famhist: family history of heart disease, a factor with levels “Absent” and “Present”</li>
+<li>typea: type-A behavior</li>
+<li>obesity: a numeric vector</li>
+<li>alcohol: current alcohol consumption</li>
+<li>age: age at onset</li>
+<li>chd: target variable, absence/presence of coronary heart disease</li>
+</ul>
+<p>Some light preprocessing is also carried out by simply converting relevant variables to type numeric and type factor.</p>
+<pre class="r"><code>#remove id variable
+cardiovascular &lt;- cardiovascular[,-1]
+
+#convert tobacco, ldl, adiposity, obesity, alcohol to type numeric
+cardiovascular[,c(2,3,4,7,8)] &lt;- as.numeric(unlist(cardiovascular[,c(2,3,4,7,8)]))
+
+#convert famhist and chd to type factor
+cardiovascular[,5] &lt;- as.factor(cardiovascular[,5])
+cardiovascular[,10] &lt;- as.factor(cardiovascular[,10])
+
+#relabel chd for better understanding
+levels(cardiovascular$chd) &lt;- c(&#39;No&#39;, &#39;Yes&#39;)
+
+#variable description
+str(cardiovascular)</code></pre>
+<pre><code>## &#39;data.frame&#39;:    462 obs. of  10 variables:
+##  $ sbp      : int  160 144 118 170 134 132 142 114 114 132 ...
+##  $ tobacco  : num  12 0.01 0.08 7.5 13.6 6.2 4.05 4.08 0 0 ...
+##  $ ldl      : num  5.73 4.41 3.48 6.41 3.5 6.47 3.38 4.59 3.83 5.8 ...
+##  $ adiposity: num  23.1 28.6 32.3 38 27.8 ...
+##  $ famhist  : Factor w/ 2 levels &quot;Absent&quot;,&quot;Present&quot;: 2 1 2 2 2 2 1 2 2 2 ...
+##  $ typea    : int  49 55 52 51 60 62 59 62 49 69 ...
+##  $ obesity  : num  25.3 28.9 29.1 32 26 ...
+##  $ alcohol  : num  97.2 2.06 3.81 24.26 57.34 ...
+##  $ age      : int  52 63 46 58 49 45 38 58 29 53 ...
+##  $ chd      : Factor w/ 2 levels &quot;No&quot;,&quot;Yes&quot;: 2 2 1 2 2 1 1 2 1 2 ...</code></pre>
+<p>As it can be seen, the dataset is fairly small, with only 462 observations and 10 variables (including the target). It should be noted that while standardizing and normalizing can improve predictive performance, this is not carried out as maximum accuracy is not the goal here. Also, since there is no information given about the units of measurement for most of the variables, it would be improper to begin scaling the data without this information. Therefore, the data in its raw format will be used. A summary statistics table for the variables is shown below.</p>
+<pre class="r"><code>#summary statistics
+pander::pander(summary(cardiovascular))</code></pre>
+<table>
+<caption>Table continues below</caption>
+<colgroup>
+<col width="19%" />
+<col width="21%" />
+<col width="20%" />
+<col width="19%" />
+<col width="19%" />
+</colgroup>
+<thead>
+<tr class="header">
+<th align="center">sbp</th>
+<th align="center">tobacco</th>
+<th align="center">ldl</th>
+<th align="center">adiposity</th>
+<th align="center">famhist</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td align="center">Min. :101.0</td>
+<td align="center">Min. : 0.0000</td>
+<td align="center">Min. : 0.980</td>
+<td align="center">Min. : 6.74</td>
+<td align="center">Absent :270</td>
+</tr>
+<tr class="even">
+<td align="center">1st Qu.:124.0</td>
+<td align="center">1st Qu.: 0.0525</td>
+<td align="center">1st Qu.: 3.283</td>
+<td align="center">1st Qu.:19.77</td>
+<td align="center">Present:192</td>
+</tr>
+<tr class="odd">
+<td align="center">Median :134.0</td>
+<td align="center">Median : 2.0000</td>
+<td align="center">Median : 4.340</td>
+<td align="center">Median :26.11</td>
+<td align="center">NA</td>
+</tr>
+<tr class="even">
+<td align="center">Mean :138.3</td>
+<td align="center">Mean : 3.6356</td>
+<td align="center">Mean : 4.740</td>
+<td align="center">Mean :25.41</td>
+<td align="center">NA</td>
+</tr>
+<tr class="odd">
+<td align="center">3rd Qu.:148.0</td>
+<td align="center">3rd Qu.: 5.5000</td>
+<td align="center">3rd Qu.: 5.790</td>
+<td align="center">3rd Qu.:31.23</td>
+<td align="center">NA</td>
+</tr>
+<tr class="even">
+<td align="center">Max. :218.0</td>
+<td align="center">Max. :31.2000</td>
+<td align="center">Max. :15.330</td>
+<td align="center">Max. :42.49</td>
+<td align="center">NA</td>
+</tr>
+</tbody>
+</table>
+<table>
+<colgroup>
+<col width="20%" />
+<col width="21%" />
+<col width="22%" />
+<col width="21%" />
+<col width="13%" />
+</colgroup>
+<thead>
+<tr class="header">
+<th align="center">typea</th>
+<th align="center">obesity</th>
+<th align="center">alcohol</th>
+<th align="center">age</th>
+<th align="center">chd</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td align="center">Min. :13.0</td>
+<td align="center">Min. :14.70</td>
+<td align="center">Min. : 0.00</td>
+<td align="center">Min. :15.00</td>
+<td align="center">No :302</td>
+</tr>
+<tr class="even">
+<td align="center">1st Qu.:47.0</td>
+<td align="center">1st Qu.:22.98</td>
+<td align="center">1st Qu.: 0.51</td>
+<td align="center">1st Qu.:31.00</td>
+<td align="center">Yes:160</td>
+</tr>
+<tr class="odd">
+<td align="center">Median :53.0</td>
+<td align="center">Median :25.80</td>
+<td align="center">Median : 7.51</td>
+<td align="center">Median :45.00</td>
+<td align="center">NA</td>
+</tr>
+<tr class="even">
+<td align="center">Mean :53.1</td>
+<td align="center">Mean :26.04</td>
+<td align="center">Mean : 17.04</td>
+<td align="center">Mean :42.82</td>
+<td align="center">NA</td>
+</tr>
+<tr class="odd">
+<td align="center">3rd Qu.:60.0</td>
+<td align="center">3rd Qu.:28.50</td>
+<td align="center">3rd Qu.: 23.89</td>
+<td align="center">3rd Qu.:55.00</td>
+<td align="center">NA</td>
+</tr>
+<tr class="even">
+<td align="center">Max. :78.0</td>
+<td align="center">Max. :46.58</td>
+<td align="center">Max. :147.19</td>
+<td align="center">Max. :64.00</td>
+<td align="center">NA</td>
+</tr>
+</tbody>
+</table>
+<p>From the table above, it is apparent that there is in fact a class imbalance present in the target variable (chd). While this is not a severe imbalance, it can still be enough for a model to generate inaccurate and misleading results.</p>
+</div>
+<div id="visual-exploration" class="section level3">
+<h3>Visual Exploration</h3>
+<p>To provide a clearer view of the class imbalance, the bar chart below is used. It can be seen that from the entire dataset, roughly only 34% of the observations are signifying the presence of heart disease. In much larger datasets, such a percentage may not be problematic, but with a limited number of observations, it is likely that a model will have trouble correctly classifying the classes in this variable.</p>
+<pre class="r"><code>#target variable visual
+ggplot(cardiovascular, aes(chd)) +
+  geom_bar(aes(fill = chd), color = &#39;black&#39;) +
+  scale_fill_manual(values = c(&#39;grey60&#39;, &#39;steelblue4&#39;)) +
+  xlab(&#39;chd&#39;) +
+  ggtitle(&#39;Absence/Presence of Coronary Heart Disease (Target Variable)&#39;) +
+  theme_minimal()</code></pre>
+<p><img src="/blog/cardiovasc_files/figure-html/unnamed-chunk-4-1.png" width="864" /></p>
+<p>The other dependent numeric variables are also visually explored below. There seems to be a clear disposition for older individuals to contract a coronary heart disease. A similar, but slightly less significantly sized effect can be seen in the tobacco, adiposity and sbp variables. However, the lack of strong differentiation between distributions within most of the variables highlights that the dependent variables in the dataset may not have much of an impact on the target variable.</p>
+<pre class="r"><code>#numeric variable explorations
+melted &lt;- melt(cardiovascular[,-5])
+
+ggplot(melted, aes(value)) +
+  geom_density(aes(fill = chd), alpha = 0.75) +
+  scale_fill_manual(values = c(&#39;grey60&#39;, &#39;steelblue4&#39;)) +
+  facet_wrap( ~ variable, scales = &#39;free&#39;) +
+  ggtitle(&#39;Numeric Variable Distributions based on Heart Disease Status&#39;) +
+  theme_minimal()</code></pre>
+<p><img src="/blog/cardiovasc_files/figure-html/unnamed-chunk-5-1.png" width="864" /></p>
+<p>An overall view of the distribution and correlations for each variable (numeric and categorical) is also shown below. There seems to be a strong correlation between adiposity and obesity, and a slight imbalance is also seen in the famhist variable.</p>
+<pre class="r"><code>#overall variable explorations
+ggpairs(cardiovascular) +
+  ggtitle(&#39;Overall Variable Correlations and Visuals&#39;) +
+  theme_minimal()</code></pre>
+<p><img src="/blog/cardiovasc_files/figure-html/unnamed-chunk-6-1.png" width="864" /></p>
+</div>
+<div id="optimal-threshold" class="section level3">
+<h3>Optimal Threshold</h3>
+<p>To find the optimal threshold value that will lead to accurate class labelling, first a predictive model needs to be run to generate predictions. In this case, a generalized linear model with regularization is used. The data is split into training and testing sets with a 75-25 split. Repeated cross validation is also used in an effort to enhance model performance. As for the output, instead of predicting the class labels directly, the model is set to produce class probabilities instead, which is essential for the threshold tuning.</p>
+<pre class="r"><code>#set seed for reproducibility
+set.seed(1234)
+
+#train test split
+split &lt;- initial_split(cardiovascular, prop = 0.75, strata = &#39;chd&#39;)
+train &lt;- training(split)
+test &lt;- testing(split)
+
+#repeated cross-validation
+cv &lt;- trainControl(method = &#39;repeatedcv&#39;, number = 10, repeats = 5,
+                   classProbs = TRUE, summaryFunction = twoClassSummary)
+
+#set seed for reproducibility
+set.seed(1234)
+
+#apply model
+glm_cardio &lt;- train(chd ~ .,
+                    data = train,
+                    method = &#39;glmnet&#39;,
+                    trControl = cv,
+                    tuneLength = 10,
+                    metric = &#39;ROC&#39;)</code></pre>
+<p>Having run the model, predictions based on the test set are generated. Specifically, class probabilities for predicting the minority class ‘Yes’ in this case are produced. With these predictions, the ROC curve will be used to find the optimal threshold using three key metrics: Sensitivity, Specificity and Threshold itself.</p>
+<ul>
+<li><p>Sensitivity: Defined as the True Positive rate, which measures the proportion of positive (‘Yes’) cases correctly identified by the model. Having a high sensitivity implies a lower false negative rate. This is crucial in cases such as medical diagnosis, where having a higher false negative rate is much more detrimental than having a higher false positive rate. In the context of this cardiovascular dataset, a high sensitivity would lead to fewer heart disease patients being misclassified as healthy (false negative)</p></li>
+<li><p>Specificity: Defined as the True Negative rate, which measures the proportion of negative (‘No’) cases correctly identified by the model. A high specificity implies a lower false positive rate, which in this case would be fewer healthy people being misclassified as heart disease patients. In an ideal world, the perfect model would have both a high Sensitivity and Specificity, but in practical applications there is often a trade-off between the two. A model is therefore tuned to favour one or the other based on whether a lower false positive rate or false negative rate is more desirable. In most medical cases, a lower false negative is preferred, therefore implying the importance of higher sensitivity.</p></li>
+<li><p>Threshold: This is defined as the value used to convert class probability predictions into class labels. Simply put, if the default threshold value of 0.5 is used, any class probabilities (in the context of the current dataset) equal to and greater than 0.5 will be labelled as class ‘Yes’ while the rest will be labelled as class ‘No’.</p></li>
+</ul>
+<p>With these three metrics extracted, an ROC curve is plotted and a point is identified as to where the default threshold of 0.5 lies on the ROC curve.</p>
+<pre class="r"><code>#generate predictions and extract metrics
+preds_glm &lt;- predict(glm_cardio, test, type = &#39;prob&#39;)
+
+auc_glm &lt;- roc(test$chd, preds_glm$Yes)
+
+metrics &lt;- data.frame(&quot;Sensitivity&quot; = auc_glm$sensitivities,
+                      &quot;Specificity&quot; = auc_glm$specificities,
+                      &quot;Threshold&quot; = auc_glm$thresholds)
+
+#filter out specificity and sensitivity combination with default threshold 0.5
+org_thr &lt;- metrics %&gt;%
+  filter(Threshold == metrics[91,3])
+
+#plot ROC with default threshold
+ggplot(metrics, aes(x = 1-Specificity, y = Sensitivity)) +
+  geom_line() +
+  geom_point(data = org_thr,
+             aes(x = 1-Specificity, y = Sensitivity),
+             size = 4) +
+  ggtitle(&#39;ROC Curve with point shown at approximate default threshold of: 0.5&#39;) +
+  theme_minimal()</code></pre>
+<p><img src="/blog/cardiovasc_files/figure-html/unnamed-chunk-8-1.png" width="864" /></p>
+<p>Assuming familiarity with the ROC curve, it is known that the optimal point on the curve is closest to the top left region. However, using the default threshold highlights a point quite further away from the optimal region. Examining the Sensitivity and Specificity values at this threshold can shed further light onto why the default threshold value does not work on this dataset.</p>
+<pre class="r"><code>org_thr</code></pre>
+<pre><code>##   Sensitivity Specificity Threshold
+## 1       0.375   0.8666667 0.5042759</code></pre>
+<p>At an approximated threshold value of 0.5, the Specificity appears to be quite high implying few false positive cases. However, the Sensitivity value is quite significantly low, which is highly unwanted as this implies a very high rate of false negative cases. This means a large number of patients who actually have a coronary heart disease are being misclassified as healthy (majority class being ‘No’/healthy), which is a highly undesirable outcome as this would lead to patients in need of actual medical attention being ignored. Clearly the threshold value of 0.5 is not adequate and needs to be changed.</p>
+<p>To find the optimal threshold value, a more balanced trade-off between the Sensitivity and Specificity values needs to be found. One such method to find this balance is through the Geometric Mean (G-Mean). Once the G-Mean for all the combinations of Sensitivity and Specificity are calculated, the threshold value is chosen which is associated with the largest G-Mean value. This shown below using an ROC curve.</p>
+<pre class="r"><code>#calculate G-Mean
+metrics$GMeans &lt;- sqrt(metrics$Sensitivity * metrics$Specificity)
+
+#filter maximum G-Mean
+gmean_thr &lt;- metrics %&gt;%
+  filter(GMeans == max(metrics$GMeans))
+
+#plot ROC with G-Mean threshold
+ggplot(metrics, aes(x = 1-Specificity, y = Sensitivity)) +
+  geom_line() +
+  geom_point(data = gmean_thr,
+             aes(x = 1-Specificity, y = Sensitivity),
+             size = 4) +
+  ggtitle(paste(&#39;ROC Curve with point shown using G-Mean at optimal threshold of: &#39;,
+                round(gmean_thr$Threshold, 4))) +
+  theme_minimal()</code></pre>
+<p><img src="/blog/cardiovasc_files/figure-html/unnamed-chunk-10-1.png" width="864" /></p>
+<p>The ROC plot above shows that the optimized threshold value found by the G-Mean calculation is more towards the top left area of the plot as compared to the original default threshold. The improvement in results can be seen by the combination of the Sensitivity and Specificity values associated with the new threshold value.</p>
+<pre class="r"><code>gmean_thr</code></pre>
+<pre><code>##   Sensitivity Specificity Threshold    GMeans
+## 1       0.775        0.64 0.2763283 0.7042727</code></pre>
+<p>Compared to the original threshold value, the Specificity has dropped slightly, but with the added benefit of a much higher Sensitivity value. Utilising this new threshold value implies that while there may be slightly more cases of false positives, there are a lot fewer false negative classifications occurring. This is far more beneficial within the context of this dataset as identified earlier, since more people actually infected with a heart disease are being correctly classified as having a heart disease instead of being incorrectly labelled as healthy.</p>
+<p>An alternative method to the G-Means is the Youden’s J statistic, which is seemingly quicker and provides the same result. This statistic is optimised more for ROC curves, and its calculation and result is shown below.</p>
+<pre class="r"><code>#calculate Youden&#39;s J Statistic
+metrics$YJStat &lt;- metrics$Sensitivity + metrics$Specificity - 1
+
+#filter maximum statistic value
+yjstat_thr &lt;- metrics %&gt;%
+  filter(YJStat == max(metrics$YJStat))
+
+#plot ROC with YJstat threshold
+ggplot(metrics, aes(x = 1-Specificity, y = Sensitivity)) +
+  geom_line() +
+  geom_point(data = yjstat_thr,
+             aes(x = 1-Specificity, y = Sensitivity),
+             size = 4) +
+  ggtitle(paste(&quot;ROC Curve with point shown using Youden&#39;s J Stat at optimal threshold of: &quot;,
+                round(yjstat_thr$Threshold, 4))) +
+  theme_minimal()</code></pre>
+<p><img src="/blog/cardiovasc_files/figure-html/unnamed-chunk-12-1.png" width="864" /></p>
+<pre class="r"><code>yjstat_thr</code></pre>
+<pre><code>##   Sensitivity Specificity Threshold    GMeans YJStat
+## 1       0.775        0.64 0.2763283 0.7042727  0.415</code></pre>
+<p>The G-Mean and Youden’s J statistic provide the same optimized threshold value of 0.2763, which is lower than the default value of 0.5. This implies a larger number of class probabilities being classified as ‘Yes’ (heart disease present), which makes sense based on the new sensitivity and specificity values. More ‘Yes’ classifications will lead to fewer unhealthy people being misclassified, at the cost of slightly more healthy people being misclassified as unhealthy.</p>
+</div>
+<div id="conclusion" class="section level3">
+<h3>Conclusion</h3>
+<p>As shown above, changing the threshold value with which predicted class probabilities are converted into class labels can significantly change the accuracy of predictions generated by a model from imbalanced data. Depending on the context of the analysis, an optimal threshold value can be found that sufficiently balances the true positive and true negative rates of predictions, thereby adjusting for class imbalance and maximizing predictive performance.</p>
+</div>
