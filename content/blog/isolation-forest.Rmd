@@ -1,0 +1,123 @@
+---
+title: "Insurance and Outliers - Identifying Outliers with Isolation Forests"
+output: html_notebook
+---
+
+### Introduction
+
+The following is a brief extension to the previous analysis regarding appropriate regression modelling on the health insurance dataset, depending on the outliers present within. The focus here is more on the exploratory stage of data analysis in terms of identifying the outliers themselves in the dataset. Specifically, the use of the Isolation Forests algorithm will be described and demonstrated for outlier/anomaly detection. As in-depth data exploration has already been carried out in the previous analysis, it will not be repeated here. 
+
+Both R and Python are used for this analysis. The standard Python libraries are loaded.
+
+```{r message=FALSE, warning=FALSE, fig.width=9, fig.height=7, echo = FALSE}
+#R
+
+library(reticulate)
+```
+
+```{python, engine.path = 'C:\\Users\\faiza\\Anaconda3\\python.exe'}
+#Python
+
+import pandas as pd
+import numpy as np
+import seaborn as sns
+import matplotlib.pyplot as plt
+```
+
+### Visually Identified Outliers
+
+The categorical variables are converted into dummy variables using one-hot encoding to allow the algorithm to operate effectively. 
+
+```{python, engine.path = 'C:\\Users\\faiza\\Anaconda3\\python.exe'}
+#Python
+
+insurance = pd.read_csv('insurance.csv')
+
+encode = pd.get_dummies(insurance[['sex','smoker','region']])
+
+insurance_encode = pd.concat([encode,insurance],
+                             axis = 1)
+
+insurance_encode = insurance_encode.drop(['sex','smoker','region'],axis = 1)
+```
+
+When it comes to identifying outliers, one highly simple method would be to identify such values visually using charts and graphs. In the previous analysis, when comparing the charges variable against age and bmi, some outlier values were identified in this manner. These seven outliers were seen in the charges variable where the value was exceeding 50000. A detailed look at these seven observations is shown below. 
+
+```{python, engine.path = 'C:\\Users\\faiza\\Anaconda3\\python.exe'}
+#Python
+
+#7 outliers observed during exploratory analysis
+gt_50000 = insurance[insurance['charges'] > 50000]
+```
+
+```{r message=FALSE, warning=FALSE, fig.width=9, fig.height=7}
+#R
+
+py$gt_50000
+```
+
+Aside from the indication that only smokers are being charged such high premiums, none of the other explanatory variables provide a similar confident indication, with their values varying significantly. For instance, within these 7 observations, all four regions are being included as those being charged a high amount of premiums. 
+
+### Isolation Forests
+
+The issue with identifying outliers visually is that perspective is limited only to the variables that are being considered in the chart. Since at a maximum only 3 variables can be considered simultaneously in a chart, the process of identifying outlier observations/anomalies can become increasingly tedious as the number of features to consider increases. In order to counteract this, there are various algorithms available which can process an entire dataset and provide a reasonable identification of the outliers in a data via unsupervised learning techniques. One such method is known as Isolation Forests.
+
+Isolation Forests essentially follow the same principles as decision trees and random forests, as in it develops various trees and combines the results from all of them to identify outliers. The way is does this is based on how the tree itself is constructed. A tree is constructed by randomly selecting a feature/variable, then randomly selecting a value between the minimum and maximum of that feature upon which a split can be created for the next feature selected, and the process is repeated till a desired tree depth is reached. The very first split is known as the root node, and the final splits are known as the leaf nodes. Keeping this process in mind, the way isolation forests identify outliers using this tree building mechanism is that assuming that outliers are few and significantly different from other observations, the 'branches' (path lengths) created by outlier values during the tree building process will be much shorter than those of other standard observations. By identifying the shortest paths, isolation forests are able to effectively identify anomalies in the data.
+
+To identify outliers in this insurance dataset, the isolation forests algorithm is applied below. All hyperparameter values are kept at their default except for n_estimator, which is changed from 100 to 500 for a higher number of trees to be created in the forest. A random state value is also set for reproducibility due to the random element of this algorithm.
+
+```{python, engine.path = 'C:\\Users\\faiza\\Anaconda3\\python.exe'}
+#Python
+
+from sklearn.ensemble import IsolationForest
+
+i_forest = IsolationForest(n_estimators=500,
+                           contamination=0.1,
+                           random_state=1234,
+                           max_samples='auto')
+
+outliers_forest = i_forest.fit_predict(insurance_encode)
+
+outliers_forest = outliers_forest.reshape(-1,1)
+
+insurance_encode['outliers_forest'] = outliers_forest
+
+forest_outliers = insurance_encode[insurance_encode['outliers_forest'] == -1]
+```
+
+The algorithm identifies anomalies by labelling them -1. These observations are filtered into a separate dataframe. 
+
+```{r message=FALSE, warning=FALSE, fig.width=9, fig.height=7}
+#R
+
+f_o <- py$forest_outliers
+```
+
+### Key Observations
+
+A summary statistics table for these outlier observations is shown below. A total of 134 observations have been classified as outliers from 1338 rows. 
+
+```{r message=FALSE, warning=FALSE, fig.width=9, fig.height=7}
+#R
+
+x <- c(1:8,11)
+
+for (i in x) {
+  f_o[,i] <- as.factor(f_o[,i])
+}
+
+rm(x,i)
+
+pander::pander(summary(f_o[,-13]))
+```
+
+Some key observations can be made about these outliers from the summary table:
+
+- Majority of the individuals in these observations are classified as smokers (131 from 134 total)
+- Approximately 57% of these individuals are women (76/134)
+- Among the regions, most belong to the north west and least to the north east
+- Majority of these outliers are individuals with no children. 
+- Within the strictly numerical variables (age, bmi and charges), a relatively normal distribution can be seen as evidenced by the minimal differences between the mean and median values for each. In the charges variable however, it is interesting to note that aside from the minimum value of 6666, from the first quartile to the maximum, all values are above 20000. This indicates that majority of the outlier observations involve higher premiums being charged to the individual, if compared to mean (13270) and median (9382) values of this variable in the context of the entire dataset shown in the previous analysis. 
+
+Once such outlier values are identified, they can be managed according to the requirements of the analysis. As this is unsupervised learning, it cannot be said with certainty whether all the outliers identified are indeed 100% accurate. However, by analysing the statistics of such observations to highlight unreasonable observations, and by tuning the hyperparameters of the algorithm, anomalies can be consistently identified with improved accuracy. 
+

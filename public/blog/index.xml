@@ -151,6 +151,15 @@ The dataset contains some information about computers, with the dependant variab
     </item>
     
     <item>
+      <title>Insurance and Outliers - Identifying Outliers with Isolation Forests</title>
+      <link>/blog/isolation-forest/</link>
+      <pubDate>Mon, 01 Jan 0001 00:00:00 +0000</pubDate>
+      
+      <guid>/blog/isolation-forest/</guid>
+      <description>IntroductionThe following is a brief extension to the previous analysis regarding appropriate regression modelling on the health insurance dataset, depending on the outliers present within. The focus here is more on the exploratory stage of data analysis in terms of identifying the outliers themselves in the dataset. Specifically, the use of the Isolation Forests algorithm will be described and demonstrated for outlier/anomaly detection. As in-depth data exploration has already been carried out in the previous analysis, it will not be repeated here.</description>
+    </item>
+    
+    <item>
       <title>Jazz, Metal, Electronic - Analyzing and Clustering Music</title>
       <link>/blog/music/</link>
       <pubDate>Mon, 01 Jan 0001 00:00:00 +0000</pubDate>
