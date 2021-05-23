@@ -1,0 +1,494 @@
+<!DOCTYPE html>
+<html lang="en-us">
+
+<head>
+  <title>Insurance and Outliers - Comparing OLS and Quantile Regression Models | Fazi_RDA</title>
+
+  <meta charset="UTF-8">
+  <meta name="language" content="en">
+  <meta name="description" content="">
+  <meta name="keywords" content="">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta http-equiv="content-type" content="text/html; charset=utf-8">
+  <meta http-equiv="X-UA-Compatible" content="IE=edge">
+
+  
+  
+
+  <link rel="shortcut icon" type="image/png" href="/favicon.ico" />
+
+  
+  
+    
+ 
+  
+  
+  
+  
+  
+  
+    
+    <link rel="stylesheet" href="/css/post.min.3b28d14676e4769849164baf362f2b0aa069ab25702fef98f0c4227cb68d74cd.css" integrity="sha256-OyjRRnbkdphJFkuvNi8rCqBpqyVwL&#43;&#43;Y8MQifLaNdM0="/>
+  
+    
+    <link rel="stylesheet" href="/css/custom.min.e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855.css" integrity="sha256-47DEQpj8HBSa&#43;/TImW&#43;5JCeuQeRkm5NMpJWZG3hSuFU="/>
+  
+  
+   
+   
+    
+
+<script type="application/ld+json">
+  
+    {
+      "@context" : "http://schema.org",
+      "@type" : "BlogPosting",
+      "mainEntityOfPage": {
+            "@type": "WebPage",
+            "@id": "\/"
+      },
+      "articleSection" : "blog",
+      "name" : "Insurance and Outliers - Comparing OLS and Quantile Regression Models",
+      "headline" : "Insurance and Outliers - Comparing OLS and Quantile Regression Models",
+      "description" : "",
+      "inLanguage" : "en-US",
+      "author" : "",
+      "creator" : "",
+      "publisher": "",
+      "accountablePerson" : "",
+      "copyrightHolder" : "",
+      "copyrightYear" : "0001",
+      "datePublished": "0001-01-01 00:00:00 \u002b0000 UTC",
+      "dateModified" : "0001-01-01 00:00:00 \u002b0000 UTC",
+      "url" : "\/blog\/insurance\/",
+      "wordCount" : "2113",
+      "keywords" : ["Blog"]
+    }
+  
+  </script>
+</head>
+
+<body>
+  <div class="burger__container">
+  <div class="burger" aria-controls="navigation" aria-label="Menu">
+    <div class="burger__meat burger__meat--1"></div>
+    <div class="burger__meat burger__meat--2"></div>
+    <div class="burger__meat burger__meat--3"></div>
+  </div>
+</div>
+ 
+
+  <nav class="nav" role="navigation">
+  <ul class="nav__list">
+    
+    
+      <li>
+        <a  href="/">about</a>
+      </li>
+    
+      <li>
+        <a  class="active"
+         href="/blog">projects</a>
+      </li>
+    
+  </ul>
+</nav>
+
+
+  <main>
+    
+    
+
+    <div class="flex-wrapper">
+      <div class="post__container">
+        <div class="post">
+          <header class="post__header">
+            <h1 id="post__title">Insurance and Outliers - Comparing OLS and Quantile Regression Models</h1>
+            <time datetime="0001-01-01 00:00:00 &#43;0000 UTC" class="post__date"
+            > </time>
+          </header>
+          <article class="post__content">
+              
+
+
+
+<div id="introduction" class="section level3">
+<h3>Introduction</h3>
+<p>The following analysis aims to provide a comparison between Ordinary Least Squares (OLS) Regression and Quantile Regression models on how each of these methods are relevant depending on the significance of outliers present in a dataset. The dataset used in this analysis describes health insurance charges on various individuals, and how the premiums charged varies based on the individual attributes represented by the explanatory variables. Such tidy and simplistic datasets might be highly unlikely to be present realistically. However, the simplicity of this particular dataset provides a good foundation to statistically examine the effects that are observed in this analysis. The variables considered are as follows:</p>
+<ul>
+<li>Age: Age of beneficiary</li>
+<li>Sex: Gender of the contractor</li>
+<li>BMI: Body Mass Index</li>
+<li>Children: Number of dependants covered by health insurance</li>
+<li>Smoker: Smoker or Non-Smoker</li>
+<li>Region: Residential area in the US</li>
+<li>Charges (target variable): Premiums charged by health insurance</li>
+</ul>
+<p>No additional information about these variables are given from the source. The data was freely obtained via the following link: <a href="https://www.kaggle.com/teertha/ushealthinsurancedataset" class="uri">https://www.kaggle.com/teertha/ushealthinsurancedataset</a></p>
+<p>The required libraries and the dataset are loaded.</p>
+<pre class="r"><code>#libraries
+library(tidyverse)
+library(ggrepel)
+library(recipes)
+library(rsample)
+library(quantreg)
+
+#data
+insurance &lt;- read.csv(&#39;insurance.csv&#39;)</code></pre>
+</div>
+<div id="processing-and-exploratory-analysis" class="section level3">
+<h3>Processing and Exploratory Analysis</h3>
+<p>Once the dataset is loaded, the only preprocessing required is to convert the relevant categorical features (Sex, Smoker, Region) from characters to factor data type to represent categorical data. A summary statistics for the complete dataset is shown below.</p>
+<pre class="r"><code>#convert to factor data type
+x &lt;- c(2,5,6)
+
+for (i in x) {
+  insurance[,i] &lt;- as.factor(insurance[,i])
+}
+
+rm(x,i)
+
+#summary statistics
+pander::pander(summary(insurance))</code></pre>
+<table>
+<caption>Table continues below</caption>
+<colgroup>
+<col width="22%" />
+<col width="18%" />
+<col width="22%" />
+<col width="22%" />
+<col width="15%" />
+</colgroup>
+<thead>
+<tr class="header">
+<th align="center">age</th>
+<th align="center">sex</th>
+<th align="center">bmi</th>
+<th align="center">children</th>
+<th align="center">smoker</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td align="center">Min. :18.00</td>
+<td align="center">female:662</td>
+<td align="center">Min. :15.96</td>
+<td align="center">Min. :0.000</td>
+<td align="center">no :1064</td>
+</tr>
+<tr class="even">
+<td align="center">1st Qu.:27.00</td>
+<td align="center">male :676</td>
+<td align="center">1st Qu.:26.30</td>
+<td align="center">1st Qu.:0.000</td>
+<td align="center">yes: 274</td>
+</tr>
+<tr class="odd">
+<td align="center">Median :39.00</td>
+<td align="center">NA</td>
+<td align="center">Median :30.40</td>
+<td align="center">Median :1.000</td>
+<td align="center">NA</td>
+</tr>
+<tr class="even">
+<td align="center">Mean :39.21</td>
+<td align="center">NA</td>
+<td align="center">Mean :30.66</td>
+<td align="center">Mean :1.095</td>
+<td align="center">NA</td>
+</tr>
+<tr class="odd">
+<td align="center">3rd Qu.:51.00</td>
+<td align="center">NA</td>
+<td align="center">3rd Qu.:34.69</td>
+<td align="center">3rd Qu.:2.000</td>
+<td align="center">NA</td>
+</tr>
+<tr class="even">
+<td align="center">Max. :64.00</td>
+<td align="center">NA</td>
+<td align="center">Max. :53.13</td>
+<td align="center">Max. :5.000</td>
+<td align="center">NA</td>
+</tr>
+</tbody>
+</table>
+<table style="width:44%;">
+<colgroup>
+<col width="22%" />
+<col width="22%" />
+</colgroup>
+<thead>
+<tr class="header">
+<th align="center">region</th>
+<th align="center">charges</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td align="center">northeast:324</td>
+<td align="center">Min. : 1122</td>
+</tr>
+<tr class="even">
+<td align="center">northwest:325</td>
+<td align="center">1st Qu.: 4740</td>
+</tr>
+<tr class="odd">
+<td align="center">southeast:364</td>
+<td align="center">Median : 9382</td>
+</tr>
+<tr class="even">
+<td align="center">southwest:325</td>
+<td align="center">Mean :13270</td>
+</tr>
+<tr class="odd">
+<td align="center">NA</td>
+<td align="center">3rd Qu.:16640</td>
+</tr>
+<tr class="even">
+<td align="center">NA</td>
+<td align="center">Max. :63770</td>
+</tr>
+</tbody>
+</table>
+<p>From the above summary statistics table, some initial insights into the properties of the variables are observed. The dataset has no missing values present, and all the numeric explanatory variables have a seemingly symmetrical distribution, as the mean and median values are almost equivalent. The Sex and Region categorical variables are also quite balanced based on the number of observations within each of their unique classes.</p>
+<p>The smokers variable stands out with a strong class imbalance, as only a small proportion of the total population are labelled as smokers. The target variable (charges) on the other hand shows a significant difference between the mean and median values, indicating a positively skewed distribution (mean &gt; median). The skew indicates that outliers are definitely present within this feature, and the predictive model applied will need to take this into consideration.</p>
+<p>The relationship between the explanatory variables and the target variable can be visually explored further.</p>
+<pre class="r"><code>ggplot(insurance, aes(x = charges, y = age)) +
+  geom_point() +
+  xlab(&#39;Premium Charges&#39;) +
+  ylab(&#39;Age&#39;) +
+  ggtitle(&#39;Age vs Premium Charges Scatter Plot&#39;) +
+  geom_label_repel(data = subset(insurance, charges &gt;= 50000),
+             aes(charges, age, label = age),
+             vjust = 2, segment.color = &#39;blue&#39;) +
+  theme_minimal()</code></pre>
+<p><img src="/blog/insurance_files/figure-html/unnamed-chunk-3-1.png" width="864" /></p>
+<p>While no distinct pattern or correlation can be seen between the age and charges variable, hints about the skewness of the charges variable and the presence of outliers can be clearly seen. At the very left of the chart, a large compact cluster of observations indicates a linear relationship between age and premiums charged up until roughly 15000. However beyond that no other similar cluster can be seen. Seven observations, each at different ages, can be seen as extreme outliers in terms of premiums charged, with amounts exceeding 50000.</p>
+<pre class="r"><code>ggplot(insurance, aes(x = charges)) +
+  geom_density(aes(fill = sex), alpha = 0.75) +
+  scale_fill_manual(values = c(&#39;purple2&#39;, &#39;steelblue1&#39;)) + 
+  xlab(&#39;Premium Charges&#39;) +
+  ggtitle(&#39;Premium Charge Distributions by Gender&#39;) +
+  theme_minimal()</code></pre>
+<p><img src="/blog/insurance_files/figure-html/unnamed-chunk-4-1.png" width="864" /></p>
+<p>Comparing men and women indicates that there seems to be a higher likelihood of men being charged higher amounts of premiums in contrast to women. The skewed nature of the charges variable is now clearly visible in this chart.</p>
+<pre class="r"><code>ggplot(insurance, aes(x = charges, y = bmi)) +
+  geom_point() +
+  xlab(&#39;Premium Charges&#39;) +
+  ylab(&#39;BMI&#39;) +
+  ggtitle(&#39;BMI vs Premium Charges Scatter Plot&#39;) +
+  geom_label_repel(data = subset(insurance, charges &gt;= 50000),
+                   aes(charges, bmi, label = bmi),
+                   vjust = 2, segment.color = &#39;blue&#39;) +
+  theme_minimal()</code></pre>
+<p><img src="/blog/insurance_files/figure-html/unnamed-chunk-5-1.png" width="864" /></p>
+<p>Based on the chart above, at best a weak linear relationship between the BMI and premiums charged can be extrapolated. However, similar to the age vs charges scatter plot, seven outlier observations are again observed at varying BMI levels, with premiums being charged in excess of 50000. It is evident that these seven observations are the same observed earlier.</p>
+<pre class="r"><code>ggplot(insurance, aes(x = as.factor(children), y = charges)) +
+  geom_boxplot() +
+  xlab(&#39;Number of Children&#39;) +
+  ylab(&#39;Premium Charges&#39;) +
+  ggtitle(&#39;Premium Charge Boxplots by Number of Children&#39;) +
+  theme_minimal()</code></pre>
+<p><img src="/blog/insurance_files/figure-html/unnamed-chunk-6-1.png" width="864" /></p>
+<p>Although the median values for the premium charges are roughly the same for each category in the number of children variable, there is significant deviation within the overall value ranges and the presence of outliers. There are two interesting observations which can be derived from this boxplot chart. Firstly, it seems that what might be considered as outliers differs with each variables perspective. For instance, Age and BMI both indicated the same seven observations as outliers with charges in excess of 50000. However, based on the number of children, the charges being considered as outliers vary significantly in terms of both quantity and amount. Secondly, there seems to be some imbalance in the number of observations for each number of children group. This is verified by the table below:</p>
+<pre class="r"><code>pander::pander(table(as.factor(insurance$children)))</code></pre>
+<table style="width:47%;">
+<colgroup>
+<col width="8%" />
+<col width="8%" />
+<col width="8%" />
+<col width="8%" />
+<col width="6%" />
+<col width="6%" />
+</colgroup>
+<thead>
+<tr class="header">
+<th align="center">0</th>
+<th align="center">1</th>
+<th align="center">2</th>
+<th align="center">3</th>
+<th align="center">4</th>
+<th align="center">5</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td align="center">574</td>
+<td align="center">324</td>
+<td align="center">240</td>
+<td align="center">157</td>
+<td align="center">25</td>
+<td align="center">18</td>
+</tr>
+</tbody>
+</table>
+<p>it can be seen that there are fewer and fewer observations as the number of children increases, which makes sense realistically.</p>
+<pre class="r"><code>ggplot(insurance, aes(x = charges)) +
+  geom_density(aes(fill = smoker), alpha = 0.75) +
+  scale_fill_manual(values = c(&#39;skyblue2&#39;, &#39;gray50&#39;)) + 
+  xlab(&#39;Premium Charges&#39;) +
+  ggtitle(&#39;Premium Charge Distributions by Smoking Status&#39;) +
+  theme_minimal()</code></pre>
+<p><img src="/blog/insurance_files/figure-html/unnamed-chunk-8-1.png" width="864" /></p>
+<p>A distinct pattern can be observed in this chart, with a clear indication that a vast majority of the high premium charges are being issued to individuals who are currently smokers. There is however still a positive skew observed in the non-smokers group as well, indicating that there are outlier values present within non-smokers.</p>
+<pre class="r"><code>ggplot(insurance, aes(x = region, y = charges)) +
+  geom_boxplot() +
+  xlab(&#39;Region&#39;) +
+  ylab(&#39;Premium Charges&#39;) +
+  ggtitle(&#39;Premium Charge Boxplots by Region&#39;) +
+  theme_minimal()</code></pre>
+<p><img src="/blog/insurance_files/figure-html/unnamed-chunk-9-1.png" width="864" /></p>
+<p>Lastly, boxplots describing the relationship between region and premium charges indicate no significant difference between the regions in terms of median premiums charged. It is interesting to note that overall there seems to be smaller quartile ranges and lower maximum values in the west (northwest and southwest) compared to the eastern regions.</p>
+</div>
+<div id="feature-engineering-and-traintest-split" class="section level3">
+<h3>Feature Engineering and Train/Test Split</h3>
+<p>In terms of feature engineering, the only step carried out is dummy encoding the categorical variables so that the linear regression models can process these variable effectively. The data is split into a 75/25 train-test split to assess each of the two models performance.</p>
+<pre class="r"><code>#split train-test
+set.seed(1234)
+split &lt;- initial_split(insurance, prop = 0.75)
+ins_train &lt;- training(split)
+ins_test &lt;- testing(split)
+
+#dummy encoding categorical variables
+ins_recipe &lt;- recipe(charges ~ ., data = ins_train) %&gt;%
+  step_dummy(all_nominal()) %&gt;%
+  prep(training = ins_train)
+
+ins_new_train &lt;- bake(ins_recipe, ins_train)
+ins_new_test &lt;- bake(ins_recipe, ins_test)
+
+rm(ins_recipe, ins_train, ins_test, split)</code></pre>
+</div>
+<div id="ols-regression" class="section level3">
+<h3>OLS Regression</h3>
+<p>With the data processed and split into training/testing sets, the standard OLS regression model can be applied as follows:</p>
+<pre class="r"><code>slr_model &lt;- lm(charges ~ ., ins_new_train)</code></pre>
+<p>The subject here is to examine whether this dataset meets the assumptions set by OLS regression. This is of high importance since if the assumptions are not met, any metrics generated by the OLS regression model will be highly unreliable and prone to error, thus rendering the exercise practically useless. The key assumptions set by OLS regression are:</p>
+<ul>
+<li>No multicollinearity between variables</li>
+<li>Homoscedasticity: constant variance within the residual terms</li>
+<li>Normal distribution of residual terms</li>
+<li>Linear relationship between target and explanatory variables</li>
+</ul>
+<p>While it is debatable whether a strict linear relationship between the target and explanatory variables exists, the other three assumptions can easily be confirmed via statistical testing.</p>
+<p>To test for multicollinearity, the Variance Inflation Factor (VIF) scores for each of the variables can be calculated. A score of 5 or above strongly indicates multicollinearity. In this case however, all the scores are much lower than 5, therefore the assumption of no multicollinearity is met.</p>
+<pre class="r"><code>regclass::VIF(slr_model)</code></pre>
+<pre><code>##              age              bmi         children         sex_male 
+##         1.016088         1.104235         1.004857         1.006721 
+##       smoker_yes region_northwest region_southeast region_southwest 
+##         1.009742         1.570990         1.685310         1.567532</code></pre>
+<p>For testing heteroscedasticity, the Breusch-Pagan test can be used as a hypothesis test, with the null hypothesis being that variances of the error (residual) terms are all equal. With a p-value of much lower than 0.05, there is strong evidence to reject this null hypothesis, indicating that there is heteroscedasticity present, thus violating one of the key assumptions of OLS regression.</p>
+<pre class="r"><code>lmtest::bptest(slr_model)</code></pre>
+<pre><code>## 
+##  studentized Breusch-Pagan test
+## 
+## data:  slr_model
+## BP = 100.07, df = 8, p-value &lt; 2.2e-16</code></pre>
+<p>A visual representation of these properties can also be seen. Evidence of the heteroscedasticity can be seen again in the residuals vs fitted plot. The Q-Q plot also indicates that the assumption of normally distributed residuals is not being met. The outliers present in this dataset, especially with regards to the target variable, are most likely responsible for these assumptions not being met.</p>
+<pre class="r"><code>par(mfrow=c(2,2))
+plot(slr_model)</code></pre>
+<p><img src="/blog/insurance_files/figure-html/unnamed-chunk-14-1.png" width="864" /></p>
+</div>
+<div id="qunatile-regression-and-performance-comparison" class="section level3">
+<h3>Qunatile Regression and Performance Comparison</h3>
+<p>When the key assumptions of OLS regression are not being met, particularly due to the presence of outliers, an alternative approach to modelling can be quantile regression. The primary difference between quantile regression and OLS regression lies in how the conditional functions of y(target) given x(explanatory) are calculated. In OLS regression, the aim is to calculate the conditional mean function, whereas in quantile regression the aim is to calculate the conditional median (or any other quartile) function. The use of median instead of mean in this case makes quantile regression more suitable for outliers due to the median being robust to such extreme values in comparison to the mean. While the standard assumptions of linear relationships and no multicollinearity still hold for quantile regression, the assumptions of constant variance and normal distribution of residual terms are not required. This implies more reliable metrics being generated by quantile regression in comparison to OLS regression when modelling outlier values.</p>
+<p>For a comparison, a quantile regression model with the default parameter value of 0.5 is applied to assess the performance based on the conditional median function being estimated by the model.</p>
+<pre class="r"><code>qr_0.5 &lt;- rq(charges ~ ., tau = 0.5, data = ins_new_train)</code></pre>
+<p>The performance between the two models on the testing sets is shown below.</p>
+<pre class="r"><code>#OLS regression
+slr_preds &lt;- predict(slr_model, ins_new_test)
+caret::postResample(slr_preds, ins_new_test$charges)</code></pre>
+<pre><code>##         RMSE     Rsquared          MAE 
+## 6350.6938877    0.7197361 4337.5305835</code></pre>
+<pre class="r"><code>#Quantile regression
+qr_0.5_preds &lt;- predict(qr_0.5, ins_new_test)
+caret::postResample(qr_0.5_preds, ins_new_test$charges)</code></pre>
+<pre><code>##         RMSE     Rsquared          MAE 
+## 7409.4158936    0.6842509 3795.3171209</code></pre>
+<p>The above comparison shows that in terms of the RMSE metric, the OLS regression appears to perform better, whereas in terms of the MAE, quantile regression has a better performance. This disparity is most likely due to the loss functions that are minimized during model training. The quantile loss function that is utilised by the quantile regression model is actually simply an extension of the standard MAE function. When the quantile chosen is 0.5 (50th percentile - median), the loss function that is optimized is essentially equivalent to the MAE function. Due to this, it might be more appropriate to assess the performance of the quantile regression model using the MAE instead of RMSE. It should be noted that as quantile regression is considered inefficient, a larger sample size would likely result in a better overall performance by the quantile regression than that which is shown here.</p>
+<p>The choice between the two models at the end of the day is determined by how the outliers present in the data are perceived. If for instance the outliers are redundant information and can be removed, it is highly likely that issues with the residual terms highlighted earlier will be fixed, thus rendering the OLS regression more suitable. If however the outliers cannot be removed and must be considered by the linear regression model, then quantile regression is a better option, where the quantile measure can also be varied to find the best fitting model. This perception also impacts the choice of the performance metric used. As RMSE gives a much higher weight to larger errors, it can easily indicate a higher error simply due to a few outliers present. If robustness to outliers is required, the MAE metric is a better choice due to the absolute calculations involved.</p>
+</div>
+
+
+              
+          </article>
+          
+
+ <div class="pagination">
+  
+    <a class="pagination__item" href="/blog/music/">
+        <span class="pagination__label">Previous Post</span>
+        <span class="pagination__title">Jazz, Metal, Electronic - Analyzing and Clustering Music</span>
+    </a>
+  
+
+  
+    <a class="pagination__item" href="/blog/house-price/">
+      <span class="pagination__label">Next Post</span>
+      <span class="pagination__title" >House Price Predictions with Clusters and Regressions</a>
+    </a>
+  
+</div>
+
+          
+          <footer class="post__footer">
+            
+
+
+<div class="social-icons">
+  
+     
+    
+  
+     
+    
+  
+     
+    
+  
+     
+    
+  
+     
+    
+  
+     
+    
+  
+     
+    
+  
+     
+    
+     
+</div>
+
+            <p>© 2021 fazi_rda</p>
+          </footer>
+          </div>
+      </div>
+      
+    </div>
+    
+
+  </main>
+
+   
+
+  
+  <script src="/js/index.min.49e4d8a384357d9b445b87371863419937ede9fa77737522ffb633073aebfa44.js" integrity="sha256-SeTYo4Q1fZtEW4c3GGNBmTft6fp3c3Ui/7YzBzrr&#43;kQ=" crossorigin="anonymous"></script>
+  
+  
+  <script src="https://unpkg.com/prismjs@1.20.0/components/prism-core.min.js"></script>
+
+  
+  <script src="https://unpkg.com/prismjs@1.20.0/plugins/autoloader/prism-autoloader.min.js"
+    data-autoloader-path="https://unpkg.com/prismjs@1.20.0/components/"></script>
+
+  
+
+
+</body>
+
+</html>

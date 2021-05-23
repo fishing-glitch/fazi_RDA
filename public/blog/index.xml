@@ -142,6 +142,15 @@ The dataset contains some information about computers, with the dependant variab
     </item>
     
     <item>
+      <title>Insurance and Outliers - Comparing OLS and Quantile Regression Models</title>
+      <link>/blog/insurance/</link>
+      <pubDate>Mon, 01 Jan 0001 00:00:00 +0000</pubDate>
+      
+      <guid>/blog/insurance/</guid>
+      <description>IntroductionThe following analysis aims to provide a comparison between Ordinary Least Squares (OLS) Regression and Quantile Regression models on how each of these methods are relevant depending on the significance of outliers present in a dataset. The dataset used in this analysis describes health insurance charges on various individuals, and how the premiums charged varies based on the individual attributes represented by the explanatory variables. Such tidy and simplistic datasets might be highly unlikely to be present realistically.</description>
+    </item>
+    
+    <item>
       <title>Jazz, Metal, Electronic - Analyzing and Clustering Music</title>
       <link>/blog/music/</link>
       <pubDate>Mon, 01 Jan 0001 00:00:00 +0000</pubDate>

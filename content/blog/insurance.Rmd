@@ -1,0 +1,222 @@
+---
+title: "Insurance and Outliers - Comparing OLS and Quantile Regression Models"
+output: html_notebook
+---
+
+### Introduction
+
+The following analysis aims to provide a comparison between Ordinary Least Squares (OLS) Regression and Quantile Regression models on how each of these methods are relevant depending on the significance of outliers present in a dataset. The dataset used in this analysis describes health insurance charges on various individuals, and how the premiums charged varies based on the individual attributes represented by the explanatory variables. Such tidy and simplistic datasets might be highly unlikely to be present realistically. However, the simplicity of this particular dataset provides a good foundation to statistically examine the effects that are observed in this analysis. The variables considered are as follows:
+
+- Age: Age of beneficiary
+- Sex: Gender of the contractor
+- BMI: Body Mass Index 
+- Children: Number of dependants covered by health insurance
+- Smoker: Smoker or Non-Smoker
+- Region: Residential area in the US
+- Charges (target variable): Premiums charged by health insurance
+
+No additional information about these variables are given from the source. The data was freely obtained via the following link: https://www.kaggle.com/teertha/ushealthinsurancedataset
+
+The required libraries and the dataset are loaded.
+
+```{r message=FALSE, warning=FALSE, fig.width=9, fig.height=7}
+#libraries
+library(tidyverse)
+library(ggrepel)
+library(recipes)
+library(rsample)
+library(quantreg)
+
+#data
+insurance <- read.csv('insurance.csv')
+```
+
+### Processing and Exploratory Analysis
+
+Once the dataset is loaded, the only preprocessing required is to convert the relevant categorical features (Sex, Smoker, Region) from characters to factor data type to represent categorical data. A summary statistics for the complete dataset is shown below.
+
+```{r message=FALSE, warning=FALSE, fig.width=9, fig.height=7}
+#convert to factor data type
+x <- c(2,5,6)
+
+for (i in x) {
+  insurance[,i] <- as.factor(insurance[,i])
+}
+
+rm(x,i)
+
+#summary statistics
+pander::pander(summary(insurance))
+```
+
+From the above summary statistics table, some initial insights into the properties of the variables are observed. The dataset has no missing values present, and all the numeric explanatory variables have a seemingly symmetrical distribution, as the mean and median values are almost equivalent. The Sex and Region categorical variables are also quite balanced based on the number of observations within each of their unique classes. 
+
+The smokers variable stands out with a strong class imbalance, as only a small proportion of the total population are labelled as smokers. The target variable (charges) on the other hand shows a significant difference between the mean and median values, indicating a positively skewed distribution (mean > median). The skew indicates that outliers are definitely present within this feature, and the predictive model applied will need to take this into consideration. 
+
+The relationship between the explanatory variables and the target variable can be visually explored further. 
+
+```{r message=FALSE, warning=FALSE, fig.width=9, fig.height=7}
+ggplot(insurance, aes(x = charges, y = age)) +
+  geom_point() +
+  xlab('Premium Charges') +
+  ylab('Age') +
+  ggtitle('Age vs Premium Charges Scatter Plot') +
+  geom_label_repel(data = subset(insurance, charges >= 50000),
+             aes(charges, age, label = age),
+             vjust = 2, segment.color = 'blue') +
+  theme_minimal()
+```
+
+While no distinct pattern or correlation can be seen between the age and charges variable, hints about the skewness of the charges variable and the presence of outliers can be clearly seen. At the very left of the chart, a large compact cluster of observations indicates a linear relationship between age and premiums charged up until roughly 15000. However beyond that no other similar cluster can be seen. Seven observations, each at different ages, can be seen as extreme outliers in terms of premiums charged, with amounts exceeding 50000. 
+
+```{r message=FALSE, warning=FALSE, fig.width=9, fig.height=7}
+ggplot(insurance, aes(x = charges)) +
+  geom_density(aes(fill = sex), alpha = 0.75) +
+  scale_fill_manual(values = c('purple2', 'steelblue1')) + 
+  xlab('Premium Charges') +
+  ggtitle('Premium Charge Distributions by Gender') +
+  theme_minimal()
+```
+
+Comparing men and women indicates that there seems to be a higher likelihood of men being charged higher amounts of premiums in contrast to women. The skewed nature of the charges variable is now clearly visible in this chart. 
+
+```{r message=FALSE, warning=FALSE, fig.width=9, fig.height=7}
+ggplot(insurance, aes(x = charges, y = bmi)) +
+  geom_point() +
+  xlab('Premium Charges') +
+  ylab('BMI') +
+  ggtitle('BMI vs Premium Charges Scatter Plot') +
+  geom_label_repel(data = subset(insurance, charges >= 50000),
+                   aes(charges, bmi, label = bmi),
+                   vjust = 2, segment.color = 'blue') +
+  theme_minimal()
+```
+
+Based on the chart above, at best a weak linear relationship between the BMI and premiums charged can be extrapolated. However, similar to the age vs charges scatter plot, seven outlier observations are again observed at varying BMI levels, with premiums being charged in excess of 50000. It is evident that these seven observations are the same observed earlier. 
+
+```{r message=FALSE, warning=FALSE, fig.width=9, fig.height=7}
+ggplot(insurance, aes(x = as.factor(children), y = charges)) +
+  geom_boxplot() +
+  xlab('Number of Children') +
+  ylab('Premium Charges') +
+  ggtitle('Premium Charge Boxplots by Number of Children') +
+  theme_minimal()
+```
+
+Although the median values for the premium charges are roughly the same for each category in the number of children variable, there is significant deviation within the overall value ranges and the presence of outliers. There are two interesting observations which can be derived from this boxplot chart. Firstly, it seems that what might be considered as outliers differs with each variables perspective. For instance, Age and BMI both indicated the same seven observations as outliers with charges in excess of 50000. However, based on the number of children, the charges being considered as outliers vary significantly in terms of both quantity and amount. Secondly, there seems to be some imbalance in the number of observations for each number of children group. This is verified by the table below:
+
+```{r message=FALSE, warning=FALSE, fig.width=9, fig.height=7}
+pander::pander(table(as.factor(insurance$children)))
+```
+it can be seen that there are fewer and fewer observations as the number of children increases, which makes sense realistically. 
+
+```{r message=FALSE, warning=FALSE, fig.width=9, fig.height=7}
+ggplot(insurance, aes(x = charges)) +
+  geom_density(aes(fill = smoker), alpha = 0.75) +
+  scale_fill_manual(values = c('skyblue2', 'gray50')) + 
+  xlab('Premium Charges') +
+  ggtitle('Premium Charge Distributions by Smoking Status') +
+  theme_minimal()
+```
+
+A distinct pattern can be observed in this chart, with a clear indication that a vast majority of the high premium charges are being issued to individuals who are currently smokers. There is however still a positive skew observed in the non-smokers group as well, indicating that there are outlier values present within non-smokers. 
+
+```{r message=FALSE, warning=FALSE, fig.width=9, fig.height=7}
+ggplot(insurance, aes(x = region, y = charges)) +
+  geom_boxplot() +
+  xlab('Region') +
+  ylab('Premium Charges') +
+  ggtitle('Premium Charge Boxplots by Region') +
+  theme_minimal()
+```
+
+Lastly, boxplots describing the relationship between region and premium charges indicate no significant difference between the regions in terms of median premiums charged. It is interesting to note that overall there seems to be smaller quartile ranges and lower maximum values in the west (northwest and southwest) compared to the eastern regions. 
+
+### Feature Engineering and Train/Test Split
+
+In terms of feature engineering, the only step carried out is dummy encoding the categorical variables so that the linear regression models can process these variable effectively. The data is split into a 75/25 train-test split to assess each of the two models performance. 
+
+```{r message=FALSE, warning=FALSE, fig.width=9, fig.height=7}
+#split train-test
+set.seed(1234)
+split <- initial_split(insurance, prop = 0.75)
+ins_train <- training(split)
+ins_test <- testing(split)
+
+#dummy encoding categorical variables
+ins_recipe <- recipe(charges ~ ., data = ins_train) %>%
+  step_dummy(all_nominal()) %>%
+  prep(training = ins_train)
+
+ins_new_train <- bake(ins_recipe, ins_train)
+ins_new_test <- bake(ins_recipe, ins_test)
+
+rm(ins_recipe, ins_train, ins_test, split)
+```
+
+
+### OLS Regression
+
+With the data processed and split into training/testing sets, the standard OLS regression model can be applied as follows: 
+
+```{r message=FALSE, warning=FALSE, fig.width=9, fig.height=7}
+slr_model <- lm(charges ~ ., ins_new_train)
+```
+
+The subject here is to examine whether this dataset meets the assumptions set by OLS regression. This is of high importance since if the assumptions are not met, any metrics generated by the OLS regression model will be highly unreliable and prone to error, thus rendering the exercise practically useless. The key assumptions set by OLS regression are:
+
+- No multicollinearity between variables
+- Homoscedasticity: constant variance within the residual terms
+- Normal distribution of residual terms
+- Linear relationship between target and explanatory variables
+
+While it is debatable whether a strict linear relationship between the target and explanatory variables exists, the other three assumptions can easily be confirmed via statistical testing. 
+
+To test for multicollinearity, the Variance Inflation Factor (VIF) scores for each of the variables can be calculated. A score of 5 or above strongly indicates multicollinearity. In this case however, all the scores are much lower than 5, therefore the assumption of no multicollinearity is met. 
+
+```{r message=FALSE, warning=FALSE, fig.width=9, fig.height=7}
+regclass::VIF(slr_model)
+```
+
+For testing heteroscedasticity, the Breusch-Pagan test can be used as a hypothesis test, with the null hypothesis being that variances of the error (residual) terms are all equal. With a p-value of much lower than 0.05, there is strong evidence to reject this null hypothesis, indicating that there is heteroscedasticity present, thus violating one of the key assumptions of OLS regression. 
+
+```{r message=FALSE, warning=FALSE, fig.width=9, fig.height=7}
+lmtest::bptest(slr_model)
+```
+
+A visual representation of these properties can also be seen. Evidence of the heteroscedasticity can be seen again in the residuals vs fitted plot. The Q-Q plot also indicates that the assumption of normally distributed residuals is not being met. The outliers present in this dataset, especially with regards to the target variable, are most likely responsible for these assumptions not being met. 
+
+```{r message=FALSE, warning=FALSE, fig.width=9, fig.height=7}
+par(mfrow=c(2,2))
+plot(slr_model)
+```
+
+### Qunatile Regression and Performance Comparison
+
+When the key assumptions of OLS regression are not being met, particularly due to the presence of outliers, an alternative approach to modelling can be quantile regression. The primary difference between quantile regression and OLS regression lies in how the conditional functions of y(target) given x(explanatory) are calculated. In OLS regression, the aim is to calculate the conditional mean function, whereas in quantile regression the aim is to calculate the conditional median (or any other quartile) function. The use of median instead of mean in this case makes quantile regression more suitable for outliers due to the median being robust to such extreme values in comparison to the mean. While the standard assumptions of linear relationships and no multicollinearity still hold for quantile regression, the assumptions of constant variance and normal distribution of residual terms are not required. This implies more reliable metrics being generated by quantile regression in comparison to OLS regression when modelling outlier values. 
+
+For a comparison, a quantile regression model with the default parameter value of 0.5 is applied to assess the performance based on the conditional median function being estimated by the model. 
+
+```{r message=FALSE, warning=FALSE, fig.width=9, fig.height=7}
+qr_0.5 <- rq(charges ~ ., tau = 0.5, data = ins_new_train)
+```
+
+The performance between the two models on the testing sets is shown below.
+
+```{r message=FALSE, warning=FALSE, fig.width=9, fig.height=7}
+#OLS regression
+slr_preds <- predict(slr_model, ins_new_test)
+caret::postResample(slr_preds, ins_new_test$charges)
+```
+
+```{r message=FALSE, warning=FALSE, fig.width=9, fig.height=7}
+#Quantile regression
+qr_0.5_preds <- predict(qr_0.5, ins_new_test)
+caret::postResample(qr_0.5_preds, ins_new_test$charges)
+```
+
+The above comparison shows that in terms of the RMSE metric, the OLS regression appears to perform better, whereas in terms of the MAE, quantile regression has a better performance. This disparity is most likely due to the loss functions that are minimized during model training. The quantile loss function that is utilised by the quantile regression model is actually simply an extension of the standard MAE function. When the quantile chosen is 0.5 (50th percentile - median), the loss function that is optimized is essentially equivalent to the MAE function. Due to this, it might be more appropriate to assess the performance of the quantile regression model using the MAE instead of RMSE. It should be noted that as quantile regression is considered inefficient, a larger sample size would likely result in a better overall performance by the quantile regression than that which is shown here. 
+
+The choice between the two models at the end of the day is determined by how the outliers present in the data are perceived. If for instance the outliers are redundant information and can be removed, it is highly likely that issues with the residual terms highlighted earlier will be fixed, thus rendering the OLS regression more suitable. If however the outliers cannot be removed and must be considered by the linear regression model, then quantile regression is a better option, where the quantile measure can also be varied to find the best fitting model. This perception also impacts the choice of the performance metric used. As RMSE gives a much higher weight to larger errors, it can easily indicate a higher error simply due to a few outliers present. If robustness to outliers is required, the MAE metric is a better choice due to the absolute calculations involved.
+
+
