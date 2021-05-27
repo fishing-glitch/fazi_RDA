@@ -1,0 +1,149 @@
+---
+title: "Drugs and Memories - Using Bayesian Linear Regression"
+output: html_notebook
+---
+
+### Introduction
+
+In the previous analysis using this particular dataset, the impact of interaction effects upon regression performance was explored. The focus in this analysis however is more of a comparison between two linear regression methods: the standard OLS (Ordinary Least Squares) Linear Regression, and the Bayesian Linear Regression approach. Instead of focusing on performance differences (as they are negligible in this case anyway), the aim here is to highlight the differences in how each model presents information about the relevant features. It will also be discussed that under certain circumstances, how one might prefer the use of Bayesian Regression as opposed to the standard approach due to the differences in information portrayal. Although several sources can be found explaining the mathematical differences between the two approaches, the aim here is to explain this same difference using a more intuitive approach for a simpler understanding of the overall concepts.
+
+The required libraries and data are loaded.
+
+```{r message=FALSE, warning=FALSE, fig.width=9, fig.height=7}
+#Libraries
+library(tidyverse)
+library(recipes)
+library(rstanarm)
+library(bayestestR)
+library(reshape2)
+library(broom)
+
+#Data
+memory <- read.csv('Islander-data.csv')
+```
+
+### Data Processing & Deviations from previous analysis
+
+As the variables involved in this dataset are already visually explored in the previous analysis, those charts will not be recreated here. However, there are some key deviations here compared to the previous analysis that are worth noting:
+
+- Instead of Diff, Mem_Score_After is now going to be considered the target variable, while maintaining Mem_Score_Before as an explanatory variable and removing Diff altogether. Based on the overall poor performance of the linear models previously, this approach is used to incorporate the impact of the initial memory scores along with the other variables on the final memory scores. In hindsight, it seems that removing the Mem_Score_Before variable in the previous analysis led to significant information loss, thus resulting in poor performance. Therefore, as the final memory scores after the dosages, drugs and accounting for the other variables is a viable target variable to predict, this approach is potentially more thorough and can generate overall stronger models. 
+- Dosage is left as a quantitative variable instead of assuming it is categorical. This is because dosage is a numeric value with a meaningful order and has consistent intervals, thus making it suitable to be assumed as a quantitative variable. Converting this to categorical in the previous analysis could have potentially led to more information loss, thus avoiding this conversion here. 
+- The other two variables (Happy_Sad_Group and Drug) are converted to dummy variables for better interpretability, although the model as shown previously is able to automatically treat the other two variables as dummy variables and estimate their coefficients accordingly.
+
+These pre-processing steps are carried out in the code block below.
+
+```{r message=FALSE, warning=FALSE, fig.width=9, fig.height=7}
+#removing columns with names
+memory <- memory[, -1:-2] 
+
+#converting happy sad and drug to categorical
+memory[,2] <- as.factor(memory[,2]) 
+memory[,4] <- as.factor(memory[,4])
+
+#removing Diff Variable
+memory <- memory[,-7]
+
+#creating dummy variables
+mem_recipe <- recipe(Mem_Score_After ~ ., data = memory) %>%
+  step_dummy(all_nominal()) %>%
+  prep(training = memory)
+
+memory_new <- bake(mem_recipe, memory)
+```
+
+### Possible Issue with OLS Regression
+
+In order to explore the differences between OLS regression and Bayesian regression, first a standard regression model is applied to the data. 
+
+```{r message=FALSE, warning=FALSE, fig.width=9, fig.height=7}
+#OLS model
+ols_model <- lm(Mem_Score_After ~ ., memory_new)
+tidy(ols_model)
+```
+*Just as a quick comparison before moving forward, it seems that the R-squared value shown below for this model with the changes in variables mentioned earlier shows much better performance than that in the previous analysis, indicating an improvement.* 
+```{r message=FALSE, warning=FALSE, fig.width=9, fig.height=7}
+#R squared value for ols model
+summary(ols_model)$r.squared
+```
+
+The important aspect of this summary of the OLS regression model are the estimates of the coefficients. These coefficients essentially determine the magnitude and direction of the 'effect' that explanatory variables have on determining the value of the target variable. In OLS regression, these estimates (known as the maximum likelihood estimate) of coefficient values are determined by minimizing a loss function (difference between actual and predicted - residuals/error). 
+
+The primary critique of these estimates are its associated p-values, as seen in the above table. More specifically, it is the commonly occurring misunderstanding and misuse of these p-values. For instance, in this case of determining the effect of an explanatory variable, a hypothesis test has been conducted. Within this test, the null hypothesis states that the effect (coefficient value to be precise) is equivalent to zero, or in other words the explanatory variable has no effect on the target variable. 
+
+To assess if the null hypothesis is in fact valid, p-values are calculated. Based on the exact definition, a p-value will determine the probability of witnessing observations as extreme as those seen in the data being analysed, given that the null hypothesis is true. Therefore, assuming a threshold of 0.05, a p-value of less than 0.05 would imply there is a less than 5% probability that the observations in the data would occur if the null hypothesis is true. This does not definitively mean that the null hypothesis is false; rather it only implies that it is very likely to be false and can be rejected based on that threshold. Similarly, if the p-value is above the threshold, then it can be concluded that there is insufficient evidence to reject the null hypothesis. 
+
+Based on the way conclusions are derived from p-values, a lot of care must be taken so as to not imply something incorrect. For instance, common misuses include assuming that the alternate hypothesis is automatically true once a null hypothesis is rejected. This is incorrect because the p-value itself does not provide any evidence with regards to accepting or rejecting the alternate hypothesis. Another incorrect framing would be to say that the null hypothesis can be 'accepted', instead of saying there is insufficient evidence or lack of confidence to reject it, as technically it might just be that there is insufficient data to prove that the null hypothesis is false, which does not mean that it should be accepted nonetheless. 
+
+While p-values are quite powerful if used correctly, they are unfortunately subject to a lot of confusion and misinterpretation. With regards to determining the effects of an explanatory variable in a linear regression, an alternative to avoiding these confusions can be to use a Bayesian approach.  
+
+### The Bayesian Approach
+
+In order to see exactly how Bayesian Linear Regression helps in interpretability, a model with default parameters is run on the dataset. 
+
+```{r message=FALSE, warning=FALSE, fig.width=9, fig.height=7, results='hide'}
+bayes_model <- stan_glm(Mem_Score_After ~ ., data = memory_new)
+```
+
+Having run the model, the summary of the variable coefficients below shows how the Bayesian approach to estimating coefficients differs from standard OLS. 
+
+```{r message=FALSE, warning=FALSE, fig.width=9, fig.height=7}
+print_md(describe_posterior(bayes_model))
+```
+
+What the Bayesian Linear Regression model has essentially done is instead of calculating a single estimated value for the coefficients, it has provided an entire distribution of possible values for the coefficients across various probabilities. 
+
+As the name suggests, Bayesian Linear Regression utilizes the Bayesian theory of using prior knowledge of something to estimate future probabilities. In the context of estimating coefficients, the Bayesian approach estimates a 'posterior' probability of a coefficient value given values of y (target) and x (explanatory). To calculate this posterior, a 'prior' is used. The prior is an already existing probability distribution that is assumed to be how the coefficients are historically distributed. In the default parameters of the model run above, the prior is assumed to be a normal distribution, but depending on the context it can be any suitable distribution. Using the prior distribution and iterating over the data, a distribution of possible coefficient values can be estimated by the model. 
+
+In contrast to the complexities in interpreting p-values in OLS, the interpretation from Bayesian Regression is much more intuitive. Using the probability distribution generated by the model, and assuming that the prior distribution provided is accurate, the probability of the coefficient having a certain value can be interpreted exactly as it is; that is the probability of the coefficient being value x given the original data and the prior distribution. The use of a distribution also allows for higher reliability and accuracy (especially in small size datasets such as this one being analyses with only 198 observations). This is because using the OLS approach the margin of error is much higher as the parameter is completely unknown, and it is assumed that there is exactly one fixed value that must be estimated using the data. Bayesian Regression on the other hand assumes that the parameter is already known based on the prior, and instead of a single unique value, probabilities of different values are estimated resulting in a distribution and a lower margin of error. 
+
+Some of the essential parameters shown in the Bayesian output above are described below:
+
+- Median: In order to describe the entire distribution using one value, the median value of distribution is used, as it is robust to outliers and skewness. Note how this value and the point estimate provided by OLS regression are quite similar. 
+- Credible Interval (CI): Not be confused with the Confidence Intervals in OLS regression. A 95% CI implies that the coefficient value has a 95% chance of being in that specific range of values. 
+- Probability of Direction (pd): The probability that the coefficient value is either positive or negative (direction of the effect).
+- % in ROPE: Defines what percentage of the CI belongs to a null region (ROPE range). This range is defined as a specific range where the coefficients estimates have practically no effect, and is called the Region of Practical Equivalence (ROPE). Instead of determining whether an effect is significant or not by simply testing whether is different from zero (as in OLS regression), using % in ROPE provides a more probabilistic view of how likely it is that the effect is negligible. A low % in ROPE value is preferred to show significant effect (< 2.5% is generally ideal). 
+
+Further more detailed information about the other parameters and the Bayesian Regression method itself can be found via the following links: 
+- https://easystats.github.io/bayestestR/articles/guidelines.html
+- https://easystats.github.io/bayestestR/articles/bayestestR.html
+
+
+### Which method to use?
+
+To compare the estimates of the coefficients for each of the explanatory variables (including the intercept) for this dataset, the following chart is plotted. The vertical line represents the single estimated value from the OLS regression, plotted against the distributions estimated by the Bayesian model. 
+
+
+```{r message=FALSE, warning=FALSE, fig.width=9, fig.height=7}
+#posterior estimates from bayes model
+sample_posteriors <- insight::get_parameters(bayes_model)
+sample_posteriors_melt <- melt(sample_posteriors)
+
+#coefficient estimates from OLS model
+cof <- as.data.frame(ols_model$coefficients)
+cof_t <- data.frame(t(cof))
+
+#combining the two for plotting 
+colnames(cof_t) <- colnames(sample_posteriors)
+cof_t <- melt(cof_t)
+ols_and_bayes <- left_join(sample_posteriors_melt, cof_t, by = 'variable')
+
+#plot
+ggplot(ols_and_bayes, aes(x = value.x)) +
+  geom_density(aes(fill = variable)) +
+  scale_fill_brewer(palette = "Set1") +
+  facet_wrap(~variable, scales = 'free') +
+  geom_vline(data = ols_and_bayes, aes(xintercept = value.y), 
+             linetype = 'dashed', size = 1.2) +
+  xlab('Coefficient Estimates') +
+  ggtitle('Bayesian Distribution Output vs OLS Point Estimate') +
+  theme_minimal() + 
+  guides(colour = guide_legend(nrow = 3)) +
+  theme(legend.position = c(0.65,0.15), legend.direction = 'horizontal') +
+  guides(fill = guide_legend(nrow = 4, byrow = TRUE))
+```
+
+It can be seen that the median/mean estimates from the Bayesian model are indeed very close to the point estimates generated by the OLS regression model for each variable. It is the case that if the dataset is sufficiently large enough, this difference gets smaller and smaller until eventual convergence. 
+
+Based on the properties described earlier, under certain circumstances the use of the Bayesian regression can be preferred more than the OLS method. In the case of limited data for instance, it is advantageous to visualize exactly how much the effect of each variable varies, which can be done easily via the distribution plots shown above. This can provide a clearer picture about the possible errors and variations in estimating the target variable itself. 
+
+In other cases, it might also be required to utilise pre-existing knowledge about the variables. Instead of using the default normal distribution as shown above, other distributions can also be used to provide a more 'true to life' estimate for the coefficients. The choice of whether to use OLS regression or Bayesian Regression depends really upon the specific circumstances and what is exactly required from the modelling process. It has been highlighted that in terms of intuitive understanding and higher reliability, the Bayesian Linear Regression model does hold the advantage. However, it should be noted that in order for the Bayesian regression to be successful, the prior distributions used must be assumed to be correct, otherwise any estimates or distributions generated will in fact be completely unreliable.

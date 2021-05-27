@@ -106,6 +106,15 @@ The dataset contains some information about computers, with the dependant variab
     </item>
     
     <item>
+      <title>Drugs and Memories - Using Bayesian Linear Regression</title>
+      <link>/blog/bayesian-regression/</link>
+      <pubDate>Mon, 01 Jan 0001 00:00:00 +0000</pubDate>
+      
+      <guid>/blog/bayesian-regression/</guid>
+      <description>IntroductionIn the previous analysis using this particular dataset, the impact of interaction effects upon regression performance was explored. The focus in this analysis however is more of a comparison between two linear regression methods: the standard OLS (Ordinary Least Squares) Linear Regression, and the Bayesian Linear Regression approach. Instead of focusing on performance differences (as they are negligible in this case anyway), the aim here is to highlight the differences in how each model presents information about the relevant features.</description>
+    </item>
+    
+    <item>
       <title>Epileptic Seizure Recognition with Deep Learning</title>
       <link>/blog/seizure_final/</link>
       <pubDate>Mon, 01 Jan 0001 00:00:00 +0000</pubDate>
