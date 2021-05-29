@@ -1,0 +1,400 @@
+<!DOCTYPE html>
+<html lang="en-us">
+
+<head>
+  <title>Semi-Supervised Learning with Pseudo Labelling | Fazi_RDA</title>
+
+  <meta charset="UTF-8">
+  <meta name="language" content="en">
+  <meta name="description" content="">
+  <meta name="keywords" content="">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta http-equiv="content-type" content="text/html; charset=utf-8">
+  <meta http-equiv="X-UA-Compatible" content="IE=edge">
+
+  
+  
+
+  <link rel="shortcut icon" type="image/png" href="/favicon.ico" />
+
+  
+  
+    
+ 
+  
+  
+  
+  
+  
+  
+    
+    <link rel="stylesheet" href="/css/post.min.3b28d14676e4769849164baf362f2b0aa069ab25702fef98f0c4227cb68d74cd.css" integrity="sha256-OyjRRnbkdphJFkuvNi8rCqBpqyVwL&#43;&#43;Y8MQifLaNdM0="/>
+  
+    
+    <link rel="stylesheet" href="/css/custom.min.e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855.css" integrity="sha256-47DEQpj8HBSa&#43;/TImW&#43;5JCeuQeRkm5NMpJWZG3hSuFU="/>
+  
+  
+   
+   
+    
+
+<script type="application/ld+json">
+  
+    {
+      "@context" : "http://schema.org",
+      "@type" : "BlogPosting",
+      "mainEntityOfPage": {
+            "@type": "WebPage",
+            "@id": "\/"
+      },
+      "articleSection" : "blog",
+      "name" : "Semi-Supervised Learning with Pseudo Labelling",
+      "headline" : "Semi-Supervised Learning with Pseudo Labelling",
+      "description" : "",
+      "inLanguage" : "en-US",
+      "author" : "",
+      "creator" : "",
+      "publisher": "",
+      "accountablePerson" : "",
+      "copyrightHolder" : "",
+      "copyrightYear" : "0001",
+      "datePublished": "0001-01-01 00:00:00 \u002b0000 UTC",
+      "dateModified" : "0001-01-01 00:00:00 \u002b0000 UTC",
+      "url" : "\/blog\/pseudo-labelling\/",
+      "wordCount" : "2238",
+      "keywords" : ["Blog"]
+    }
+  
+  </script>
+</head>
+
+<body>
+  <div class="burger__container">
+  <div class="burger" aria-controls="navigation" aria-label="Menu">
+    <div class="burger__meat burger__meat--1"></div>
+    <div class="burger__meat burger__meat--2"></div>
+    <div class="burger__meat burger__meat--3"></div>
+  </div>
+</div>
+ 
+
+  <nav class="nav" role="navigation">
+  <ul class="nav__list">
+    
+    
+      <li>
+        <a  href="/">about</a>
+      </li>
+    
+      <li>
+        <a  class="active"
+         href="/blog">projects</a>
+      </li>
+    
+  </ul>
+</nav>
+
+
+  <main>
+    
+    
+
+    <div class="flex-wrapper">
+      <div class="post__container">
+        <div class="post">
+          <header class="post__header">
+            <h1 id="post__title">Semi-Supervised Learning with Pseudo Labelling</h1>
+            <time datetime="0001-01-01 00:00:00 &#43;0000 UTC" class="post__date"
+            > </time>
+          </header>
+          <article class="post__content">
+              
+
+
+
+<div id="introduction" class="section level3">
+<h3>Introduction</h3>
+<p>Machine learning techniques for predictive analytics of data can be divided in 3 main categories: supervised, unsupervised, and semi-supervised. While supervised and unsupervised techniques work with labelled and unlabelled data respectively, semi-supervised learning uses both labelled and unlabelled data simultaneously to improve the performance of any model being trained. This method is especially useful in situations where only a limited amount of labelled data is present for training, while there is also unlabelled data available.</p>
+<p>The aim of this analysis is to demonstrate a simple implementation of semi-supervised learning on tabular data, using a technique called pseudo labelling. Improvements in model performance will be shown using this method, while also discussing some considerations that should be made during its implementation. Although the dataset used here is quite simple, pseudo labelling can be and has been successfully applied to more complex datasets such as images.</p>
+<p>The analysis is completed in R. All packages and data are loaded below. The dataset is related to electric power quality and was obtained freely from the following link: <a href="https://www.kaggle.com/jaideepreddykotla/powerqualitydistributiondataset1" class="uri">https://www.kaggle.com/jaideepreddykotla/powerqualitydistributiondataset1</a>.</p>
+<pre class="r"><code>#load libraries
+library(tidyverse)
+library(rsample)
+library(recipes)
+library(caret)
+library(pROC)
+library(reshape2)
+
+#load data
+pq &lt;- read.csv(&#39;PowerQualityDistributionDataset1.csv&#39;)</code></pre>
+</div>
+<div id="data-processing" class="section level3">
+<h3>Data Processing</h3>
+<p>As there are not many details available describing what the data is specifically about from the source, not much can be said about the features and their relationship with the target variable. However, in the context of this analysis, understanding these relationships is not important as the aim here is to demonstrate the effects of pseudo labelling as a method of predictive modelling. However, the data will still be briefly explored and processed.</p>
+<pre class="r"><code>#data dimensions
+data.frame(nrow(pq), ncol(pq))</code></pre>
+<pre><code>##   nrow.pq. ncol.pq.
+## 1    11998      130</code></pre>
+<p>The dataset is fairly large, as shown above. As pseudo labelling is applied on classification problems, the target variable in this case is divided into 5 different classes of power quality. To make this problem simpler, this is converted into a binary classification problem, with classes labelled 3 and below placed under a new category called ‘Low’, while classes 4 and 5 are placed under the category ‘High’. From the 130 features, the first one is only an index column, so this is removed. Excluding the target variable, there are 128 features, indicating a high number of dimensions in the data. To make the modelling process more efficient, dimension reduction will also be carried out to reduce the number of features.</p>
+<pre class="r"><code>pq &lt;- pq[,-1] #remove index column
+
+colnames(pq)[129] &lt;- &#39;y&#39; #rename target variable
+
+pq &lt;- pq %&gt;%
+  mutate(y = ifelse(y &lt;=3, &#39;Low&#39;, &#39;High&#39;)) #converting to binary classification
+
+pq$y &lt;- as.factor(pq$y) #applying suitable data type</code></pre>
+<p>The output variable is visualized below. The class imbalance, although present, is not severe enough to be detrimental to performance.</p>
+<pre class="r"><code>ggplot(pq, aes(y)) +
+  geom_bar(fill = &#39;black&#39;) +
+  geom_text(aes(label = ..count..), stat = &#39;count&#39;,
+            vjust = -0.8) +
+  xlab(&#39;Low/High Power Quality&#39;) +
+  theme_minimal()</code></pre>
+<p><img src="/blog/pseudo-labelling_files/figure-html/unnamed-chunk-4-1.png" width="864" /></p>
+<p>The explanatory variables in this dataset are quite similar to each other in terms of how they are distributed and scaled. Boxplots for the first 10 variables from 128 shows this similarity.</p>
+<pre class="r"><code>temp_table &lt;- melt(pq[,1:10]) #selecting first 10 variables
+
+ggplot(temp_table, aes(x = variable, y = value)) +
+  geom_boxplot(fill = &#39;grey&#39;) +
+  theme_minimal()</code></pre>
+<p><img src="/blog/pseudo-labelling_files/figure-html/unnamed-chunk-5-1.png" width="864" /></p>
+<pre class="r"><code>rm(temp_table)</code></pre>
+<p>It should be noted that this data is entirely labelled. As pseudo labelling requires unlabelled data, this dataset will be split into different partitions, and one partition will have its labels removed in order to simulate unlabelled data. The data is initially split into 80% training and 20% testing data. From the training data, 30% is split for the actual labelled dataset to be used, and 70% is kept aside for the ‘unlabelled’ dataset. The testing set is split into half, with 50% going for a validation set and 50% for an overall testing set. The use of a validation set is highly recommended in this analysis as it is an iterative process with some parameter tuning, and using a validation set in this case will prevent the risk of data leakage. All the partitions are created ensuring that the original class balance shown earlier is maintained in each set. The overall test set will be used only for the initial run and the final run to showcase the overall improvement in performance.</p>
+<p>Once all these partitions are created, dimension reduction is applied via PCA (Principal Component Analysis). To explain it briefly, PCA essentially combines variables in such a way that each ‘component’ aims to explain the maximum amount of variation in a dataset, while being independent to each other. Here, 3 components are extracted from the PCA procedure, thus significantly dropping the overall number of features. PCA is carried out on all the partitions. Finally, the labels from the unlabelled partition are removed, and the data is now ready for the pseudo labelling process.</p>
+<pre class="r"><code>#First Partition
+set.seed(1234)
+split &lt;- initial_split(pq, prop = 0.80, strata = &#39;y&#39;)
+pq_train &lt;- training(split)
+pq_test &lt;- testing(split)
+
+#Second Partition
+set.seed(1234)
+split_2 &lt;- initial_split(pq_train, prop = 0.3, strata = &#39;y&#39;)
+pq_train_lab &lt;- training(split_2)
+pq_train_unlab &lt;- testing(split_2)
+
+#Third Partition
+set.seed(1234)
+split_3 &lt;- initial_split(pq_test, prop = 0.5, strata = &#39;y&#39;)
+pq_testing &lt;- training(split_3)
+pq_validation &lt;- testing(split_3)
+
+#Applying PCA
+pq_recipe &lt;- recipe(y ~ ., data = pq_train_lab) %&gt;%
+  step_pca(all_numeric(), num_comp = 3) %&gt;%
+  prep(training = pq_train_lab)
+
+pq_train_lab &lt;- bake(pq_recipe, pq_train_lab)
+pq_train_unlab &lt;- bake(pq_recipe, pq_train_unlab)
+pq_testing &lt;- bake(pq_recipe, pq_testing)
+pq_validation &lt;- bake(pq_recipe, pq_validation)
+
+#removing unnecessary data
+rm(split, split_2, split_3, pq_train, pq_test, pq_recipe, pq)
+
+pq_train_lab &lt;- pq_train_lab[,c(2,3,4,1)]
+pq_train_unlab &lt;- pq_train_unlab[,-1] #removing labels from unlabelled data
+pq_testing &lt;- pq_testing[,c(2,3,4,1)]
+pq_validation &lt;- pq_validation[,c(2,3,4,1)]</code></pre>
+<p>With the data ready, the modelling phase can now begin.</p>
+</div>
+<div id="initial-baseline-regression" class="section level3">
+<h3>Initial Baseline Regression</h3>
+<p>The model chosen here is a simple logistic regression, to avoid any complications associated with more complex models. However, pseudo labelling can be applied to any model. An initial baseline performance is noted by testing the model on both the testing and the validation set. For the iterations however only the validation set will be used. 5-fold Cross-Validation is used as the sampling method, and the AUC (Area Under the Curve) of the ROC (Receiver Operating Characteristic) curve is used as the performance metric to monitor.</p>
+<pre class="r"><code>cv &lt;- trainControl(method = &#39;cv&#39;, number = 5,
+                   classProbs = TRUE, summaryFunction = twoClassSummary) #setting resampling method.
+
+set.seed(1234)
+logistic_model &lt;- train(
+  y ~ .,
+  data = pq_train_lab,
+  mthod = &#39;glm&#39;,
+  family = &#39;binomial&#39;,
+  trControl = cv,
+  metric = &#39;ROC&#39;
+) #baseline logistic model</code></pre>
+<pre><code>## note: only 2 unique complexity parameters in default grid. Truncating the grid to 2 .</code></pre>
+<pre class="r"><code>preds_test_base &lt;- predict(logistic_model, pq_testing, type = &#39;prob&#39;)
+round(roc(pq_testing$y, preds_test_base$High)$auc,6) #measuring auc on test set</code></pre>
+<pre><code>## [1] 0.987686</code></pre>
+<pre class="r"><code>preds_base &lt;- predict(logistic_model, pq_validation, type = &#39;prob&#39;)
+round(roc(pq_validation$y, preds_base$High)$auc, 6) #measuring auc on validation set</code></pre>
+<pre><code>## [1] 0.98828</code></pre>
+<p>The results from the validation (0.98828) and test (0.987686) sets highlight an already strong performing model, so any improvements observed may be relatively marginal (3rd or 4th decimal place). However, the amount of improvement is highly dependent on the data itself (in terms of quality and amount), where in some cases the performance improvement can be much larger or smaller. With the baseline measurements noted, the first iteration can be run.</p>
+<pre class="r"><code>rm(preds_base, preds_test_base)</code></pre>
+</div>
+<div id="first-iteration" class="section level3">
+<h3>First Iteration</h3>
+<p>To describe the process as simply as possible, pseudo-labelling basically involves running a trained model on an unlabelled dataset and generating class-specific probabilities for each class being predicted. As this is a binary classification problem, here the class probabilities will be for ‘High’ and ‘Low’. Class probabilities is referring to the percentage probability generated by the model for each unlabelled observation. This probability signifies the confidence the model has in a specific label it has predicted for each observation.</p>
+<p>Once these class probabilities from the unlabelled dataset are generated, observations with probabilities above a certain threshold are extracted without replacement from the unlabelled dataset. These observations, along with their assigned labels, are then combined with the original training data. The model is then trained again on the evolved training data, and the steps are run for multiple iterations until no further observations that meet the required threshold are found, or until performance stops improving.</p>
+<p>There are a couple of parameters to note here. Firstly, the threshold is important in selecting the optimal observations to combine. Different levels of performance have been observed for different thresholds, and thus tuning this value is required. In general, a higher threshold (over 0.8) is preferred as it implies more confidence by the model. Secondly, the label which is selected to combine with the training data should also be carefully chosen. For instance, in this analysis, the class ‘High’ is in the minority. Therefore, only the observations where the model is confident that the class label is ‘High’ are selected, as this reduces the already existing class imbalance present in the datasets.</p>
+<pre class="r"><code>pq_train_unlab$y &lt;- predict(logistic_model, pq_train_unlab, type = &#39;prob&#39;)$High #run model on unlabelled data
+best_1st_iter &lt;- subset(pq_train_unlab, y &gt;= 0.85) #extract observations greater than 0.85
+nrow(best_1st_iter)</code></pre>
+<pre><code>## [1] 2279</code></pre>
+<p>In this first iteration, the model is run on the unlabelled data, and observations equal to and above the threshold of 0.85 are selected. This amounts to 2279 total observations extracted, all with the class label ‘High’. It should be noted that 0.85 was selected as it gave the best performance from the choice of 0.75, 0.85 and 0.95. It is possible to select a more precise threshold, but for this case 0.85 is sufficient. The 2279 observations are then removed from the unlabelled data and combined with the training dataset. The model is then trained on the new training data and its performance on the validation set is noted.</p>
+<pre class="r"><code>pq_train_unlab &lt;- subset(pq_train_unlab, y &lt; 0.85) #remove selected observations from unlabeled data
+pq_train_unlab &lt;- pq_train_unlab[,-4] #removing remaining labels
+
+best_1st_iter$y &lt;- &#39;High&#39;
+best_1st_iter$y &lt;- as.factor(best_1st_iter$y)
+
+pq_train_lab &lt;- rbind(pq_train_lab, best_1st_iter) #combine training and selected observations
+
+set.seed(1234)
+logistic_model &lt;- train(
+  y ~ .,
+  data = pq_train_lab,
+  mthod = &#39;glm&#39;,
+  family = &#39;binomial&#39;,
+  trControl = cv,
+  metric = &#39;ROC&#39;
+) #run model</code></pre>
+<pre><code>## note: only 2 unique complexity parameters in default grid. Truncating the grid to 2 .</code></pre>
+<pre class="r"><code>preds_1st &lt;- predict(logistic_model, pq_validation, type = &#39;prob&#39;)
+
+round(roc(pq_validation$y, preds_1st$High)$auc,6) #generate first iteration auc</code></pre>
+<pre><code>## [1] 0.988651</code></pre>
+<pre class="r"><code>rm(preds_1st,best_1st_iter)</code></pre>
+<p>Combined to the baseline performance with the validation set (0.98828), the new value of 0.988651 is a clear improvement in results. This implies that the first iteration was successful, and a second iteration can be run.</p>
+</div>
+<div id="second-iteration" class="section level3">
+<h3>Second Iteration</h3>
+<p>The exact same steps as in the first iteration are applied. The only difference is this time the threshold is shifted to 0.95, as once again through tuning, this threshold proved to have the best results.</p>
+<pre class="r"><code>pq_train_unlab$y &lt;- predict(logistic_model, pq_train_unlab, type = &#39;prob&#39;)$High
+best_2nd_iter &lt;- subset(pq_train_unlab, y &gt;= 0.95)
+nrow(best_2nd_iter)</code></pre>
+<pre><code>## [1] 27</code></pre>
+<p>The number of selected observations has now drastically fallen compared to the first iteration, with only 27 selected. While this is partly due to the higher threshold, it also indicates that the total number of positive iterations may only be limited to 2 or 3 in this case. The observations are combined with the training data, and the model is run again.</p>
+<pre class="r"><code>pq_train_unlab &lt;- subset(pq_train_unlab, y &lt; 0.95)
+pq_train_unlab &lt;- pq_train_unlab[,-4]
+
+best_2nd_iter$y &lt;- &#39;High&#39;
+best_2nd_iter$y &lt;- as.factor(best_2nd_iter$y)
+
+pq_train_lab &lt;- rbind(pq_train_lab, best_2nd_iter)
+
+set.seed(1234)
+logistic_model &lt;- train(
+  y ~ .,
+  data = pq_train_lab,
+  mthod = &#39;glm&#39;,
+  family = &#39;binomial&#39;,
+  trControl = cv,
+  metric = &#39;ROC&#39;
+)</code></pre>
+<pre><code>## note: only 2 unique complexity parameters in default grid. Truncating the grid to 2 .</code></pre>
+<pre class="r"><code>preds_2nd &lt;- predict(logistic_model, pq_validation, type = &#39;prob&#39;)
+
+round(roc(pq_validation$y, preds_2nd$High)$auc,6) #second iteration auc</code></pre>
+<pre><code>## [1] 0.989018</code></pre>
+<pre class="r"><code>rm(preds_2nd, best_2nd_iter)</code></pre>
+<p>Another improvement has been observed in the AUC score, thus rendering the second iteration successful as well. A third iteration is then run.</p>
+</div>
+<div id="third-iteration" class="section level3">
+<h3>Third Iteration</h3>
+<p>A third iteration is run, with a new threshold of 0.98, thus selecting only the observations with the best confidence.</p>
+<pre class="r"><code>pq_train_unlab$y &lt;- predict(logistic_model, pq_train_unlab, type = &#39;prob&#39;)$High
+best_3rd_iter &lt;- subset(pq_train_unlab, y &gt;= 0.98)
+nrow(best_3rd_iter)</code></pre>
+<pre><code>## [1] 0</code></pre>
+<p>However, at this threshold, there are no longer any observations available. At this point, the iterations can be stopped, and the final model can now be used further. Lowering the threshold may yield more observations, but that implies lowering the confidence even further and this will likely not lead to further model performance, especially in this case where performance increments are already quite marginal. The density plot for the probabilities predicted by the model also indicates that majority of the observations have quite low confidence attached to it. This makes further iterations pointless.</p>
+<pre class="r"><code>ggplot(pq_train_unlab, aes(x = y)) +
+  geom_density(fill = &#39;black&#39;) +
+  theme_minimal()</code></pre>
+<p><img src="/blog/pseudo-labelling_files/figure-html/unnamed-chunk-15-1.png" width="864" /></p>
+</div>
+<div id="final-assessment" class="section level3">
+<h3>Final Assessment</h3>
+<p>The final trained model is then run on the separate test set seen at the start, to observe if the performance improvement is consistent.</p>
+<pre class="r"><code>preds_test &lt;- predict(logistic_model, pq_testing, type = &#39;prob&#39;)
+
+round(roc(pq_testing$y, preds_test$High)$auc,6)</code></pre>
+<pre><code>## [1] 0.9884</code></pre>
+<p>Compared to the baseline value of 0.987686, the final trained model now generates a higher AUC of 0.9884, thus indicating that the process has definitely improved the overall results.</p>
+<p>It was mentioned earlier that pseudo-labelling can be especially useful in cases where the labelled dataset available for training may be highly limited but sufficient unlabelled data is available. In the dataset used here, this was not really the case as the amount of data was quite sufficient and the individual structure of each feature did enable excellent performance by default. However, this does not imply that the use of pseudo-labelling results in limited performance increments. Instead, it should be observed that for this method to work, there are some key parameters that need to be carefully considered, including the actual data itself, in order to maximize the performance returns observed.</p>
+</div>
+
+
+              
+          </article>
+          
+
+ <div class="pagination">
+  
+    <a class="pagination__item" href="/blog/tobacco/">
+        <span class="pagination__label">Previous Post</span>
+        <span class="pagination__title">Smoking and Visualizing - Exploring Tobacco Use and Mortality Data</span>
+    </a>
+  
+
+  
+    <a class="pagination__item" href="/blog/sao-paulo-temperature/">
+      <span class="pagination__label">Next Post</span>
+      <span class="pagination__title" >Sao Paulo Temperature - Time Series with Exponential Smoothing Models</a>
+    </a>
+  
+</div>
+
+          
+          <footer class="post__footer">
+            
+
+
+<div class="social-icons">
+  
+     
+    
+  
+     
+    
+  
+     
+    
+  
+     
+    
+  
+     
+    
+  
+     
+    
+  
+     
+    
+  
+     
+    
+     
+</div>
+
+            <p>© 2021 fazi_rda</p>
+          </footer>
+          </div>
+      </div>
+      
+    </div>
+    
+
+  </main>
+
+   
+
+  
+  <script src="/js/index.min.49e4d8a384357d9b445b87371863419937ede9fa77737522ffb633073aebfa44.js" integrity="sha256-SeTYo4Q1fZtEW4c3GGNBmTft6fp3c3Ui/7YzBzrr&#43;kQ=" crossorigin="anonymous"></script>
+  
+  
+  <script src="https://unpkg.com/prismjs@1.20.0/components/prism-core.min.js"></script>
+
+  
+  <script src="https://unpkg.com/prismjs@1.20.0/plugins/autoloader/prism-autoloader.min.js"
+    data-autoloader-path="https://unpkg.com/prismjs@1.20.0/components/"></script>
+
+  
+
+
+</body>
+
+</html>

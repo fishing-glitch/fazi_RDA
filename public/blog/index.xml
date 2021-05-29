@@ -241,6 +241,15 @@ The dataset contains some information about computers, with the dependant variab
     </item>
     
     <item>
+      <title>Semi-Supervised Learning with Pseudo Labelling</title>
+      <link>/blog/pseudo-labelling/</link>
+      <pubDate>Mon, 01 Jan 0001 00:00:00 +0000</pubDate>
+      
+      <guid>/blog/pseudo-labelling/</guid>
+      <description>IntroductionMachine learning techniques for predictive analytics of data can be divided in 3 main categories: supervised, unsupervised, and semi-supervised. While supervised and unsupervised techniques work with labelled and unlabelled data respectively, semi-supervised learning uses both labelled and unlabelled data simultaneously to improve the performance of any model being trained. This method is especially useful in situations where only a limited amount of labelled data is present for training, while there is also unlabelled data available.</description>
+    </item>
+    
+    <item>
       <title>Smoking and Visualizing - Exploring Tobacco Use and Mortality Data</title>
       <link>/blog/tobacco/</link>
       <pubDate>Mon, 01 Jan 0001 00:00:00 +0000</pubDate>
